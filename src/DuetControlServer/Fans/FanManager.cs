@@ -5,6 +5,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.Fans;
 
@@ -44,7 +45,7 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     /// <returns>The fan, or null if there is none</returns>
     /// <remarks>The caller must hold the object model lock</remarks>
     public Fan? Find(int fanNumber)
-        => fanNumber >= 0 && fanNumber < model.Fans.Count ? model.Fans[fanNumber] : null;
+        => model.Fans.GetAt(fanNumber);
 
     /// <summary>
     /// Make room for a fan number in the object model
@@ -57,14 +58,7 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     /// </remarks>
     public Fan Create(int fanNumber)
     {
-        while (model.Fans.Count <= fanNumber)
-        {
-            model.Fans.Add(null);
-        }
-
-        Fan fan = new();
-        model.Fans[fanNumber] = fan;
-        return fan;
+        return model.Fans.SetAt(fanNumber, new Fan());
     }
 
     /// <summary>
@@ -80,10 +74,7 @@ public sealed class FanManager(Model.ObjectModel model, LinkInterface linkInterf
     /// </remarks>
     public void Delete(int fanNumber)
     {
-        if (fanNumber >= 0 && fanNumber < model.Fans.Count)
-        {
-            model.Fans[fanNumber] = null;
-        }
+        model.Fans.ClearAt(fanNumber);
     }
 
     /// <summary>

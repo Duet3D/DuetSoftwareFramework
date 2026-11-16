@@ -7,6 +7,7 @@ using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Ports;
 using Microsoft.Extensions.Logging;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.Spindles;
 
@@ -85,7 +86,7 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// </summary>
     /// <remarks>The caller must hold the object model lock</remarks>
     public Spindle? Find(int spindleNumber)
-        => spindleNumber >= 0 && spindleNumber < model.Spindles.Count ? model.Spindles[spindleNumber] : null;
+        => model.Spindles.GetAt(spindleNumber);
 
     /// <summary>
     /// Create a spindle from the outputs that drive it
@@ -98,11 +99,6 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// <remarks>The caller must hold the object model write lock</remarks>
     public Spindle Create(int spindleNumber, int pwmPort, int onOffPort, int directionPort)
     {
-        while (model.Spindles.Count <= spindleNumber)
-        {
-            model.Spindles.Add(null);
-        }
-
         Spindle spindle = new()
         {
             State = SpindleState.Stopped,
@@ -110,8 +106,7 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
             Active = 0,
             CanReverse = directionPort >= 0
         };
-        model.Spindles[spindleNumber] = spindle;
-        return spindle;
+        return model.Spindles.SetAt(spindleNumber, spindle);
     }
 
     /// <summary>
@@ -194,6 +189,58 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// </summary>
     public ValueTask<Message> StopAsync(int spindleNumber, CancellationToken cancellationToken)
         => SetSpeedAsync(spindleNumber, 0, reverse: false, cancellationToken);
+
+    /// <summary>
+    /// Whether a spindle can turn at a speed
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Spindle::IsValidRpm</c>. The caller must hold the object model lock</remarks>
+    public static bool IsValidRpm(Spindle spindle, int rpm) => rpm >= (spindle.Min ?? 0) && rpm <= (spindle.Max ?? 0);
+
+    /// <summary>
+    /// Set the speed a spindle turns at when it is started, and optionally apply it to its outputs at once
+    /// </summary>
+    /// <param name="spindleNumber">The spindle</param>
+    /// <param name="rpm">The speed</param>
+    /// <param name="updateCurrentRpm">Whether a running spindle changes to the speed now</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the boards said</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Spindle::SetConfiguredRpm</c>, whose <c>Spindle::SetRpm</c> writes a stopped spindle's outputs
+    /// back to the stopped state. The caller must not hold the object model lock
+    /// </remarks>
+    public async ValueTask<Message> SetConfiguredRpmAsync(int spindleNumber, int rpm, bool updateCurrentRpm,
+                                                          CancellationToken cancellationToken)
+    {
+        SpindleState state;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(spindleNumber) is not Spindle spindle)
+            {
+                return new Message(MessageType.Error, $"Spindle {spindleNumber} is not configured");
+            }
+            spindle.Active = rpm;
+            state = spindle.State;
+        }
+
+        if (!updateCurrentRpm)
+        {
+            return new Message();
+        }
+        if (state is SpindleState.Forward or SpindleState.Reverse)
+        {
+            return await SetSpeedAsync(spindleNumber, rpm, state == SpindleState.Reverse, cancellationToken);
+        }
+
+        Message reply = await StopAsync(spindleNumber, cancellationToken);
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(spindleNumber) is Spindle spindle)
+            {
+                spindle.Active = rpm;
+            }
+        }
+        return reply;
+    }
 
     /// <summary>
     /// Stop every spindle

@@ -50,10 +50,8 @@ public class M302Tests : BenchFixture
     /// RRF truth: GCodes2.cpp case 302 and Heat.cpp's objectModelTable: coldExtrudeTemperature
     /// and coldRetractTemperature report 0 while cold extrusion is allowed, else the configured
     /// minimums, whose defaults are DefaultMinExtrusionTemperature (160) and
-    /// DefaultMinRetractionTemperature (90) from RRF3Common.h. The bench starts with cold extrusion
-    /// allowed
+    /// DefaultMinRetractionTemperature (90) from RRF3Common.h. This scenario starts with M302 P1
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M302ControlsColdExtrusion()
     {
@@ -111,7 +109,6 @@ public class M302Tests : BenchFixture
     /// retractionMinTemp apart from the coldExtrude flag, which Heat.cpp's objectModelTable reports as 0 while set
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task AllowingHidesTheMinimumsWithoutLosingThem()
     {
         await using Bench bench = await Bench.StartAsync("M302 S120 R110");
@@ -148,7 +145,6 @@ public class M302Tests : BenchFixture
     [TestCase("M302 P0")]
     [TestCase("M302 S120")]
     [TestCase("M302 R110")]
-    [Category("KnownGap")]
     public async Task ChangingTheInterlockWaitsForStandstill(string code)
         => Assert.That(await AnswersWhileAMoveIsQueuedAsync(code), Is.False, $"{code} waits for the X move, the timeline being frozen");
 
@@ -187,12 +183,11 @@ public class M302Tests : BenchFixture
     [TestCase("M302 P0", 25.0f, -1.0f, TestName = "M302 P0 drops a cold retraction")]
     [TestCase("M302 P0", 120.0f, 1.0f, TestName = "M302 P0 drops an extrusion below the extrusion minimum")]
     [TestCase("M302 P0 S100 R50", 40.0f, -1.0f, TestName = "M302 R raises the retraction minimum")]
-    [Category("KnownGap")]
     public async Task TheExtruderIsLeftOutBelowTheMinimum(string m302, float temperature, float extrusion)
     {
         await using Bench bench = await ExtrudeAsync(m302, temperature, extrusion);
         Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.Zero.Within(1e-2f), "the extruder is left out of the move");
-        await bench.Host.WaitForMessageAsync(MessageType.Warning, string.Empty);
+        await bench.Host.WaitForMessageAsync(MessageType.Warning, "Tool 0 was not driven");
     }
 
     /// <summary>

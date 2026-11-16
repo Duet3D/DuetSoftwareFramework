@@ -3252,11 +3252,18 @@ public struct CanMessageGeneric : ICanMessageBody<CanMessageGeneric>
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 5)]
 public struct CanSensorReport
 {
-    /// <summary>This holds a TemperatureError</summary>
-    [FieldOffset(0)] public TemperatureError ErrorCode;
+    /// <summary>Storage of ErrorCode, as the integer it travels as</summary>
+    [FieldOffset(0)] private byte _errorCode;
 
     /// <summary>The last temperature we read</summary>
     [FieldOffset(1)] private float Temperature;
+
+    /// <summary>This holds a TemperatureError</summary>
+    public TemperatureError ErrorCode
+    {
+        readonly get => (TemperatureError)_errorCode;
+        set => _errorCode = (byte)value;
+    }
 
     /// <summary>Read the temperature, allowing for the field being unaligned</summary>
     public readonly float GetTemperature() => (float)(Temperature);
@@ -3300,14 +3307,21 @@ public struct CanMessageSensorTemperatures : ICanMessage<CanMessageSensorTempera
 [StructLayout(LayoutKind.Explicit, Pack = 1, Size = 6)]
 public struct CanHeaterReport
 {
-    /// <summary>A HeaterMode value</summary>
-    [FieldOffset(0)] public HeaterMode Mode;
+    /// <summary>Storage of Mode, as the integer it travels as</summary>
+    [FieldOffset(0)] private byte _mode;
 
     /// <summary>Scaled to 0-255 to save space</summary>
     [FieldOffset(1)] public byte AveragePwm;
 
     /// <summary>The last temperature we read</summary>
     [FieldOffset(2)] private float Temperature;
+
+    /// <summary>A HeaterMode value</summary>
+    public HeaterMode Mode
+    {
+        readonly get => (HeaterMode)_mode;
+        set => _mode = (byte)value;
+    }
 
     /// <summary>Read the temperature, allowing for the field being unaligned</summary>
     public readonly float GetTemperature() => (float)(Temperature);

@@ -57,6 +57,8 @@ Every node in the model derives from one of a small set of base types in
   (they are not camel-cased). Supports a "null removes the item" mode.
 - **`JsonModelDictionary`** - an untyped key/value store of raw JSON values, used for `Global`.
 
+Collections of numbered items are indexed by item number, with `null` where nothing has the number, as RepRapFirmware reports them: `tools[]`, `heat.heaters[]`, `fans[]`, `spindles[]`, `state.gpOut[]`, `sensors.analog[]`, `sensors.probes[]` and `sensors.endstops[]`. `tools[n]` is tool n, so `tools[]` reaches the highest-numbered tool and shrinks when that tool is deleted; a client looks a tool up by index rather than by searching for its `number`. DCS reads and writes these collections through `Model/IndexedCollection.cs`.
+
 Two attributes annotate properties and drive query/merge behaviour:
 
 - **`[SbcProperty]`** marks a property that exists only when DSF is present - `network`, `sbc`,
@@ -97,12 +99,13 @@ and shuts the app down if a lock is held too long, to surface deadlocks rather t
 
 ### Who writes what
 
-There are four writers, and no polling of another program's model among them:
+There are five writers, and no polling of another program's model among them:
 
 | Writer | Writes |
 | --- | --- |
 | **Code handlers** (`Codes/Handlers/`) | Everything a code configures: `move.*`, `heat.*`, `fans[]`, `tools[]`, `sensors.*`, `boards[].drivers[]`, `state.*`. Under the write lock, as part of executing the code |
 | **`Link/Expansion/ExpansionBoardManager.cs`** | What the boards report: announcements into `boards[]`, temperatures into `sensors.analog[]`, heater state, fan RPM, driver status, input changes into `sensors.endstops[]` / `sensors.gpIn[]`. A bounded queue with the oldest entry dropped when full, because these are periodic reports where the newest is worth more than a backlog |
+| **`Heat/SensorManager.cs`** | The timeout of a sensor whose readings stop: after 2 s without one, `sensors.analog[].state` becomes `timeout` and `.lastReading` 2000, as RepRapFirmware's heat task does when it polls a sensor. The readings themselves reach it from `ExpansionBoardManager`, and the main board's MCU temperature sensor is fed from `boards[0].mcuTemp` |
 | **`Motion/MotionService.cs`** | The live position - `move.axes[].machinePosition` from the engine's snapshot, so the field means where the machine *is* rather than where the last move was planned to end |
 | **`Model/PeriodicUpdateService.cs`** | Host-side facts nothing else can know: network interfaces, storage volumes, SBC CPU/memory/distribution info. Gathered asynchronously outside the lock, applied under a brief write lock |
 

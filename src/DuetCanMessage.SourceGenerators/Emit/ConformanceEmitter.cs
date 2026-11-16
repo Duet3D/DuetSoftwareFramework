@@ -402,7 +402,29 @@ public sealed class ConformanceEmitter(CanSchema schema)
 
                     foreach ((string name, int offset) in f.FieldOffsets)
                     {
-                        w.Line($"Assert.That(Marshal.OffsetOf<{f.Struct}>(\"{Naming.Pascal(Flat(name))}\").ToInt32(), Is.EqualTo({offset}), \"offset of {f.Struct}.{Naming.Pascal(name)}\");");
+                        MemberDef? enumField = s.FlatMembers.FirstOrDefault(m => m.Kind == MemberKind.Field && m.Enum is not null && m.Name == Flat(name));
+                        if (enumField is null)
+                        {
+                            w.Line($"Assert.That(Marshal.OffsetOf<{f.Struct}>(\"{Naming.Pascal(Flat(name))}\").ToInt32(), Is.EqualTo({offset}), \"offset of {f.Struct}.{Naming.Pascal(name)}\");");
+                            continue;
+                        }
+
+                        // An enum field is reached through its property, so the probe also pins the width the
+                        // property writes: all ones in the enum's own type spills past the field if that type
+                        // is wider than the wire
+                        string property = Naming.Pascal(enumField.Name);
+                        CSharpEnumRef csharpEnum = CSharpEmitter.EnumRef(schema, enumField.Enum!);
+                        byte[] pattern = new byte[f.Size];
+                        Array.Fill(pattern, (byte)0xFF, offset, enumField.Size);
+                        string allOnes = $"unchecked(({csharpEnum.Namespace}.{csharpEnum.Name})(-1))";
+                        w.Line($"Assert.That(Marshal.OffsetOf<{f.Struct}>(\"{CSharpEmitter.EnumStorageName(enumField.Name)}\").ToInt32(), Is.EqualTo({offset}), \"offset of {f.Struct}.{property}\");");
+                        w.Line("{");
+                        w.Indent();
+                        w.Line($"{f.Struct} probe = default;");
+                        w.Line($"probe.{property} = {allOnes};");
+                        w.Line($"Assert.That(Raw(ref probe), Is.EqualTo(new byte[] {{ {string.Join(", ", pattern.Select(b => $"0x{b:X2}"))} }}), \"width of {f.Struct}.{property}\");");
+                        w.Outdent();
+                        w.Line("}");
                     }
 
                     foreach ((string name, int width, bool signed, bool isBool, CSharpEnumRef? csharpEnum, byte[] pattern) in f.BitPatterns)

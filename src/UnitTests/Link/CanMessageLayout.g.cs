@@ -1139,7 +1139,12 @@ public class CanMessageLayout
     public void CanSensorReport_Layout()
     {
         Assert.That(Unsafe.SizeOf<CanSensorReport>(), Is.EqualTo(5), "size of CanSensorReport");
-        Assert.That(Marshal.OffsetOf<CanSensorReport>("ErrorCode").ToInt32(), Is.EqualTo(0), "offset of CanSensorReport.ErrorCode");
+        Assert.That(Marshal.OffsetOf<CanSensorReport>("_errorCode").ToInt32(), Is.EqualTo(0), "offset of CanSensorReport.ErrorCode");
+        {
+            CanSensorReport probe = default;
+            probe.ErrorCode = unchecked((DuetAPI.ObjectModel.TemperatureError)(-1));
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x00, 0x00, 0x00, 0x00 }), "width of CanSensorReport.ErrorCode");
+        }
     }
 
     [Test]
@@ -1154,7 +1159,12 @@ public class CanMessageLayout
     public void CanHeaterReport_Layout()
     {
         Assert.That(Unsafe.SizeOf<CanHeaterReport>(), Is.EqualTo(6), "size of CanHeaterReport");
-        Assert.That(Marshal.OffsetOf<CanHeaterReport>("Mode").ToInt32(), Is.EqualTo(0), "offset of CanHeaterReport.Mode");
+        Assert.That(Marshal.OffsetOf<CanHeaterReport>("_mode").ToInt32(), Is.EqualTo(0), "offset of CanHeaterReport.Mode");
+        {
+            CanHeaterReport probe = default;
+            probe.Mode = unchecked((DuetControlServer.Link.Protocol.Shared.HeaterMode)(-1));
+            Assert.That(Raw(ref probe), Is.EqualTo(new byte[] { 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 }), "width of CanHeaterReport.Mode");
+        }
         Assert.That(Marshal.OffsetOf<CanHeaterReport>("AveragePwm").ToInt32(), Is.EqualTo(1), "offset of CanHeaterReport.AveragePwm");
     }
 

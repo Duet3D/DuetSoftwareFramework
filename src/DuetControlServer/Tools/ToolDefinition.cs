@@ -10,7 +10,8 @@ namespace DuetControlServer.Tools;
 /// A record rather than a long parameter list, because M563 carries nine independent things and the
 /// order of nine <c>int</c>s and <c>List</c>s at a call site is not something a reader can check.
 /// Fan 0 is RepRapFirmware's default. The axis maps have no default here: X maps to the axis lettered
-/// X, which is wherever M584 put it, so M563 works them out from the axes it finds
+/// X, which is wherever M584 put it, so M563 works them out from the axes it finds. The numbers are as
+/// M563 gave them; <see cref="ToolManager.Validate"/> checks them
 /// </remarks>
 public sealed record ToolDefinition
 {

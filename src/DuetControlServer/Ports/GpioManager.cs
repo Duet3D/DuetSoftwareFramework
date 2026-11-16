@@ -5,6 +5,7 @@ using DuetAPI.ObjectModel;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.Ports;
 
@@ -73,14 +74,7 @@ public sealed class GpioManager(Model.ObjectModel model, LinkInterface linkInter
     /// <remarks>The caller must hold the object model write lock</remarks>
     public GpOutputPort Create(int portNumber)
     {
-        while (model.State.GpOut.Count <= portNumber)
-        {
-            model.State.GpOut.Add(null);
-        }
-
-        GpOutputPort port = new();
-        model.State.GpOut[portNumber] = port;
-        return port;
+        return model.State.GpOut.SetAt(portNumber, new GpOutputPort());
     }
 
     /// <summary>

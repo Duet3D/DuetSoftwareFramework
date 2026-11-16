@@ -252,6 +252,10 @@ That adds fields RepRapFirmware does not keep, does not report, or both:
 | `move.extruders[].pressAdv.K1` and `.D` | The CAN message carries only the first coefficient, so the second and its transition speed are held here alone — which is exactly what the rule is for |
 | `move.axes[].phaseStepKv` and `.phaseStepKa`, and the same on `move.extruders[]` | M970.1 and M970.2 send the phase stepping feedforward gains to the board that applies them. RepRapFirmware keeps its own copy in `DriveMovement` and answers a bare M970.1 from it; here the board is the only other place they exist, so without these a restart would lose them and the bare form would have nothing to report |
 | `move.axes[].rotational` and `.continuousRotation` | M584's R and S say what kind of axis is being created, which RepRapFirmware keeps in bitmaps of its own and prints as `(r)` and `(c)` in the M584 report without reporting anywhere a client can read |
+| `heat.coldExtrusionAllowed`, `heat.minExtrusionTemperature` and `heat.minRetractionTemperature` | M302 P is a flag RepRapFirmware keeps beside the minimums S and R set, and while it allows cold extrusion `heat.coldExtrudeTemperature` and `heat.coldRetractTemperature` report 0, which hides the minimums. These hold the flag and the minimums; the two RRF fields still report what RRF's do |
+| `sensors.analog[].type` of an expansion board's sensor | RepRapFirmware reports every expansion board's sensor as `remote` (`RemoteSensor::GetShortSensorType`, "TODO save the actual type"). Here it is the type `M308 Y` gave, such as `thermistor` or `linearanalog`, because a sensor cannot be recreated without it |
+| `sensors.analog[].offsetAdj` and `.slopeAdj` of an expansion board's sensor | `M308 U` and `V` go to the board, which applies them, and RepRapFirmware then clears its own copy (`ClearAdjustments`) and reports 0. Here they record what the board was sent |
+| `sensors.analog[].r25`, `.beta`, `.c`, `.rRef`, `.lowReading`, `.highReading`, `.adcLowOffset`, `.adcHighOffset`, `.filtered`, `.mainsFrequency`, `.wires` and `.thermocoupleType` of an expansion board's sensor | RepRapFirmware sends the rest of `M308` to the board and keeps none of it. Each field holds what its letter set for the sensor's type: `B` and `C` are a thermistor's `beta` and `c` but a linear analog sensor's `lowReading` and `highReading`, and `L` and `H` are a thermistor's ADC corrections |
 
 **`HeaterMonitorCondition` enum value matches the `C` param values of `M143`.** This removes the need to have converters between the OM and gcode parameter and makes error messages more clear and consistent.
 
@@ -401,10 +405,11 @@ Added minimum array limits to the following gcodes:
 - `M203` - max feedrate
 - `M205`/`M566` - jerk
 - `M350` - microstepping
-- `M563` - define tool
 - `M572` - pressure advance
 - `M906`/`M913`/`M917` - motor current & standstill current
 A `GCodeException` is thrown if the value is below the minimum (typically `0.0f`)
+
+A sensor `M308` creates is `notReady` until its first reading, and times out if none arrives within 2 s of its creation. RepRapFirmware starts a new sensor's reading clock at zero (`TemperatureSensor::whenLastRead`), so the first poll before the board has reported times it out at once.
 
 `M140` and `M141` stop at a refused `H` (an invalid heater number, a heater a tool uses, or a heater of the other kind of slot) and leave the slot and its heaters as they were. RepRapFirmware reports the refusal but goes on to apply `S` and `R` to the slot's existing heaters, and a heater switched on successfully there replaces the error with success.
 

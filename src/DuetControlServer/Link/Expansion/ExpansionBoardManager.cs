@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.Link.Expansion;
 
@@ -42,9 +43,10 @@ namespace DuetControlServer.Link.Expansion;
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>
+/// <param name="sensorManager">Takes the sensor readings the boards report</param>
 /// <param name="logger">Logger</param>
 internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.EventQueue events,
-                                           ClosedLoopDataCollector closedLoopDataCollector,
+                                           ClosedLoopDataCollector closedLoopDataCollector, Heat.SensorManager sensorManager,
                                            IOptions<Settings> settings, ILogger<ExpansionBoardManager> logger) : BackgroundService
 {
     /// <summary>
@@ -247,7 +249,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
                 break;
 
             case CanMessageType.SensorTemperaturesReport:
-                await ApplySensorTemperaturesAsync(CanMessageSerializer.Deserialize<CanMessageSensorTemperatures>(report.Payload), cancellationToken);
+                await ApplySensorTemperaturesAsync(report.Source, CanMessageSerializer.Deserialize<CanMessageSensorTemperatures>(report.Payload), cancellationToken);
                 break;
 
             case CanMessageType.HeatersStatusReport:
@@ -573,6 +575,10 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             board.McuTemp = status.HasMcuTemp != 0 ? ToMinMaxCurrent(status.McuTemp) : null;
             board.VIn = status.HasVin != 0 ? ToMinMaxCurrent(status.VIn) : null;
             board.V12 = status.HasV12 != 0 ? ToMinMaxCurrent(status.V12) : null;
+            if (board.McuTemp is MinMaxCurrent mcuTemp)
+            {
+                sensorManager.ApplyMcuTemperature(mcuTemp.Current);
+            }
         }
     }
 
@@ -643,9 +649,10 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     /// <summary>
     /// Apply a sensor temperature report
     /// </summary>
+    /// <param name="source">CAN address of the board that sent it</param>
     /// <param name="report">The report</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private async ValueTask ApplySensorTemperaturesAsync(CanMessageSensorTemperatures report, CancellationToken cancellationToken)
+    private async ValueTask ApplySensorTemperaturesAsync(byte source, CanMessageSensorTemperatures report, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -653,12 +660,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             foreach (int sensor in SetBits(report.WhichSensors, CanSensorReportArray11.Length))
             {
                 CanSensorReport sensorReport = report.TemperatureReports[slot++];
-                // TODO RRF applies a report only from the board the sensor is on (RemoteSensor::UpdateRemoteTemperature)
-                if (Find(model.Sensors.Analog, sensor) is AnalogSensor analogSensor)
-                {
-                    analogSensor.LastReading = sensorReport.GetTemperature();
-                    analogSensor.State = (TemperatureError)sensorReport.ErrorCode;
-                }
+                sensorManager.ApplyRemoteReading(source, sensor, sensorReport.GetTemperature(), sensorReport.ErrorCode);
             }
         }
     }
@@ -1038,11 +1040,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
             return null;
         }
 
-        while (collection.Count <= index)
-        {
-            collection.Add(null);
-        }
-        return collection[index] ??= create();
+        return collection.GetOrAddAt(index, create);
     }
 
     /// <summary>

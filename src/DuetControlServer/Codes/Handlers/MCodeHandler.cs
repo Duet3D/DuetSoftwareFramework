@@ -54,6 +54,8 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="gpioManager">The general-purpose outputs, which spindles and servos are built on</param>
 /// <param name="spindleManager">The spindles the machine has</param>
 /// <param name="heatManager">The heaters the machine has, and what they are asked to reach</param>
+/// <param name="coldExtrusion">The cold extrusion interlock M302 configures</param>
+/// <param name="sensorManager">The temperature sensors the machine has</param>
 /// <param name="toolManager">The tools the machine has, and which one is selected</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
@@ -83,6 +85,8 @@ internal partial class MCodeHandler(
     Ports.GpioManager gpioManager,
     Spindles.SpindleManager spindleManager,
     Heat.HeatManager heatManager,
+    Heat.ColdExtrusionInterlock coldExtrusion,
+    Heat.SensorManager sensorManager,
     Tools.ToolManager toolManager,
     IOptions<Settings> settings) : ICodeHandler
 {
@@ -279,7 +283,7 @@ internal partial class MCodeHandler(
         // Babystepping
         { 290, CodeClass.Immediate, (h, c, ct) => h.HandleBabysteppingAsync(c, ct) },
         // Cold extrude and retract limits
-        { 302, CodeClass.Immediate, (h, c, ct) => h.HandleColdExtrusionAsync(c, ct) },
+        { 302, c => c.Parameters.Any(p => p.Letter is 'P' or 'S' or 'R') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleColdExtrusionAsync(c, ct) },
         // Heater process model
         { 307, CodeClass.Immediate, (h, c, ct) => h.HandleHeaterModelAsync(c, ct) },
         // Configure a temperature sensor
@@ -338,8 +342,8 @@ internal partial class MCodeHandler(
         // Clear a heater fault
         { 562, CodeClass.Immediate, (h, c, ct) => h.HandleClearHeaterFaultAsync(c, ct) }, // clearing a fault must not wait on a queue the fault may be blocking
         // Define or delete a tool: its offsets are part of the transform queued moves were planned
-        // against. A bare M563 is a report
-        { 563, c => c.Parameters.Any(p => p.Letter == 'P') ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleDefineToolAsync(c, ct) },
+        // against. M563 P with nothing that defines a tool is a report
+        { 563, c => c.Parameters.Any(p => ToolDefinitionLetters.Contains(p.Letter)) ? CodeClass.FlushAndStandstill : CodeClass.Immediate, (h, c, ct) => h.HandleDefineToolAsync(c, ct) },
         // Limit axes and movement before homing
         { 564, CodeClass.Immediate, (h, c, ct) => h.HandleMovementLimitsAsync(c, ct) },
         // Set the mixing ratios of a tool

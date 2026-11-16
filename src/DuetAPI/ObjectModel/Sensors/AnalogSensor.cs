@@ -6,6 +6,32 @@
 public partial class AnalogSensor : ModelObject, IStaticModelObject
 {
     /// <summary>
+    /// ADC high-end offset correction of a thermistor or PT1000 sensor, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 H
+    /// </remarks>
+    public int? AdcHighOffset
+    {
+        get => _adcHighOffset;
+        set => SetPropertyValue(ref _adcHighOffset, value);
+    }
+    private int? _adcHighOffset;
+
+    /// <summary>
+    /// ADC low-end offset correction of a thermistor or PT1000 sensor, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 L
+    /// </remarks>
+    public int? AdcLowOffset
+    {
+        get => _adcLowOffset;
+        set => SetPropertyValue(ref _adcLowOffset, value);
+    }
+    private int? _adcLowOffset;
+
+    /// <summary>
     /// Beta value of this sensor (if applicable)
     /// </summary>
     public float? Beta
@@ -26,7 +52,20 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private float? _c;
 
     /// <summary>
-    /// High sensor reading (only linear analog sensors, otherwise null)
+    /// Whether a linear analog sensor's reading is filtered, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 F
+    /// </remarks>
+    public bool? Filtered
+    {
+        get => _filtered;
+        set => SetPropertyValue(ref _filtered, value);
+    }
+    private bool? _filtered;
+
+    /// <summary>
+    /// High sensor reading: the reading at the top of a linear analog sensor's range (otherwise null)
     /// </summary>
     public float? HighReading
     {
@@ -47,7 +86,7 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private float? _lastReading;
 
     /// <summary>
-    /// Low sensor reading (only linear analog sensors, otherwise null)
+    /// Low sensor reading: the reading at the bottom of a linear analog sensor's range (otherwise null)
     /// </summary>
     public float? LowReading
     {
@@ -55,6 +94,19 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _lowReading, value);
     }
     private float? _lowReading;
+
+    /// <summary>
+    /// Mains frequency (in Hz) an RTD or thermocouple sensor's converter rejects, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 F
+    /// </remarks>
+    public int? MainsFrequency
+    {
+        get => _mainsFrequency;
+        set => SetPropertyValue(ref _mainsFrequency, value);
+    }
+    private int? _mainsFrequency;
 
     /// <summary>
     /// Name of this sensor or null if not configured
@@ -133,6 +185,19 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
     private TemperatureError _state = TemperatureError.Ok;
 
     /// <summary>
+    /// Type letter of a MAX31856 thermocouple, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 K
+    /// </remarks>
+    public string? ThermocoupleType
+    {
+        get => _thermocoupleType;
+        set => SetPropertyValue(ref _thermocoupleType, value);
+    }
+    private string? _thermocoupleType;
+
+    /// <summary>
     /// Type of this sensor
     /// </summary>
     public AnalogSensorType Type
@@ -141,4 +206,17 @@ public partial class AnalogSensor : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _type, value);
     }
     private AnalogSensorType _type = AnalogSensorType.Unknown;
+
+    /// <summary>
+    /// Number of wires an RTD sensor is connected with, or null if not set
+    /// </summary>
+    /// <remarks>
+    /// See also M308 W
+    /// </remarks>
+    public int? Wires
+    {
+        get => _wires;
+        set => SetPropertyValue(ref _wires, value);
+    }
+    private int? _wires;
 }

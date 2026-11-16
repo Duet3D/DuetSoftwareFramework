@@ -48,7 +48,8 @@ public static partial class ServiceCollectionExtensions
                 services.GetRequiredService<BedCompensation>(),
                 services.GetRequiredService<EndstopCorrection>(),
                 () => services.GetRequiredService<Tools.ToolManager>().Current,
-                services.GetRequiredService<Link.Expansion.ExpansionBoardManager>().GetClosedEndstopSwitches))
+                services.GetRequiredService<Link.Expansion.ExpansionBoardManager>().GetClosedEndstopSwitches,
+                services.GetRequiredService<Heat.ColdExtrusionInterlock>().ExtruderMovementAllowed))
             .AddHostedService<MotionService>();
     }
 }

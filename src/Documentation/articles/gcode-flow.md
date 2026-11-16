@@ -226,6 +226,7 @@ flowchart TD
   | M92/M350/M584/M906 | Motion configuration, then a reconfiguration of the planner at standstill |
 | M201/M203/M204/M205/M566 | Motion limits, picked up by the next move built without waiting for standstill |
   | M104/M109/M140/M307/M308 | Heaters and sensors, configured here and driven over CAN |
+  | M302 | The cold extrusion interlock: each segment of a move is queued without the extruders whose tool's heaters are below the minimum or faulty, and a warning names the tool |
   | M106/M950 | Fans and the I/O ports everything else is built from |
   | M563/M567/M568 | Tool definition, mixing and settings |
   | M558/M574/M119 | Probes and endstops ([Endstops](endstops.md)) |

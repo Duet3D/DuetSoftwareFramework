@@ -21,6 +21,7 @@ public sealed class CSharpEmitter(CanSchema schema)
 {
     private readonly SortedSet<string> _buffers = [];
     private readonly List<(string Field, string? Doc)> _stringAccessors = [];
+    private readonly List<MemberDef> _enumAccessors = [];
 
     /// <summary>The schema type used for the C# property of a bitfield, ignoring any enum it carries.</summary>
     public static string BitFieldSchemaType(BitFieldDef f) => f.Bool ? "bool"
@@ -355,7 +356,9 @@ public sealed class CSharpEmitter(CanSchema schema)
             }
 
             _stringAccessors.Clear();
+            _enumAccessors.Clear();
             EmitFields(writer, s, ref needsBlank);
+            EmitEnumAccessors(writer, ref needsBlank);
             EmitStringAccessors(writer, ref needsBlank);
             EmitBitFieldProperties(writer, s, ref needsBlank);
             EmitMethods(writer, s, ref needsBlank);
@@ -407,13 +410,20 @@ public sealed class CSharpEmitter(CanSchema schema)
             MemberDef member = m;
             declarations.Add((member.Offset, () =>
             {
+                if (member.Enum is not null)
+                {
+                    // Stored as the integer it travels as and exposed through an enum-typed property,
+                    // because an enum declared outside this tool may be built on a wider integer
+                    writer.XmlDoc($"Storage of {Naming.Pascal(member.Name)}, as the integer it travels as");
+                    writer.Line($"[FieldOffset({member.Offset})] private {Types.CSharpIn(schema, s, member.Type)} {EnumStorageName(member.Name)};");
+                    _enumAccessors.Add(member);
+                    return;
+                }
+
                 writer.XmlDoc(member.Doc ?? ReservedDoc(member.Reserved));
                 string visibility = member.CppPrivate ? "private" : "public";
-                // A field that carries an enum is declared as that enum. Its storage is the integer the
-                // enum is built on, so the layout is the one the schema computed either way
                 string type = member.Kind == MemberKind.Array
                     ? BufferName(member.Type == "char" ? "char" : Types.CSharpIn(schema, s, member.Type), member.ResolvedLength)
-                    : member.Enum is not null ? EnumRef(schema, member.Enum).Name
                     : Types.CSharpIn(schema, s, member.Type);
                 writer.Line($"[FieldOffset({member.Offset})] {visibility} {type} {Naming.Pascal(member.Name)};");
                 if (member.Kind == MemberKind.Array && member.Type == "char")
@@ -445,6 +455,35 @@ public sealed class CSharpEmitter(CanSchema schema)
             }
             needsBlank = true;
             emit();
+        }
+    }
+
+    /// <summary>The private field holding a scalar field that carries an enum.</summary>
+    public static string EnumStorageName(string name) => "_" + char.ToLowerInvariant(name[0]) + name[1..];
+
+    /// <summary>Emit the enum-typed property over the integer storage of each scalar field that carries an enum.</summary>
+    private void EmitEnumAccessors(CodeWriter writer, ref bool needsBlank)
+    {
+        foreach (MemberDef member in _enumAccessors)
+        {
+            if (needsBlank)
+            {
+                writer.Line();
+            }
+            needsBlank = true;
+
+            string enumName = EnumRef(schema, member.Enum!).Name;
+            string storage = EnumStorageName(member.Name);
+            string wire = Types.CSharp(schema, member.Type);
+            writer.XmlDoc(member.Doc ?? ReservedDoc(member.Reserved));
+            using (writer.Block($"{(member.CppPrivate ? "private" : "public")} {enumName} {Naming.Pascal(member.Name)}", "}"))
+            {
+                writer.Outdent();
+                writer.Line("{");
+                writer.Indent();
+                writer.Line($"readonly get => ({enumName}){storage};");
+                writer.Line($"set => {storage} = ({wire})value;");
+            }
         }
     }
 

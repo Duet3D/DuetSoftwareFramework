@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -25,152 +27,397 @@ namespace DuetControlServer.Codes.Handlers;
 internal partial class MCodeHandler
 {
     /// <summary>
-    /// M308: configure a temperature sensor
+    /// M308: create, configure, report or delete a temperature sensor
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     /// <remarks>
-    /// The sensor belongs to the board carrying its port, and that board is the one that reads it, so
-    /// the parameters are repackaged as the generic message its table describes and answered by that
-    /// board. What is recorded here is what the object model needs to describe the machine
+    /// RepRapFirmware's <c>Heat::ConfigureSensor</c>. A sensor belongs to the board carrying its port, and
+    /// that board is the one that reads it, so the parameters are repackaged as the generic message its
+    /// table describes and answered by that board (<c>RemoteSensor::Configure</c>). What is recorded here is
+    /// what the object model needs to describe the machine. The one sensor without a port is the main
+    /// board's MCU temperature sensor, which is read from <c>boards[0].mcuTemp</c>
     /// </remarks>
     private async ValueTask<Message> HandleConfigureSensorAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // TODO RRF has no list form: S is required, and S >= MaxSensors is "Sensor number out of range"
-        if (!code.TryGetInt('S', out int sensorNumber) || sensorNumber < 0)
+        int sensorNumber = (int)code.GetUInt('S', max: SensorManager.MaxSensors - 1, errorString: _ => "Sensor number out of range");
+
+        string? port = null;
+        if (code.TryGetString('P', out string? portName))
         {
-            return await ReportSensorsAsync(cancellationToken);
+            if (IoPorts.IsNoPort(portName))
+            {
+                await DeleteSensorAsync(sensorNumber, cancellationToken);
+                return new Message();
+            }
+            port = portName;
         }
 
-        string? port = code.TryGetString('P', out string? portName) ? portName : null;
-        byte board;
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            // TODO RRF's Heat::ConfigureSensor:
-            // - P"nil" (with or without a board) deletes the sensor: P"nil" goes to the board it was on and the
-            //   entry becomes null
-            // - Y always deletes the old sensor first (P"nil" to its board) and starts from a fresh one
-            // - P without Y is "Sensor N does not exist" for a new sensor, and an error when it moves the sensor
-            //   to another board
-            // - a new sensor starts notReady at 2000C and times out without reports
-            AnalogSensor? sensor = sensorNumber < model.Sensors.Analog.Count ? model.Sensors.Analog[sensorNumber] : null;
-            if (port is not null)
-            {
-                if (!IoPorts.TrySplitPort(port, "Sensor port", out board, out _, out string? error))
-                {
-                    return new Message(MessageType.Error, error);
-                }
-
-                while (model.Sensors.Analog.Count <= sensorNumber)
-                {
-                    model.Sensors.Analog.Add(null);
-                }
-                sensor ??= new AnalogSensor();
-                sensor.Port = port;
-                model.Sensors.Analog[sensorNumber] = sensor;
-            }
-            else if (sensor?.Port is null)
-            {
-                return new Message(MessageType.Error, $"Sensor {sensorNumber} has no port; use P to give it one");
-            }
-            else if (!IoPorts.TrySplitPort(sensor.Port, "Sensor port", out board, out _, out string? error))
-            {
-                return new Message(MessageType.Error, error);
-            }
-
-            // An unrecognised name is left for the board to judge rather than refused here: the CAN
-            // message carries Y as the operator wrote it, and which types a board supports is the
-            // board's business. The object model keeps whatever it had, which is worse than nothing
-            // only for a sensor type this side does not know the name of
-            // TODO this misses the hyphenated RRF names (mcu-temp, linear-analog, rtd-max31865, ...);
-            // AnalogSensorTypeConverter already maps the reduced forms
-            if (code.TryGetString('Y', out string? type)
-                && System.Enum.TryParse(type, ignoreCase: true, out AnalogSensorType parsed))
-            {
-                sensor.Type = parsed;
-            }
-            if (code.TryGetString('A', out string? name))
-            {
-                sensor.Name = name;
-            }
-
-            // TODO which fields a parameter sets depends on the type in RRF: a linear-analog sensor's B and C are its
-            // low and high readings, a thermistor's L and H are ADC corrections and B without C resets C, and F/W/K
-            // are not recorded. RRF also refuses U outside +-20 and V outside +-0.2
-            // The board is what turns a resistance into a temperature, but the constants it does
-            // that with are how the machine is built - a thermistor's beta is a property of the part
-            // that was fitted. Storing only the port would leave the model unable to describe it
-            if (code.TryGetFloat('T', out float r25))
-            {
-                sensor.R25 = r25;
-            }
-            if (code.TryGetFloat('B', out float beta))
-            {
-                sensor.Beta = beta;
-            }
-            if (code.TryGetFloat('C', out float shC))
-            {
-                sensor.C = shC;
-            }
-            if (code.TryGetFloat('R', out float seriesResistor))
-            {
-                sensor.RRef = seriesResistor;
-            }
-            if (code.TryGetFloat('L', out float lowReading))
-            {
-                sensor.LowReading = lowReading;
-            }
-            if (code.TryGetFloat('H', out float highReading))
-            {
-                sensor.HighReading = highReading;
-            }
-            if (code.TryGetFloat('U', out float offsetAdj))
-            {
-                sensor.OffsetAdj = offsetAdj;
-            }
-            if (code.TryGetFloat('V', out float slopeAdj))
-            {
-                sensor.SlopeAdj = slopeAdj;
-            }
-        }
-
-        // The board is what reads the sensor, so it is what has to be told how. The parameter table
-        // is the message, which is what makes this a repackaging rather than a reimplementation
-        // TODO the model was changed before the board answered; RRF only keeps a new sensor the board accepted,
-        // and deletes it again (P"nil") when the board refuses it
-        return await linkInterface.SendCodeRequestAsync<CanMessageM308V1>(board, code, cancellationToken);
+        return code.TryGetString('Y', out string? typeName)
+            ? await CreateSensorAsync(code, sensorNumber, port, typeName, cancellationToken)
+            : await ConfigureSensorAsync(code, sensorNumber, port, cancellationToken);
     }
 
     /// <summary>
-    /// Report the sensors the machine has, as M308 with no parameters does
+    /// M308 with Y: replace a sensor with a new one
     /// </summary>
-    private async ValueTask<Message> ReportSensorsAsync(CancellationToken cancellationToken)
+    /// <param name="code">The code</param>
+    /// <param name="sensorNumber">The sensor</param>
+    /// <param name="port">Port the code gave, or null</param>
+    /// <param name="typeName">Sensor type name as written</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The old sensor is deleted first, whether or not the new one can be made, and the new one starts from
+    /// nothing rather than from the old one's settings. A sensor its board refuses, or whose board does not
+    /// answer, is deleted again (<c>Heat::ConfigureSensor</c>, <c>~RemoteSensor</c>)
+    /// </remarks>
+    private async ValueTask<Message> CreateSensorAsync(Commands.Code code, int sensorNumber, string? port, string typeName,
+                                                       CancellationToken cancellationToken)
     {
-        StringBuilder builder = new();
+        await DeleteSensorAsync(sensorNumber, cancellationToken);
+
+        AnalogSensorType type = AnalogSensorTypeConverter.Parse(typeName);
+        SensorSettings settings = SensorSettings.Read(code, type, portChanged: true);
+        if (port is null)
+        {
+            return await CreateMainBoardSensorAsync(sensorNumber, type, typeName, settings, cancellationToken);
+        }
+
+        if (!IoPorts.TrySplitPort(port, "Sensor port", out byte board, out _, out string? error))
+        {
+            return new Message(MessageType.Error, error);
+        }
+
+        CanMessageM308V1 message = default;
+        message.FromCode(code);
+        AnalogSensor sensor;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            sensor = sensorManager.Create(sensorNumber);
+            sensor.Type = type;
+            sensor.Port = port;
+            settings.ApplyTo(sensor);
+        }
+
+        Message reply = await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
+        if (!reply.Succeeded())
+        {
+            await DeleteSensorAsync(sensorNumber, cancellationToken, sensor);
+        }
+        return reply;
+    }
+
+    /// <summary>
+    /// M308 with Y and no P: a sensor on the main board, of which only the MCU temperature sensor exists
+    /// </summary>
+    /// <remarks>
+    /// <c>Heat::ConfigureSensor</c> puts a sensor without a port on the main board. Board 0 runs
+    /// DuetCANMaster and has no sensor inputs or drivers, so its MCU temperature is the only thing it can
+    /// read
+    /// </remarks>
+    private async ValueTask<Message> CreateMainBoardSensorAsync(int sensorNumber, AnalogSensorType type, string typeName,
+                                                                SensorSettings settings, CancellationToken cancellationToken)
+    {
+        switch (type)
+        {
+            case AnalogSensorType.McuTemp:
+                using (await model.AccessReadWriteAsync(cancellationToken))
+                {
+                    AnalogSensor sensor = sensorManager.Create(sensorNumber);
+                    sensor.Type = type;
+                    settings.ApplyTo(sensor);
+                }
+                return new Message();
+
+            case AnalogSensorType.Unknown:
+                return new Message(MessageType.Error, $"Unknown sensor type name \"{DuetAPI.Utility.ReducedString.Reduce(typeName)}\"");
+
+            case AnalogSensorType.Drivers or AnalogSensorType.DriversDuex:
+                return new Message(MessageType.Error, CanAddresses.NoHardwareMessage($"Sensor {sensorNumber}"));
+
+            default:
+                return new Message(MessageType.Error, "Missing port name parameter");
+        }
+    }
+
+    /// <summary>
+    /// M308 without Y: amend or report an existing sensor
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="sensorNumber">The sensor</param>
+    /// <param name="port">Port the code gave, or null</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// <c>Heat::ConfigureSensor</c> then <c>RemoteSensor::Configure</c>: the board is sent only what the code
+    /// gave, and a board that finds nothing to change answers with its report, which is prefixed with the
+    /// sensor's number and name. A sensor moves to another board only by being created again
+    /// </remarks>
+    private async ValueTask<Message> ConfigureSensorAsync(Commands.Code code, int sensorNumber, string? port,
+                                                          CancellationToken cancellationToken)
+    {
+        AnalogSensor sensor;
+        byte board;
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            for (int sensor = 0; sensor < model.Sensors.Analog.Count; sensor++)
+            if (sensorManager.Find(sensorNumber) is not AnalogSensor existing)
             {
-                AnalogSensor? analog = model.Sensors.Analog[sensor];
-                if (analog is null)
-                {
-                    continue;
-                }
+                return new Message(MessageType.Error, $"Sensor {sensorNumber} does not exist");
+            }
+            sensor = existing;
+            board = SensorManager.GetBoard(sensor);
+        }
 
-                builder.Append(CultureInfo.InvariantCulture,
-                               $"Sensor {sensor} type {analog.Type} using pin {analog.Port}");
-                if (analog.LastReading is float reading)
-                {
-                    builder.Append(CultureInfo.InvariantCulture, $", last error: {analog.State}, reading {reading:F1}C");
-                }
-                builder.AppendLine();
+        if (port is not null && IoPorts.RemoveBoardAddress(port, out _) != board)
+        {
+            return new Message(MessageType.Error, "Sensor type parameter needed when moving a sensor to a different board");
+        }
+
+        if (CanAddresses.HasNoHardware(board))
+        {
+            return await ConfigureMainBoardSensorAsync(code, sensorNumber, sensor, cancellationToken);
+        }
+
+        if (port is not null && !IoPorts.TrySplitPort(port, "Sensor port", out _, out _, out string? error))
+        {
+            return new Message(MessageType.Error, error);
+        }
+
+        SensorSettings settings = SensorSettings.Read(code, sensor.Type, portChanged: port is not null);
+        CanMessageM308V1 message = default;
+        message.FromCode(code);
+
+        // The name is this side's alone, so it is set whatever the board says (ConfigureCommonParameters)
+        if (settings.Name is string name)
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                sensor.Name = name;
             }
         }
-        return builder.Length == 0
-            ? new Message(MessageType.Success, "No temperature sensors are configured")
-            : new Message(MessageType.Success, builder.ToString().TrimEnd());
+
+        Message reply = await linkInterface.SendCanRequestAsync(board, in message, cancellationToken);
+        if (!reply.Succeeded())
+        {
+            return reply;
+        }
+
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (reply.Content.StartsWith("type ", StringComparison.Ordinal))
+            {
+                reply.Content = SensorReportPrefix(sensorNumber, sensor) + reply.Content;
+            }
+            else if (ReferenceEquals(sensorManager.Find(sensorNumber), sensor))
+            {
+                if (port is not null)
+                {
+                    sensor.Port = port;
+                }
+                settings.ApplyTo(sensor);
+            }
+        }
+        return reply;
+    }
+
+    /// <summary>
+    /// M308 without Y for the main board's MCU temperature sensor, whose only settings are the common ones
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>TemperatureSensor::Configure</c>, which reports the sensor when nothing changes</remarks>
+    private async ValueTask<Message> ConfigureMainBoardSensorAsync(Commands.Code code, int sensorNumber, AnalogSensor sensor,
+                                                                   CancellationToken cancellationToken)
+    {
+        SensorSettings settings = SensorSettings.Read(code, sensor.Type, portChanged: false);
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (!ReferenceEquals(sensorManager.Find(sensorNumber), sensor))
+            {
+                return new Message(MessageType.Error, $"Sensor {sensorNumber} does not exist");
+            }
+            if (settings.SeenCommon)
+            {
+                settings.ApplyTo(sensor);
+                return new Message();
+            }
+
+            // TemperatureSensor::CopyBasicDetails
+            float reading = sensor.LastReading ?? 0.0f;
+            string lastError = JsonNamingPolicy.CamelCase.ConvertName(sensorManager.GetLastRealError(sensorNumber).ToString());
+            string readingText = sensor.OffsetAdj != 0.0f || sensor.SlopeAdj != 0.0f
+                ? string.Create(CultureInfo.InvariantCulture,
+                                $"offset adjustment {sensor.OffsetAdj:F1}, slope adjustment {sensor.SlopeAdj:F3}, adjusted reading {reading:F1}")
+                : string.Create(CultureInfo.InvariantCulture, $"reading {reading:F1}");
+            return new Message(MessageType.Success,
+                $"{SensorReportPrefix(sensorNumber, sensor)}type {SensorManager.McuSensorDescription}, last error {lastError}, {readingText}");
+        }
+    }
+
+    /// <summary>
+    /// What a sensor's report starts with: its number and, if it has one, its name
+    /// </summary>
+    /// <remarks>RemoteSensor::Configure and TemperatureSensor::CopyBasicDetails</remarks>
+    private static string SensorReportPrefix(int sensorNumber, AnalogSensor sensor)
+        => string.IsNullOrEmpty(sensor.Name) ? $"Sensor {sensorNumber} " : $"Sensor {sensorNumber} ({sensor.Name}) ";
+
+    /// <summary>
+    /// Take a sensor out of the object model and tell its board to let go of the port
+    /// </summary>
+    /// <param name="sensorNumber">The sensor, which may not exist</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="expected">The sensor to delete, or null for whichever holds the number</param>
+    /// <remarks>
+    /// RepRapFirmware's <c>Heat::DeleteSensor</c> and <c>~RemoteSensor</c>, which sends the board
+    /// <c>M308 S P"nil"</c>. What the board says to that is not read: a destructor cannot fail, so a board
+    /// that is unreachable or has already forgotten the sensor must not keep it alive here
+    /// </remarks>
+    private async ValueTask DeleteSensorAsync(int sensorNumber, CancellationToken cancellationToken, AnalogSensor? expected = null)
+    {
+        byte board;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (sensorManager.Find(sensorNumber) is not AnalogSensor sensor || (expected is not null && !ReferenceEquals(sensor, expected)))
+            {
+                return;
+            }
+            board = SensorManager.GetBoard(sensor);
+            sensorManager.Delete(sensorNumber);
+        }
+
+        if (!CanAddresses.HasNoHardware(board))
+        {
+            CanMessageM308V1 release = default;
+            release.S = (byte)sensorNumber;
+            release.P = IoPorts.NoPortName;
+            await linkInterface.SendCanRequestAsync(board, in release, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// What an M308 sets in <c>sensors.analog[]</c>, read from the code before anything is changed so that a
+    /// bad value refuses it with nothing to undo
+    /// </summary>
+    /// <remarks>
+    /// Which field a letter sets depends on the type, as in RepRapFirmware's <c>Configure</c> of each sensor
+    /// class: B and C are a thermistor's beta and Steinhart-Hart C but a linear analog sensor's low and high
+    /// readings. The common parameters A, U and V are <c>TemperatureSensor::ConfigureCommonParameters</c>
+    /// </remarks>
+    private sealed class SensorSettings
+    {
+        /// <summary>Name given by A</summary>
+        public string? Name { get; private init; }
+
+        /// <summary>Whether A, U or V was given</summary>
+        public bool SeenCommon { get; private init; }
+
+        private float? _offsetAdj, _slopeAdj;
+        private float? _r25, _beta, _c, _rRef, _lowReading, _highReading;
+        private int? _adcLowOffset, _adcHighOffset, _mainsFrequency, _wires;
+        private bool? _filtered;
+        private string? _thermocoupleType;
+        private bool _clearAdcOffsets;
+
+        /// <summary>
+        /// Value of L or H that asks a thermistor's board to measure the ADC correction itself
+        /// </summary>
+        /// <remarks>RepRapFirmware's <c>Thermistor::ConfigureLParam</c> and <c>ConfigureHParam</c></remarks>
+        private const int MeasureAdcOffset = 999;
+
+        /// <summary>
+        /// Read the settings of a sensor of the given type from a code
+        /// </summary>
+        /// <param name="code">The code</param>
+        /// <param name="type">Type of the sensor the code configures</param>
+        /// <param name="portChanged">Whether the code assigns the sensor a port</param>
+        /// <returns>The settings</returns>
+        /// <exception cref="DuetAPI.GCodeException">A value is out of range</exception>
+        public static SensorSettings Read(Commands.Code code, AnalogSensorType type, bool portChanged)
+        {
+            bool seenName = code.TryGetString('A', out string? name);
+            bool seenOffset = code.TryGetFloat('U', out float? offsetAdj, min: -20.0f, max: 20.0f);
+            bool seenSlope = code.TryGetFloat('V', out float? slopeAdj, min: -0.2f, max: 0.2f);
+            SensorSettings settings = new()
+            {
+                Name = name,
+                SeenCommon = seenName || seenOffset || seenSlope,
+                _offsetAdj = offsetAdj,
+                _slopeAdj = slopeAdj
+            };
+
+            switch (type)
+            {
+                case AnalogSensorType.Thermistor or AnalogSensorType.PT1000:
+                    // Thermistor::Configure. A new port clears the ADC corrections (InitPort)
+                    settings._clearAdcOffsets = portChanged;
+                    settings._rRef = OptionalFloat(code, 'R');
+                    if (type == AnalogSensorType.Thermistor)
+                    {
+                        settings._beta = OptionalFloat(code, 'B');
+                        settings._c = OptionalFloat(code, 'C') ?? (settings._beta is not null ? 0.0f : null);
+                        settings._r25 = OptionalFloat(code, 'T');
+                    }
+                    // TODO L999 and H999 make the board measure the correction, which only its reply states
+                    settings._adcLowOffset = OptionalInt(code, 'L') is int low and not MeasureAdcOffset ? low : null;
+                    settings._adcHighOffset = OptionalInt(code, 'H') is int high and not MeasureAdcOffset ? high : null;
+                    break;
+
+                case AnalogSensorType.LinearAnalog:
+                    settings._filtered = OptionalInt(code, 'F') is int filtered ? filtered >= 1 : null;
+                    settings._lowReading = OptionalFloat(code, 'B');
+                    settings._highReading = OptionalFloat(code, 'C');
+                    break;
+
+                case AnalogSensorType.MAX31865:
+                    settings._rRef = OptionalFloat(code, 'R');
+                    settings._wires = OptionalInt(code, 'W');
+                    settings._mainsFrequency = OptionalInt(code, 'F');
+                    break;
+
+                case AnalogSensorType.MAX31856:
+                    settings._thermocoupleType = code.TryGetString('K', out string? thermocoupleType) ? thermocoupleType : null;
+                    settings._mainsFrequency = OptionalInt(code, 'F');
+                    break;
+            }
+            return settings;
+        }
+
+        private static float? OptionalFloat(Commands.Code code, char letter)
+            => code.TryGetFloat(letter, out float? value) ? value : null;
+
+        private static int? OptionalInt(Commands.Code code, char letter)
+            => code.TryGetInt(letter, out int? value) ? value : null;
+
+        /// <summary>
+        /// Write what the code set into a sensor
+        /// </summary>
+        /// <param name="sensor">The sensor</param>
+        /// <remarks>The caller must hold the object model write lock</remarks>
+        public void ApplyTo(AnalogSensor sensor)
+        {
+            if (Name is not null)
+            {
+                sensor.Name = Name;
+            }
+            if (_clearAdcOffsets)
+            {
+                sensor.AdcLowOffset = sensor.AdcHighOffset = null;
+            }
+            sensor.OffsetAdj = _offsetAdj ?? sensor.OffsetAdj;
+            sensor.SlopeAdj = _slopeAdj ?? sensor.SlopeAdj;
+            sensor.R25 = _r25 ?? sensor.R25;
+            sensor.Beta = _beta ?? sensor.Beta;
+            sensor.C = _c ?? sensor.C;
+            sensor.RRef = _rRef ?? sensor.RRef;
+            sensor.LowReading = _lowReading ?? sensor.LowReading;
+            sensor.HighReading = _highReading ?? sensor.HighReading;
+            sensor.AdcLowOffset = _adcLowOffset ?? sensor.AdcLowOffset;
+            sensor.AdcHighOffset = _adcHighOffset ?? sensor.AdcHighOffset;
+            sensor.MainsFrequency = _mainsFrequency ?? sensor.MainsFrequency;
+            sensor.Wires = _wires ?? sensor.Wires;
+            sensor.Filtered = _filtered ?? sensor.Filtered;
+            sensor.ThermocoupleType = _thermocoupleType ?? sensor.ThermocoupleType;
+        }
     }
 
     /// <summary>
@@ -209,10 +456,7 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, error);
             }
 
-            AnalogSensor? sensor = sensorNumber >= 0 && sensorNumber < model.Sensors.Analog.Count
-                                   ? model.Sensors.Analog[sensorNumber]
-                                   : null;
-            if (sensor?.Port is null)
+            if (sensorManager.Find(sensorNumber) is not AnalogSensor sensor)
             {
                 return new Message(MessageType.Error,
                                    $"Sensor {sensorNumber} is not configured; use M308 before M950 H");
@@ -220,7 +464,7 @@ internal partial class MCodeHandler
 
             // The control loop runs where the port is driven, so a sensor on another board would be
             // read over the bus at every step of it. RepRapFirmware refuses the same combination
-            byte sensorBoard = IoPorts.RemoveBoardAddress(sensor.Port, out _);
+            byte sensorBoard = SensorManager.GetBoard(sensor);
             if (sensorBoard != board)
             {
                 return new Message(MessageType.Error,
@@ -530,45 +774,39 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// M302: allow or forbid cold extrusion, and set the temperatures it is judged against
+    /// M302: allow or forbid cold extrusion, set the minimum temperatures it is judged against, or report them
     /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's GCodes2.cpp case 302, applying P, S and R in that order. Any of them waits for standstill first
+    /// (see the code table), so the change applies from the next move on
+    /// </remarks>
     private async ValueTask<Message> HandleColdExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             bool seen = false;
+            if (code.TryGetInt('P', out int allow))
+            {
+                coldExtrusion.SetAllowed(allow > 0);
+                seen = true;
+            }
             if (code.TryGetFloat('S', out float extrude))
             {
-                model.Heat.ColdExtrudeTemperature = extrude;
+                coldExtrusion.SetMinExtrusionTemperature(extrude);
                 seen = true;
             }
             if (code.TryGetFloat('R', out float retract))
             {
-                model.Heat.ColdRetractTemperature = retract;
+                coldExtrusion.SetMinRetractionTemperature(retract);
                 seen = true;
-            }
-
-            // TODO RRF keeps P as a flag beside the two minimums, which it reports as 0 only while P1 is in force:
-            // P0 brings the stored minimums back, and S/R under P1 are stored without forbidding anything. Zeroing
-            // them here loses them, so P0 after P1 leaves cold extrusion allowed. The minimums need somewhere in the
-            // object model to live while P1 hides them. RRF also waits for standstill before changing any of these
-            if (code.TryGetInt('P', out int allow))
-            {
-                // P is the blunt form: allowing cold extrusion is the same as saying it is permitted
-                // at any temperature, which is how RepRapFirmware stores it
-                seen = true;
-                if (allow > 0)
-                {
-                    model.Heat.ColdExtrudeTemperature = 0.0f;
-                    model.Heat.ColdRetractTemperature = 0.0f;
-                }
             }
 
             if (!seen)
             {
-                return new Message(MessageType.Success, string.Create(CultureInfo.InvariantCulture,
-                    $"Cold extrusion is allowed above {model.Heat.ColdExtrudeTemperature:F1}C, "
-                    + $"cold retraction above {model.Heat.ColdRetractTemperature:F1}C"));
+                return new Message(MessageType.Success, model.Heat.ColdExtrusionAllowed
+                    ? "Cold extrusion is allowed (use M302 P0 to forbid it)"
+                    : string.Create(CultureInfo.InvariantCulture,
+                        $"Cold extrusion is forbidden (use M302 P1 to allow it), min. extrusion temperature {model.Heat.MinExtrusionTemperature:F1}C, min. retraction temperature {model.Heat.MinRetractionTemperature:F1}C"));
             }
         }
         return new Message();

@@ -167,8 +167,8 @@ public static class Program
                 }
                 CheckNotCleared(s, m.Name, m.Enum!, m.Reserved);
 
-                // The declared type is what the field takes on the wire and what C# lays out, so an enum
-                // built on a different integer would silently change the size of the message
+                // The declared type is what the field takes on the wire, so an enum built on a different
+                // integer could hold values the field cannot carry
                 string storage = Types.CSharp(schema, m.Type);
                 if (storage != e.UnderlyingType)
                 {

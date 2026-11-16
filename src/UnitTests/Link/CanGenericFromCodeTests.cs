@@ -50,6 +50,38 @@ public class CanGenericFromCodeTests
         Assert.That(CanGenericParser.GetString(message, CanGenericTables.M950FanParams, 'C'), Is.EqualTo(expected));
     }
 
+    /// <summary>
+    /// A reduced string read from a code goes on the bus lower-cased and without '-', '_' or spaces, as
+    /// RepRapFirmware's PopulateFromCommand reads it with GetReducedString
+    /// </summary>
+    [TestCase("linear-analog", "linearanalog")]
+    [TestCase("Linear_Analog", "linearanalog")]
+    [TestCase("thermocouple-max31856", "thermocouplemax31856")]
+    public void ReducesAReducedString(string typed, string expected)
+    {
+        Code code = new($"M308 S1 Y\"{typed}\" P\"1.SPI.CS0\"");
+        CanMessageGeneric message = default;
+        CanGenericWriter.FromCode(ref message, CanGenericTables.M308V1Params, code);
+
+        Assert.That(CanGenericParser.GetString(message, CanGenericTables.M308V1Params, 'Y'), Is.EqualTo(expected));
+        Assert.That(CanGenericParser.GetString(message, CanGenericTables.M308V1Params, 'P'), Is.EqualTo("spi.cs0"),
+                    "a port is reduced too, before its board address comes off");
+    }
+
+    /// <summary>
+    /// A value that does not fit its parameter refuses the code it came from, as RepRapFirmware's
+    /// GCodeException does, rather than escaping code execution as an unexpected exception
+    /// </summary>
+    [Test]
+    public void AValueThatDoesNotFitRefusesTheCode()
+    {
+        Code code = new("M308 S1 K\"KK\"");
+        CanMessageGeneric message = default;
+
+        Assert.That(() => CanGenericWriter.FromCode(ref message, CanGenericTables.M308V1Params, code),
+                    Throws.InstanceOf<DuetAPI.GCodeException>().With.Message.Contains("'K'"));
+    }
+
     [Test]
     public void ConvertsEachParameterToTheTypeTheTableDeclares()
     {

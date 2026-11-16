@@ -42,10 +42,12 @@ public class MoveInterpreterTests
     /// <param name="kinematics">Geometry name</param>
     /// <param name="closedSwitches">Which switches of an endstop are already closed</param>
     /// <param name="withU">Whether the machine has a U axis after Z, as an IDEX machine's second carriage</param>
+    /// <param name="extruderMovementAllowed">The cold extrusion interlock, which lets every extruder be driven by default</param>
     /// <returns>The machine and the interpreter that plans for it</returns>
     private static Machine NewMachine(Tool? tool = null, string kinematics = "cartesian",
                                       Func<int, uint>? closedSwitches = null, int numExtruders = 1,
-                                      bool withEndstops = false, bool withU = false)
+                                      bool withEndstops = false, bool withU = false,
+                                      Func<Tool?, bool, int, bool>? extruderMovementAllowed = null)
     {
         DuetControlServer.Model.ObjectModel model = NewModel();
         Move move = model.Move;
@@ -105,7 +107,8 @@ public class MoveInterpreterTests
         BedCompensation bed = new(model);
         MoveInterpreter interpreter = new(model, builder, state, bed,
                                           new EndstopCorrection(null!, null!, NullLogger<EndstopCorrection>.Instance),
-                                          () => tool, closedSwitches ?? (_ => 0));
+                                          () => tool, closedSwitches ?? (_ => 0),
+                                          extruderMovementAllowed ?? ((_, _, _) => true));
         return new Machine(model, builder, state, interpreter, bed);
     }
 
@@ -923,6 +926,52 @@ public class MoveInterpreterTests
         machine.Interpreter.PrepareSegment(raw, segments, 1);
 
         Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(2.0f).Within(1e-4f));
+    }
+
+    [Test]
+    public void ASegmentLeavesOutAnExtruderTheColdExtrusionInterlockRefusesAndStillMovesTheAxes()
+    {
+        Machine machine = NewMachine(NewTool(), extruderMovementAllowed: (_, _, _) => false);
+        RawMove raw = Build(machine, G("G1 X30 E6 F3000"), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        machine.Interpreter.PrepareSegment(raw, SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1), 1);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.Zero, "the extruder is left out");
+            Assert.That(raw.Coords[0], Is.EqualTo(30.0f), "X still moves");
+        });
+    }
+
+    [TestCase("G1 X30 E6 F3000", true)]
+    [TestCase("G1 X30 E-6 F3000", false)]
+    public void TheColdExtrusionInterlockIsAskedAboutTheMovesToolDirectionAndExtruder(string code, bool forwards)
+    {
+        Tool tool = NewTool(number: 2, extruders: 1);
+        List<(Tool? Tool, bool Forwards, int Extruder)> asked = [];
+        Machine machine = NewMachine(tool, numExtruders: 2, extruderMovementAllowed: (t, f, e) =>
+        {
+            asked.Add((t, f, e));
+            return true;
+        });
+        RawMove raw = Build(machine, G(code), NewInput(), isCoordinated: true, MoveType.Normal);
+
+        machine.Interpreter.PrepareSegment(raw, SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 2), 1);
+
+        Assert.That(asked, Is.EqualTo(new[] { ((Tool?)tool, forwards, 1) }), "asked once, about extruder 1 only, the other one not moving");
+    }
+
+    [Test]
+    public void AMoveThatChecksEndstopsIsNotHeldToTheColdExtrusionInterlock()
+    {
+        // RepRapFirmware's DDA::Prepare skips the check for such a move, whose tool it does not track
+        Machine machine = NewMachine(NewTool(), extruderMovementAllowed: (_, _, _) => throw new AssertionException("the interlock was asked"));
+        RawMove raw = new() { MoveType = MoveType.Homing, CheckEndstops = true };
+        raw.Coords[MotionParameters.ExtruderToDrive(0)] = 2.0f;
+
+        machine.Interpreter.PrepareSegment(raw, SegmentedMove.From(raw, [0.0f, 0.0f, 0.0f], 3, MotionLimits.MaxAxesPlusExtruders - 1), 1);
+
+        Assert.That(raw.Coords[MotionParameters.ExtruderToDrive(0)], Is.EqualTo(2.0f), "the extruder is driven");
     }
 
     [Test]

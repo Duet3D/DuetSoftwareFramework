@@ -161,7 +161,7 @@ C# side as that enum rather than as the integer it travels as. It works on a bit
 
 ```jsonc
 { "name": "resultCode", "width": 4, "enum": "GCodeResult" }                    // public CodeResult ResultCode { ... }
-{ "kind": "field", "name": "errorCode", "type": "u8", "enum": "TemperatureError" }   // public TemperatureError ErrorCode;
+{ "kind": "field", "name": "errorCode", "type": "u8", "enum": "TemperatureError" }   // public TemperatureError ErrorCode { ... }
 ```
 
 The name is CANlib's, as in the `enums` section; the C# side uses that enum's `csharpName`, so a caller
@@ -169,6 +169,8 @@ cannot pass an unrelated number where a result code or a sensor error is expecte
 the four `resultCode`s, `CanSensorReport.errorCode`, `CanHeaterReport.mode`, `heaterFunction`, a filament
 monitor's `status` and an event's `eventType`. C++ is untouched: CANlib declares all of these as plain
 integers and assigns casts to them, so the generated header would stop being a drop-in if it named the enum.
+
+A scalar field is stored as the integer it travels as, in a private field, and the enum-typed property casts to and from it, as a bitfield's does. The storage cannot be the enum itself: an enum declared outside this tool, such as DuetAPI's `TemperatureError`, may be built on a wider integer, which would overlap the fields after it. The C# harness writes all ones through each such property and checks that only the field's own bytes change.
 
 The generator checks that the enum exists and that the generated file can name it, that every enumerator
 fits — in the field's width for a bitfield, in the same underlying integer for a scalar field — and rejects

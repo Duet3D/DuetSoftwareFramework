@@ -329,7 +329,6 @@ public class M568Tests : BenchFixture
     /// </remarks>
     [TestCase('S')]
     [TestCase('R')]
-    [Category("KnownGap")]
     public async Task AtAbsoluteZeroTheToolTemperatureIsZeroedAndTheHeaterSwitchedOff(char letter)
     {
         await using Bench bench = await Bench.StartAsync(HeaterToolWithTemperatures);
@@ -513,7 +512,6 @@ public class M568Tests : BenchFixture
     /// Regression: m568-spindle-rpm
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task SpindleRpmOnAToolNotSelectedIsKeptForTheTool()
     {
         await using Bench bench = await Bench.StartAsync(SpindleToolConfig);
@@ -549,7 +547,6 @@ public class M568Tests : BenchFixture
     /// </remarks>
     [TestCase(3000)]
     [TestCase(0)]
-    [Category("KnownGap")]
     public async Task SpindleRpmOnTheSelectedToolDrivesTheRunningSpindle(int rpm)
     {
         await using Bench bench = await Bench.StartAsync(SpindleToolConfig + "\nT0\nM3 S5000");
@@ -574,7 +571,6 @@ public class M568Tests : BenchFixture
     /// <summary>An RPM above the spindle's range is refused, and nothing changes</summary>
     /// <remarks>RRF truth: Tool::SetSpindleRpm throws "Requested spindle RPM out of range" when !Spindle::IsValidRpm</remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task SpindleRpmOutsideTheSpindlesRangeIsRefused()
     {
         await using Bench bench = await Bench.StartAsync(SpindleToolConfig);
@@ -616,7 +612,6 @@ public class M568Tests : BenchFixture
     /// </summary>
     /// <remarks>RRF truth: SetOrReportOffsets reads F only when GetSpindleNumber() &gt; -1, and reports when nothing was set</remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task SpindleRpmForAToolWithoutASpindleIsIgnoredAndTheToolReported()
     {
         await using Bench bench = await Bench.StartAsync(HeaterToolWithTemperatures);

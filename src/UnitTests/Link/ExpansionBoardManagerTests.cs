@@ -1,11 +1,11 @@
 using DuetControlServer;
 using DuetControlServer.Link.Expansion;
 using DuetControlServer.Link.Protocol.Shared;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
 using System.Linq;
+using UnitTests.Utility;
 
 namespace UnitTests.Link;
 
@@ -30,19 +30,8 @@ public class ExpansionBoardManagerTests
         events = new DuetControlServer.Events.EventQueue(NullLogger<DuetControlServer.Events.EventQueue>.Instance);
         DuetControlServer.Link.Expansion.ClosedLoopDataCollector closedLoop =
             new(null!, model, NullLogger<DuetControlServer.Link.Expansion.ClosedLoopDataCollector>.Instance);
-        return new ExpansionBoardManager(model, events, closedLoop, Options.Create(new Settings()),
-                                         NullLogger<ExpansionBoardManager>.Instance);
-    }
-
-    /// <summary>
-    /// An application lifetime that never fires, which is all the object model needs to be constructed
-    /// </summary>
-    private sealed class StoppedLifetime : IHostApplicationLifetime
-    {
-        public System.Threading.CancellationToken ApplicationStarted => System.Threading.CancellationToken.None;
-        public System.Threading.CancellationToken ApplicationStopping => System.Threading.CancellationToken.None;
-        public System.Threading.CancellationToken ApplicationStopped => System.Threading.CancellationToken.None;
-        public void StopApplication() { }
+        return new ExpansionBoardManager(model, events, closedLoop, new DuetControlServer.Heat.SensorManager(model),
+                                         Options.Create(new Settings()), NullLogger<ExpansionBoardManager>.Instance);
     }
 
     /// <summary>

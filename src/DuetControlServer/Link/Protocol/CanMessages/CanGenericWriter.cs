@@ -2,15 +2,17 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Text;
+using DuetAPI;
 
 namespace DuetControlServer.Link.Protocol.CanMessages;
 
 /// <summary>
 /// Thrown when a value does not fit the parameter it is being assigned to, or when the message would
 /// overflow. Building a generic message can fail on data that came from a G-code command, so this is a
-/// normal outcome rather than a bug.
+/// normal outcome rather than a bug, and it refuses that code as RepRapFirmware's
+/// <c>CanMessageGenericConstructor</c> does by throwing a <c>GCodeException</c>.
 /// </summary>
-public sealed class CanGenericParamException(string message) : Exception(message);
+public sealed class CanGenericParamException(string message) : GCodeException(message);
 
 /// <summary>
 /// Packs parameters into the data area of a <see cref="CanMessageGeneric"/>.
@@ -221,8 +223,6 @@ public static partial class CanGenericWriter
 
         if (descriptor.Type == CanParamType.ReducedString)
         {
-            // TODO RRF sends a reduced string lowercased with '-' and '_' removed (GetReducedString); the board
-            // accepts either, but the frame bytes differ from RRF's (M308 Y"linear-analog" goes as "linearanalog")
             IoPorts.RemoveBoardAddress(value, out value);
         }
 

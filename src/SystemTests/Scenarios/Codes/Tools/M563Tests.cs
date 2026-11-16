@@ -160,7 +160,6 @@ public class M563Tests : BenchFixture
 
     /// <summary>A bare M563 P reports the tool in RepRapFirmware's format, matching the model</summary>
     /// <remarks>Tool::PrintTool (Tool.cpp): "Tool 0 - name: ...; drives: ...; ...; status: off"</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563BareReportsToolConsistentWithModel()
     {
@@ -190,7 +189,6 @@ public class M563Tests : BenchFixture
     /// Regression: m563-define-tool, whose tool 0 reports axes [[0],[1],[2]] and retraction 2.0/16.7
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M563FillsInRrfDefaults()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyze, HeaterConfig, $"M563 P0 D0 H{HeaterNumber}");
@@ -219,7 +217,6 @@ public class M563Tests : BenchFixture
     /// P before anything else is looked at. Regression: error-missing-parameters-tools ("M563" is an
     /// error)
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563WithoutPIsAnError()
     {
@@ -256,7 +253,6 @@ public class M563Tests : BenchFixture
     /// GCodes::ManageTool: with nothing but P seen it only reports, and GetLockedTool finding nothing
     /// gives "Attempt to print details of non-existent tool" with GCodeResult::error
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563ReportOfAbsentToolIsAnError()
     {
@@ -279,7 +275,6 @@ public class M563Tests : BenchFixture
     /// GetLockedTool(index), which is null where no tool has that number; Tool::DeleteTool
     /// recomputes numToolsToReport from the tools left
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563ToolNumberIndexesToolsArray()
     {
@@ -342,7 +337,6 @@ public class M563Tests : BenchFixture
     /// </remarks>
     [TestCase("D0:1")]
     [TestCase("D0:0")]
-    [Category("KnownGap")]
     public async Task M563MultiDriveToolStartsWithWholeMixOnFirstDrive(string drives)
     {
         await using Bench bench = await Bench.StartAsync(TwoExtruderConfig);
@@ -379,7 +373,6 @@ public class M563Tests : BenchFixture
 
     /// <summary>F-1 gives the tool no print fan</summary>
     /// <remarks>GCodes::ManageTool reads F as signed so that F-1 makes an empty fan map</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563FMinusOneMapsNoFans()
     {
@@ -401,7 +394,6 @@ public class M563Tests : BenchFixture
     /// heater, and ManageTool masks F to MaxFans; Heat::SetAsToolHeater does nothing for a heater
     /// FindHeater does not find
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563AcceptsUnconfiguredHeaterAndFan()
     {
@@ -455,7 +447,6 @@ public class M563Tests : BenchFixture
 
     /// <summary>A heater already assigned to the bed cannot also be a tool heater</summary>
     /// <remarks>Tool::Create: "heater %d is already assigned as a bed heater" for HeaterFunction::bed</remarks>
-    [Category("KnownGap")]
     [Test]
     public Task M563RefusesBedHeater() => AssertRefusedAsync($"M563 P0 H{HeaterNumber}");
 
@@ -491,13 +482,16 @@ public class M563Tests : BenchFixture
 
     /// <summary>
     /// A redefinition that is refused still deletes the tool it was replacing: the tool is
-    /// deselected, its heaters are switched off and it is removed
+    /// deselected, which puts its heaters on standby, then its heaters are switched off and it is
+    /// removed
     /// </summary>
     /// <remarks>
     /// GCodes::ManageTool deselects and runs Tool::DeleteTool before Tool::Create validates the new
-    /// definition, so when Create returns null the old tool is already gone
+    /// definition, so when Create returns null the old tool is already gone. The deselection is
+    /// MovementState::SelectTool(-1, false), which calls Tool::Standby: the heater is switched to
+    /// the tool's standby temperature (commandOn, still ABS_ZERO) before Heat::SwitchOff sends
+    /// commandOff at that same target
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M563RefusedRedefinitionDeletesOldTool()
     {
@@ -511,9 +505,37 @@ public class M563Tests : BenchFixture
             Assert.That(reply, Does.StartWith("Error"), "drive 1 does not exist (RRF Tool::Create)");
             Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "the old tool 0 was deleted before the new one was refused (RRF GCodes::ManageTool)");
             Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1), "the old tool was deselected (RRF GCodes::ManageTool SelectTool(-1))");
-            Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>().Select(m => (m.Board, (int)m.Message.HeaterNumber, m.Message.Command, m.Message.Function)),
-                        Is.EqualTo(new[] { (Machines.DriverBoard, HeaterNumber, CanMessageSetHeaterTemperatureV1.CommandOff, (byte)HeaterFunction.Tool) }),
-                        "the old tool's heater is switched off on its board (RRF Tool::DeleteTool)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>().Select(m => (m.Board, (int)m.Message.HeaterNumber, m.Message.Command, m.Message.Function, m.Message.SetPoint)),
+                        Is.EqualTo(new[]
+                        {
+                            (Machines.DriverBoard, HeaterNumber, CanMessageSetHeaterTemperatureV1.CommandOn, (byte)HeaterFunction.Tool, HeatManager.AbsoluteZero),
+                            (Machines.DriverBoard, HeaterNumber, CanMessageSetHeaterTemperatureV1.CommandOff, (byte)HeaterFunction.Tool, HeatManager.AbsoluteZero),
+                        }),
+                        "deselecting puts the old tool's heater on standby (RRF Tool::Standby), then it is switched off (RRF Tool::DeleteTool)");
+        });
+    }
+
+    /// <summary>
+    /// A redefinition refused while its parameters are read keeps the tool it was replacing, still
+    /// selected and with nothing sent
+    /// </summary>
+    /// <remarks>
+    /// GCodes::ManageTool returns "Cannot map two or more of X,Y,Z to the same axis" before it
+    /// deselects or deletes anything, as a parameter it cannot read throws before then too
+    /// </remarks>
+    [Test]
+    public async Task M563RefusedParametersKeepOldTool()
+    {
+        await using Bench bench = await Bench.StartAsync(Machines.Xye, HeaterConfig, $"M563 P0 D0 H{HeaterNumber} S\"Old\"\nT0");
+        DcsTestHost host = bench.Host;
+
+        string reply = (await host.ExecuteCodeAsync("M563 P0 X0 Y0")).Trim();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error"), "X and Y mapped to one axis is refused (RRF GCodes::ManageTool)");
+            Assert.That(await host.ReadModelAsync(model => model.Tools.Count > 0 ? model.Tools[0]?.Name : null), Is.EqualTo("Old"), "tool 0 is kept (RRF GCodes::ManageTool)");
+            Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "tool 0 stays selected");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>(), Is.Empty, "the heater is left alone");
         });
     }
 
@@ -585,7 +607,6 @@ public class M563Tests : BenchFixture
     [TestCase("M563 P0 D-1 H-1", 0)]
     [TestCase("M563 P0 D-1 H-1 R-1", 0)]
     [TestCase("M563 P0 S\"Renamed\"", 1)]
-    [Category("KnownGap")]
     public async Task M563DeletionSwitchesToolHeatersOff(string code, int toolsLeft)
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye, HeaterConfig, $"M563 P0 D0 H{HeaterNumber}");

@@ -9,6 +9,7 @@ using System.Globalization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -354,11 +355,7 @@ internal partial class MCodeHandler
     /// <remarks>The caller must hold the object model write lock</remarks>
     private Probe GetOrCreateProbe(int probeNumber)
     {
-        while (model.Sensors.Probes.Count <= probeNumber)
-        {
-            model.Sensors.Probes.Add(null);
-        }
-        return model.Sensors.Probes[probeNumber] ??= new Probe();
+        return model.Sensors.Probes.GetOrAddAt(probeNumber, () => new Probe());
     }
 
     /// <summary>

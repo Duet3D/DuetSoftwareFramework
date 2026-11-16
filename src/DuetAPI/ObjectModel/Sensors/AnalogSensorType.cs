@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DuetAPI.Utility;
 
 namespace DuetAPI.ObjectModel;
 
@@ -91,11 +92,6 @@ public enum AnalogSensorType
     BME68xGas,
 
     /// <summary>
-    /// Current loop sensor
-    /// </summary>
-    CurrentLoop,
-
-    /// <summary>
     /// ADS131 channel 0 (unipolar)
     /// </summary>
     ADS131Chan0Unipolar,
@@ -141,36 +137,47 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
     {
         if (reader.TokenType == JsonTokenType.String)
         {
-            return reader.GetString()!.ToLowerInvariant() switch
-            {
-                "thermistor" => AnalogSensorType.Thermistor,
-                "pt1000" => AnalogSensorType.PT1000,
-                "rtdmax31865" => AnalogSensorType.MAX31865,
-                "thermocouplemax31855" => AnalogSensorType.MAX31855,
-                "thermocouplemax31856" => AnalogSensorType.MAX31856,
-                "linearanalog" => AnalogSensorType.LinearAnalog,
-                "dht21" => AnalogSensorType.DHT21,
-                "dht22" => AnalogSensorType.DHT22,
-                "bme280" => AnalogSensorType.BME280,
-                "bmepressure" => AnalogSensorType.BME280Pressure,
-                "bmehumidity" => AnalogSensorType.BME280Humidity,
-                "bme68x" => AnalogSensorType.BME68x,
-                "bme68xpressure" => AnalogSensorType.BME68xPressure,
-                "bme68xhumidity" => AnalogSensorType.BME68xHumidity,
-                "bme68xgas" => AnalogSensorType.BME68xGas,
-                "dhthumidity" => AnalogSensorType.DHTHumidity,
-                "currentloop" => AnalogSensorType.CurrentLoop,
-                "ads131.chan0.u" => AnalogSensorType.ADS131Chan0Unipolar,
-                "ads131.chan0.b" => AnalogSensorType.ADS131Chan0Bipolar,
-                "ads131.chan1" => AnalogSensorType.ADS131Chan1,
-                "mcutemp" => AnalogSensorType.McuTemp,
-                "drivers" => AnalogSensorType.Drivers,
-                "driversduex" => AnalogSensorType.DriversDuex,
-                _ => AnalogSensorType.Unknown,
-            };
+            return Parse(reader.GetString()!);
         }
         throw new JsonException($"Invalid type for {nameof(AnalogSensorType)}");
     }
+
+    /// <summary>
+    /// Resolve a sensor type name as M308 Y and the object model spell it
+    /// </summary>
+    /// <param name="name">The name, in which case, hyphens, underscores and spaces do not count</param>
+    /// <returns>The sensor type, or <see cref="AnalogSensorType.Unknown"/></returns>
+    /// <remarks>
+    /// RepRapFirmware matches a sensor type name in its reduced form (<c>GetReducedString</c>), which is
+    /// also how it reports the type, so <c>"rtd-max31865"</c> and <c>"rtdmax31865"</c> are one type
+    /// </remarks>
+    public static AnalogSensorType Parse(string name)
+        => ReducedString.Reduce(name) switch
+        {
+            "thermistor" => AnalogSensorType.Thermistor,
+            "pt1000" => AnalogSensorType.PT1000,
+            "rtdmax31865" => AnalogSensorType.MAX31865,
+            "thermocouplemax31855" => AnalogSensorType.MAX31855,
+            "thermocouplemax31856" => AnalogSensorType.MAX31856,
+            "linearanalog" => AnalogSensorType.LinearAnalog,
+            "dht21" => AnalogSensorType.DHT21,
+            "dht22" => AnalogSensorType.DHT22,
+            "bme280" => AnalogSensorType.BME280,
+            "bmepressure" => AnalogSensorType.BME280Pressure,
+            "bmehumidity" => AnalogSensorType.BME280Humidity,
+            "bme68x" => AnalogSensorType.BME68x,
+            "bme68xpressure" => AnalogSensorType.BME68xPressure,
+            "bme68xhumidity" => AnalogSensorType.BME68xHumidity,
+            "bme68xgas" => AnalogSensorType.BME68xGas,
+            "dhthumidity" => AnalogSensorType.DHTHumidity,
+            "ads131.chan0.u" => AnalogSensorType.ADS131Chan0Unipolar,
+            "ads131.chan0.b" => AnalogSensorType.ADS131Chan0Bipolar,
+            "ads131.chan1" => AnalogSensorType.ADS131Chan1,
+            "mcutemp" => AnalogSensorType.McuTemp,
+            "drivers" => AnalogSensorType.Drivers,
+            "driversduex" => AnalogSensorType.DriversDuex,
+            _ => AnalogSensorType.Unknown,
+        };
 
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, AnalogSensorType value, JsonSerializerOptions options)
@@ -224,9 +231,6 @@ public class AnalogSensorTypeConverter : JsonConverter<AnalogSensorType>
                 break;
             case AnalogSensorType.BME68xGas:
                 writer.WriteStringValue("bme68xgas");
-                break;
-            case AnalogSensorType.CurrentLoop:
-                writer.WriteStringValue("currentloop");
                 break;
             case AnalogSensorType.ADS131Chan0Unipolar:
                 writer.WriteStringValue("ads131.chan0.u");

@@ -9,6 +9,7 @@ using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link.Requests;
+using DuetControlServer.Model;
 using DuetControlServer.Motion;
 using Microsoft.Extensions.Logging;
 
@@ -89,8 +90,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// <param name="heaterNumber">The number</param>
     /// <returns>The heater, or null if there is none</returns>
     /// <remarks>The caller must hold the object model lock</remarks>
-    public Heater? Find(int heaterNumber)
-        => heaterNumber >= 0 && heaterNumber < model.Heat.Heaters.Count ? model.Heat.Heaters[heaterNumber] : null;
+    public Heater? Find(int heaterNumber) => model.Heat.Heaters.GetAt(heaterNumber);
 
     /// <summary>
     /// Make room for a heater number in the object model
@@ -104,11 +104,6 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// </remarks>
     public Heater Create(int heaterNumber)
     {
-        while (model.Heat.Heaters.Count <= heaterNumber)
-        {
-            model.Heat.Heaters.Add(null);
-        }
-
         Heater heater = new();
         FopDt.Reset(heater.Model);
         for (int monitor = 0; monitor < CanLimits.MaxMonitorsPerHeater; monitor++)
@@ -116,9 +111,10 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             heater.Monitors.Add(new HeaterMonitor());
         }
         UpdateTemperatureLimits(heater);
-        model.Heat.Heaters[heaterNumber] = heater;
+        model.Heat.Heaters.SetAt(heaterNumber, heater);
         _modelSetByUser[heaterNumber] = _monitorsSetByUser[heaterNumber] = false;
         _lastStandbyTool[heaterNumber] = -1;
+        _active[heaterNumber] = false;
         return heater;
     }
 
@@ -139,6 +135,20 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// </summary>
     /// <remarks>RepRapFirmware's <c>Heat::lastStandbyTools</c></remarks>
     private readonly int[] _lastStandbyTool = Enumerable.Repeat(-1, MaxHeaters).ToArray();
+
+    /// <summary>
+    /// Whether each heater was last switched to its active rather than its standby temperature, which an off heater keeps
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heater::active</c>, which only <c>Heater::SetActiveOrStandby</c> changes</remarks>
+    private readonly bool[] _active = new bool[MaxHeaters];
+
+    /// <summary>
+    /// The temperature a heater is switched on or off at: its active temperature if it was last made active, else its
+    /// standby temperature
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Heater::GetTargetTemperature</c>. The caller must hold the object model lock</remarks>
+    private float GetTargetTemperature(int heaterNumber, Heater heater)
+        => _active[heaterNumber] ? heater.Active : heater.Standby;
 
     /// <summary>
     /// The tool that last put a heater on standby, or -1 for none
@@ -289,9 +299,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     public bool TryGetBoard(Heater heater, out byte board)
     {
         board = CanId.MasterAddress;
-        AnalogSensor? sensor = heater.Sensor >= 0 && heater.Sensor < model.Sensors.Analog.Count
-                               ? model.Sensors.Analog[heater.Sensor]
-                               : null;
+        AnalogSensor? sensor = model.Sensors.Analog.GetAt(heater.Sensor);
         if (sensor?.Port is null)
         {
             return false;
@@ -682,6 +690,8 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                 return new Message(MessageType.Error, $"Can't turn heater {heaterNumber} on while in fault state");
             }
 
+            _active[heaterNumber] = active;
+
             // Whether the heater is in active or standby mode is kept in its state while it is on
             if (heater.State is HeaterState.Active or HeaterState.Standby)
             {
@@ -689,7 +699,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             }
         }
 
-        Message reply = await SwitchOnAsync(heaterNumber, cancellationToken, state);
+        Message reply = await SwitchOnAsync(heaterNumber, cancellationToken);
         if (reply.Succeeded())
         {
             using (await model.AccessReadWriteAsync(cancellationToken))
@@ -712,10 +722,9 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// </summary>
     /// <param name="heaterNumber">The heater</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <param name="state">Mode whose temperature is the target, or null for the mode the heater is in</param>
     /// <returns>What the board said</returns>
     /// <remarks>RepRapFirmware's <c>RemoteHeater::SwitchOn</c>. The caller must not hold the object model lock</remarks>
-    private async ValueTask<Message> SwitchOnAsync(int heaterNumber, CancellationToken cancellationToken, HeaterState? state = null)
+    private async ValueTask<Message> SwitchOnAsync(int heaterNumber, CancellationToken cancellationToken)
     {
         float target;
         using (await model.AccessReadOnlyAsync(cancellationToken))
@@ -724,7 +733,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             {
                 return new Message(MessageType.Error, $"Heater {heaterNumber} not found");
             }
-            target = ((state ?? heater.State) == HeaterState.Standby) ? heater.Standby : heater.Active;
+            target = GetTargetTemperature(heaterNumber, heater);
         }
         return await SetTemperatureAsync(heaterNumber, target, CanMessageSetHeaterTemperatureV1.CommandOn, cancellationToken);
     }
@@ -748,7 +757,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
             {
                 return;
             }
-            target = (heater.State == HeaterState.Standby) ? heater.Standby : heater.Active;
+            target = GetTargetTemperature(heaterNumber, heater);
             if (heater.State != HeaterState.Fault)
             {
                 heater.State = HeaterState.Off;
@@ -784,31 +793,6 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     }
 
     /// <summary>
-    /// Whether an extruder may be driven at the temperature its tool is at
-    /// </summary>
-    /// <param name="tool">The tool</param>
-    /// <param name="extruding">True for extrusion, false for retraction</param>
-    /// <returns>True if the move may go ahead</returns>
-    /// <remarks>
-    /// Cold extrusion strips the filament and jams the drive, so RepRapFirmware refuses it below
-    /// M302's limits - with a lower limit for retraction, because pulling filament out of a
-    /// half-warm nozzle is safer than pushing it in. The caller must hold the object model lock
-    /// </remarks>
-    public bool CanExtrude(Tool tool, bool extruding)
-    {
-        float limit = extruding ? model.Heat.ColdExtrudeTemperature : model.Heat.ColdRetractTemperature;
-        foreach (int heaterNumber in tool.Heaters)
-        {
-            Heater? heater = Find(heaterNumber);
-            if (heater is not null && heater.Current < limit)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// <summary>
     /// Switch every heater off
     /// </summary>
     /// <param name="includingChamberAndBed">Whether the bed and chamber heaters go off too</param>
@@ -821,7 +805,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
     /// </remarks>
     public async ValueTask SwitchOffAllAsync(bool includingChamberAndBed, CancellationToken cancellationToken)
     {
-        List<int> heaterNumbers = [];
+        List<(int Heater, float Target)> heaters = [];
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             for (int heaterNumber = 0; heaterNumber < model.Heat.Heaters.Count; heaterNumber++)
@@ -836,13 +820,14 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                 }
 
                 heater.State = HeaterState.Off;
-                heaterNumbers.Add(heaterNumber);
+                _lastStandbyTool[heaterNumber] = -1;
+                heaters.Add((heaterNumber, GetTargetTemperature(heaterNumber, heater)));
             }
         }
 
-        foreach (int heaterNumber in heaterNumbers)
+        foreach ((int heaterNumber, float target) in heaters)
         {
-            Message reply = await SetTemperatureAsync(heaterNumber, 0.0f,
+            Message reply = await SetTemperatureAsync(heaterNumber, target,
                                                       CanMessageSetHeaterTemperatureV1.CommandOff,
                                                       cancellationToken);
             if (!reply.Succeeded())

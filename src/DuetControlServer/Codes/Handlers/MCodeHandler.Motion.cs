@@ -14,6 +14,7 @@ using DuetControlServer.Link.Protocol.Shared;
 using DuetControlServer.Link;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion;
+using DuetControlServer.Model;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -1212,14 +1213,7 @@ internal partial class MCodeHandler
         foreach (IGrouping<int, DriverId> board in drivers.GroupBy(driver => driver.Board))
         {
             CanMessageM915 message = default;
-            try
-            {
-                message.FromCode(code);
-            }
-            catch (CanGenericParamException e)
-            {
-                return new Message(MessageType.Error, e.Message);
-            }
+            message.FromCode(code);
 
             // 'd' is lowercase in the table so that it is never taken from the code: it is the bitmap
             // of the board's own driver numbers, which only this side can work out
@@ -2725,11 +2719,7 @@ internal partial class MCodeHandler
     /// <remarks>The caller must hold the object model write lock</remarks>
     private Endstop GetOrCreateEndstop(int axis)
     {
-        while (model.Sensors.Endstops.Count <= axis)
-        {
-            model.Sensors.Endstops.Add(null);
-        }
-        return model.Sensors.Endstops[axis] ??= new Endstop();
+        return model.Sensors.Endstops.GetOrAddAt(axis, () => new Endstop());
     }
 
     /// <summary>

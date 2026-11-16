@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,88 +24,153 @@ namespace DuetControlServer.Codes.Handlers;
 internal partial class MCodeHandler
 {
     /// <summary>
-    /// M563: define or delete a tool
+    /// The M563 parameters that define a tool, any of which makes the code a definition rather than a report
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>seen</c> in <c>GCodes::ManageTool</c>, which L alone does not set</remarks>
+    internal const string ToolDefinitionLetters = "SDHXYZFR";
+
+    /// <summary>
+    /// M563: define, delete or report a tool
     /// </summary>
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     /// <remarks>
-    /// RepRapFirmware's <c>ManageTool</c>. Redefining a tool replaces it, so a config.g that is re-run
-    /// does not accumulate duplicates
+    /// RepRapFirmware's <c>GCodes::ManageTool</c>. A definition deletes the tool with that number first and builds the
+    /// new one from exactly the parameters given. A refusal while reading the parameters keeps the old tool, while one
+    /// from <c>Tool::Create</c>'s checks comes after the old tool is gone
     /// </remarks>
     private async ValueTask<Message> HandleDefineToolAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('P', out int toolNumber))
+        int toolNumber = code.GetInt('P', min: 0, max: ToolManager.MaxTools - 1);
+        if (!code.Parameters.Any(parameter => ToolDefinitionLetters.Contains(parameter.Letter)))
         {
-            return await ReportToolsAsync(cancellationToken);
-        }
-
-        IReadOnlyList<int> toolHeaters = [];
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            int axesCount = model.Move.Axes.Count;
-            int eCount = model.Move.Extruders.Count;
-
-            // By default each of X, Y and Z drives the axis carrying that letter, wherever M584 put it,
-            // and a letter the machine does not have drives nothing
-            int xAxis = AxisIndices.IndexOf(model.Move, 'X');
-            int yAxis = AxisIndices.IndexOf(model.Move, 'Y');
-            int zAxis = AxisIndices.IndexOf(model.Move, 'Z');
-
-            int[] extruders = code.GetIntArray('D', ToolManager.MaxExtrudersPerTool, defaultValue: [], min: -1, max: eCount - 1);
-            ToolDefinition definition = new()
+            using (await model.AccessReadOnlyAsync(cancellationToken))
             {
-                Number = toolNumber,
-                Name = code.GetString('S', defaultValue: String.Empty),
-                Extruders = extruders,
-                Heaters = code.GetIntArray('H', Heat.HeatManager.MaxHeatersPerTool, defaultValue: [], min: -1, max: model.Heat.Heaters.Count - 1),
-                Fans = code.GetIntArray('F', Fans.FanManager.MaxFans, defaultValue: [], min: 0, max: model.Fans.Count - 1),
-                XMap = code.GetIntArray('X', axesCount, defaultValue: xAxis >= 0 ? [xAxis] : [], min: 0, max: axesCount - 1),
-                YMap = code.GetIntArray('Y', axesCount, defaultValue: yAxis >= 0 ? [yAxis] : [], min: 0, max: axesCount - 1),
-                ZMap = code.GetIntArray('Z', axesCount, defaultValue: zAxis >= 0 ? [zAxis] : [], min: 0, max: axesCount - 1),
-
-                // RepRapFirmware defaults this to the tool's only drive when it has exactly one:
-                // with several drives there is no single filament to speak of
-                FilamentExtruder = code.GetInt('L', defaultValue: extruders.Length == 1 ? extruders[0] : -1, min: -1, max: eCount - 1),
-                Spindle = code.GetInt('R', defaultValue: -1, min: -1, max: model.Spindles.Count - 1),
-            };
-
-            if (ShouldDeleteTool(definition))
-            {
-                toolManager.Remove(toolNumber);
-            }
-            else
-            {
-                string? error = toolManager.Define(definition);
-                if (error is not null)
-                {
-                    return new Message(MessageType.Error, error);
-                }
-                toolHeaters = definition.Heaters;
+                return (toolManager.Find(toolNumber) is Tool tool)
+                    ? new Message(MessageType.Success, DescribeTool(tool))
+                    : new Message(MessageType.Error, "Attempt to print details of non-existent tool");
             }
         }
 
-        // RRF's Tool::Create gives each heater the tool function (Heat::SetAsToolHeater)
-        foreach (int heaterNumber in toolHeaters)
+        ToolDefinition definition;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            await heatManager.SetFunctionAsync(heaterNumber, HeaterFunction.Tool, cancellationToken);
+            definition = ReadToolDefinition(code, toolNumber);
+        }
+        if (Overlaps(definition.XMap, definition.YMap) || Overlaps(definition.XMap, definition.ZMap) || Overlaps(definition.YMap, definition.ZMap))
+        {
+            return new Message(MessageType.Error, "Cannot map two or more of X,Y,Z to the same axis");
+        }
+
+        // Deleted before CreateAsync validates the definition, so a definition it refuses leaves no tool
+        await toolManager.DeleteAsync(code.Channel, toolNumber, cancellationToken);
+        if (!IsToolDeletion(definition) && await toolManager.CreateAsync(definition, cancellationToken) is string refusal)
+        {
+            return new Message(MessageType.Error, refusal);
         }
         return new Message();
+
+        static bool Overlaps(IReadOnlyList<int> first, IReadOnlyList<int> second) => first.Any(second.Contains);
     }
 
     /// <summary>
-    /// Whether the code is <c>M563 P# D-1 H-1 [R-1]</c>, which removes the tool
+    /// Read what an M563 definition asks for
     /// </summary>
     /// <remarks>
-    /// RepRapFirmware's <c>ManageTool</c> tests for exactly one drive and exactly one heater, both
-    /// of them -1, with no spindle. A -1 anywhere else is a bad drive or heater number and is
-    /// refused when the tool is built
+    /// As RepRapFirmware's <c>GCodes::ManageTool</c> reads them: X, Y and Z map onto visible axes and F onto fan numbers
+    /// below <see cref="Fans.FanManager.MaxFans"/>, dropping any other number, and F-1 maps no fan. The caller must hold
+    /// the object model lock
     /// </remarks>
-    private static bool ShouldDeleteTool(ToolDefinition definition)
+    private ToolDefinition ReadToolDefinition(Commands.Code code, int toolNumber)
     {
-        return definition.Extruders.Count == 1 && definition.Extruders[0] == -1
-            && definition.Heaters.Count == 1 && definition.Heaters[0] == -1
-            && definition.Spindle == -1;
+        int numVisibleAxes = model.Move.Axes.Count(axis => axis.Visible);
+        int[] ReadAxisMap(char letter)
+        {
+            if (code.TryGetUIntArray(letter, numVisibleAxes, out uint[]? axes))
+            {
+                return [.. axes.Where(axis => axis < numVisibleAxes).Select(axis => (int)axis).Distinct().Order()];
+            }
+
+            // By default each of X, Y and Z drives the axis carrying that letter, wherever M584 put it, and a letter the
+            // machine does not have drives nothing
+            int axisIndex = AxisIndices.IndexOf(model.Move, letter);
+            return (axisIndex >= 0) ? [axisIndex] : [];
+        }
+
+        int[] extruders = code.GetIntArray('D', ToolManager.MaxExtrudersPerTool, defaultValue: []);
+        return new ToolDefinition
+        {
+            Number = toolNumber,
+            Name = code.GetString('S', defaultValue: string.Empty),
+            Extruders = extruders,
+            Heaters = code.GetIntArray('H', Heat.HeatManager.MaxHeatersPerTool, defaultValue: []),
+            Fans = code.TryGetIntArray('F', Fans.FanManager.MaxFans, out int[]? fans)
+                ? [.. fans.Where(fan => fan >= 0 && fan < Fans.FanManager.MaxFans).Distinct().Order()]
+                : [0],
+            XMap = ReadAxisMap('X'),
+            YMap = ReadAxisMap('Y'),
+            ZMap = ReadAxisMap('Z'),
+            FilamentExtruder = code.GetInt('L', defaultValue: (extruders.Length == 1) ? extruders[0] : -1),
+            Spindle = code.GetInt('R', defaultValue: -1, min: -1, max: Spindles.SpindleManager.MaxSpindles),
+        };
+    }
+
+    /// <summary>
+    /// Whether an M563 definition is <c>M563 P# D-1 H-1 [R-1]</c>, which deletes the tool and creates none
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's <c>GCodes::ManageTool</c> tests for exactly one drive and exactly one heater, both of them -1,
+    /// with no spindle. A -1 anywhere else is a bad drive or heater number
+    /// </remarks>
+    private static bool IsToolDeletion(ToolDefinition definition)
+        => definition.Extruders is [-1] && definition.Heaters is [-1] && definition.Spindle == -1;
+
+    /// <summary>
+    /// Describe a tool, as M563 with only P does
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Tool::PrintTool</c>. The caller must hold the object model lock</remarks>
+    private string DescribeTool(Tool tool)
+    {
+        StringBuilder builder = new();
+        builder.Append(CultureInfo.InvariantCulture, $"Tool {tool.Number} - ");
+        if (!string.IsNullOrEmpty(tool.Name))
+        {
+            builder.Append(CultureInfo.InvariantCulture, $"name: {tool.Name}; ");
+        }
+
+        builder.Append((tool.Extruders.Count == 0) ? "no drives" : "drives: " + string.Join(',', tool.Extruders));
+
+        if (tool.Heaters.Count == 0)
+        {
+            builder.Append("; no heaters");
+        }
+        else
+        {
+            builder.Append("; heaters (active/standby temps): ");
+            builder.AppendJoin(',', tool.Heaters.Select((heaterNumber, index) => string.Create(CultureInfo.InvariantCulture,
+                $"{heaterNumber} ({TemperatureAt(tool.Active, index):F1}/{TemperatureAt(tool.Standby, index):F1})")));
+        }
+
+        string[] mapNames = ["xmap", "ymap", "zmap"];
+        for (int map = 0; map < mapNames.Length; map++)
+        {
+            IEnumerable<int> axes = (map < tool.Axes.Count) ? tool.Axes[map] : [];
+            builder.Append(CultureInfo.InvariantCulture, $"; {mapNames[map]}: ");
+            builder.AppendJoin(',', axes.Where(axis => axis < model.Move.Axes.Count).Select(axis => model.Move.Axes[axis].Letter));
+        }
+
+        builder.Append("; fans: ").AppendJoin(',', tool.Fans);
+        builder.Append((tool.Spindle == -1) ? "; no spindle" : string.Create(CultureInfo.InvariantCulture, $"; spindle: {tool.Spindle}@{tool.SpindleRpm}RPM"));
+        builder.Append("; status: ").Append(tool.State switch
+        {
+            ToolState.Active => "selected",
+            ToolState.Standby => "standby",
+            _ => "off"
+        });
+        return builder.ToString();
+
+        static float TemperatureAt(IList<float> temperatures, int index) => (index < temperatures.Count) ? temperatures[index] : 0.0f;
     }
 
     /// <summary>
@@ -122,11 +188,7 @@ internal partial class MCodeHandler
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            Tool? tool = code.TryGetInt('P', out int toolNumber) ? toolManager.Find(toolNumber) : toolManager.Current;
-            if (tool is null)
-            {
-                return new Message(MessageType.Error, "No tool selected");
-            }
+            Tool tool = toolManager.GetSpecifiedOrCurrent(code);
 
             // One ratio per drive of the tool, as RepRapFirmware reads it (GCodes2.cpp case 567,
             // eCount = tool->DriveCount())
@@ -171,72 +233,6 @@ internal partial class MCodeHandler
     }
 
     /// <summary>
-    /// Report the tools the machine has, as M563 with no parameters does
-    /// </summary>
-    private async ValueTask<Message> ReportToolsAsync(CancellationToken cancellationToken)
-    {
-        StringBuilder builder = new();
-        using (await model.AccessReadOnlyAsync(cancellationToken))
-        {
-            foreach (Tool? tool in model.Tools)
-            {
-                if (tool is null)
-                {
-                    continue;
-                }
-
-                builder.Append(CultureInfo.InvariantCulture, $"Tool {tool.Number}");
-                if (!string.IsNullOrEmpty(tool.Name))
-                {
-                    builder.Append(CultureInfo.InvariantCulture, $" \"{tool.Name}\"");
-                }
-                AppendList(builder, " drives", tool.Extruders);
-                AppendList(builder, " heaters", tool.Heaters);
-                AppendOffsets(builder, tool, model);
-                builder.AppendLine();
-            }
-
-            if (builder.Length == 0)
-            {
-                return new Message(MessageType.Success, "No tools are defined");
-            }
-        }
-        return new Message(MessageType.Success, builder.ToString().TrimEnd());
-    }
-
-    private static void AppendList(StringBuilder builder, string label, IReadOnlyList<int> values)
-    {
-        if (values.Count == 0)
-        {
-            return;
-        }
-
-        builder.Append(label).Append(':');
-        foreach (int value in values)
-        {
-            builder.Append(CultureInfo.InvariantCulture, $" {value}");
-        }
-    }
-
-    private static void AppendOffsets(StringBuilder builder, Tool tool, Model.ObjectModel model)
-    {
-        bool any = false;
-        for (int axis = 0; axis < tool.Offsets.Count && axis < model.Move.Axes.Count; axis++)
-        {
-            if (tool.Offsets[axis] != 0.0f)
-            {
-                if (!any)
-                {
-                    builder.Append(" offsets:");
-                    any = true;
-                }
-                builder.Append(CultureInfo.InvariantCulture,
-                               $" {model.Move.Axes[axis].Letter}{tool.Offsets[axis]:F2}");
-            }
-        }
-    }
-
-    /// <summary>
     /// M568: set a tool's active and standby temperatures, its spindle speed, and whether it is on
     /// </summary>
     /// <remarks>
@@ -248,14 +244,11 @@ internal partial class MCodeHandler
     {
         int toolNumber;
         float[]? active = null, standby = null;
+        uint? spindleRpm = null;
         ToolHeaterState? heaterState = null;
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        using (await model.AccessReadOnlyAsync(cancellationToken))
         {
-            Tool? tool = code.TryGetInt('P', out int given) ? toolManager.Find(given) : toolManager.Current;
-            if (tool is null)
-            {
-                return new Message(MessageType.Error, "No tool selected");
-            }
+            Tool tool = toolManager.GetSpecifiedOrCurrent(code);
             toolNumber = tool.Number;
 
             bool seen = false;
@@ -267,9 +260,9 @@ internal partial class MCodeHandler
                 seen |= code.TryGetFloatArray('R', hCount, out standby, pad: true);
                 seen |= code.TryGetFloatArray('S', hCount, out active, pad: true);
             }
-            if (code.TryGetInt('F', out int spindleRpm))
+            if (tool.Spindle > -1 && code.TryGetUInt('F', out uint rpm))
             {
-                tool.SpindleRpm = spindleRpm;
+                spindleRpm = rpm;
                 seen = true;
             }
             if (code.TryGetEnum('A', out ToolHeaterState requested))
@@ -301,6 +294,15 @@ internal partial class MCodeHandler
             }
         }
 
+        if (spindleRpm is uint rpmToSet)
+        {
+            Message reply = await toolManager.SetSpindleRpmAsync(toolNumber, (int)Math.Min(rpmToSet, int.MaxValue), cancellationToken);
+            if (!reply.Succeeded())
+            {
+                return reply;
+            }
+        }
+
         // A sets the heaters, not the tool's state (RRF GCodes.cpp SetOrReportOffsets)
         switch (heaterState)
         {
@@ -314,9 +316,6 @@ internal partial class MCodeHandler
                 await toolManager.HeatersToActiveOrStandbyAsync(toolNumber, true, cancellationToken);
                 break;
         }
-
-        // The spindle speed is applied when the spindle is started rather than now, which is what
-        // lets M568 F set it up before an M3 that carries no S
         return new Message();
     }
 
@@ -342,6 +341,10 @@ internal partial class MCodeHandler
             {
                 builder.Append(CultureInfo.InvariantCulture, $" {temperature:F1}");
             }
+        }
+        if (tool.Spindle > -1)
+        {
+            builder.Append(CultureInfo.InvariantCulture, $", spindle {tool.Spindle}@{tool.SpindleRpm}rpm");
         }
         return new Message(MessageType.Success, builder.ToString());
     }

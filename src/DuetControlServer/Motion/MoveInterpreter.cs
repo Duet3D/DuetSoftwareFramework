@@ -43,6 +43,10 @@ namespace DuetControlServer.Motion;
 /// <param name="closedEndstopSwitches">
 /// Which switches of an endstop are closed, switch by switch, as the arming needs them
 /// </param>
+/// <param name="extruderMovementAllowed">
+/// Whether the cold extrusion interlock lets an extruder be driven, given the move's tool, whether it extrudes
+/// forwards and the extruder number: <see cref="Heat.ColdExtrusionInterlock.ExtruderMovementAllowed"/>
+/// </param>
 internal sealed class MoveInterpreter(
     Model.ObjectModel model,
     MoveBuilder builder,
@@ -50,7 +54,8 @@ internal sealed class MoveInterpreter(
     BedCompensation bedCompensation,
     EndstopCorrection endstopCorrection,
     Func<Tool?> currentTool,
-    Func<int, uint> closedEndstopSwitches)
+    Func<int, uint> closedEndstopSwitches,
+    Func<Tool?, bool, int, bool> extruderMovementAllowed)
 {
     /// <summary>
     /// Millimetres per inch, for G20
@@ -394,13 +399,44 @@ internal sealed class MoveInterpreter(
             raw.Coords[drive] = segments.ExtrusionPerSegment[drive];
         }
 
+        Tool? tool = currentTool();
+        LeaveOutColdExtruders(raw, tool, segments.FirstExtruderDrive);
+
         if (raw.MoveType == MoveType.Normal)
         {
-            AxisAndBedTransform(raw, currentTool(), segments.NumAxes);
+            AxisAndBedTransform(raw, tool, segments.NumAxes);
         }
 
         // Each segment is its own move to the engine, so it needs its own correlation id
         raw.MoveId = 0;
+    }
+
+    /// <summary>
+    /// Leave out of a segment every extruder the cold extrusion interlock does not let be driven, so the axes move without it
+    /// </summary>
+    /// <param name="raw">The segment, whose extruder coordinates are the movement of each extruder</param>
+    /// <param name="tool">The tool the move was built for</param>
+    /// <param name="firstExtruderDrive">The lowest drive an extruder occupies</param>
+    /// <remarks>
+    /// RepRapFirmware's check in <c>DDA::Prepare</c>, made as each segment is queued so that it reads the temperatures
+    /// then. A move that checks endstops is exempt, as there. TODO RepRapFirmware also exempts a simulated job, whose
+    /// moves drive no motors; a simulated job here still drives them, so it is checked until it does not
+    /// </remarks>
+    private void LeaveOutColdExtruders(RawMove raw, Tool? tool, int firstExtruderDrive)
+    {
+        if (raw.CheckEndstops)
+        {
+            return;
+        }
+
+        for (int drive = firstExtruderDrive; drive < MotionLimits.MaxAxesPlusExtruders; drive++)
+        {
+            float movement = raw.Coords[drive];
+            if (movement != 0.0f && !extruderMovementAllowed(tool, movement > 0.0f, Parameters.DriveToExtruder(drive)))
+            {
+                raw.Coords[drive] = 0.0f;
+            }
+        }
     }
 
     /// <summary>

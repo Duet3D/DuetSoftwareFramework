@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
 using DuetControlServer.Link;
+using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Model;
+using DuetControlServer.Motion.Native;
+using DuetAPI;
 using Microsoft.Extensions.Logging;
 
 namespace DuetControlServer.Tools;
@@ -30,10 +34,11 @@ namespace DuetControlServer.Tools;
 /// <param name="model">Object model</param>
 /// <param name="macroRunner">Runs the tfree/tpre/tpost macros a tool change is made of</param>
 /// <param name="heatManager">Brings a tool's heaters to its active or standby temperatures</param>
+/// <param name="spindleManager">Drives a tool's spindle</param>
 /// <param name="eventLogger">Writes out what a heater said when a tool changed its state</param>
 /// <param name="logger">Logger</param>
-public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner,
-                                Heat.HeatManager heatManager, Utility.EventLogger eventLogger, ILogger<ToolManager> logger)
+public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner, Heat.HeatManager heatManager,
+                                Spindles.SpindleManager spindleManager, Utility.EventLogger eventLogger, ILogger<ToolManager> logger)
 {
     /// <summary>
     /// Highest tool number a machine may have
@@ -53,25 +58,51 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     public const int NoTool = -1;
 
     /// <summary>
+    /// Firmware retraction length a new tool starts with, in mm
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>DefaultRetractLength</c></remarks>
+    public const float DefaultRetractLength = 2.0f;
+
+    /// <summary>
+    /// Firmware retraction and unretraction speed a new tool starts with, in mm/s
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>DefaultRetractSpeed</c>, which is 1000 mm/min</remarks>
+    public const float DefaultRetractSpeed = 1000.0f / 60.0f;
+
+    /// <summary>
     /// Find a tool by number
     /// </summary>
     /// <param name="toolNumber">The number</param>
     /// <returns>The tool, or null if there is none with that number</returns>
     /// <remarks>
-    /// The collection is indexed by position rather than by tool number - a machine may define tools
-    /// 0 and 5 and nothing between - so this is a search rather than an index. The caller must hold
-    /// the object model lock
+    /// <c>tools[]</c> is indexed by tool number, with null where no tool has the number, as RepRapFirmware reports it.
+    /// The caller must hold the object model lock
     /// </remarks>
-    public Tool? Find(int toolNumber)
+    public Tool? Find(int toolNumber) => model.Tools.GetAt(toolNumber);
+
+    /// <summary>
+    /// The tool a code addresses: the one P names, or else the current tool
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>The tool</returns>
+    /// <exception cref="GCodeException">There is no tool to address</exception>
+    /// <remarks>RepRapFirmware's <c>GCodes::GetSpecifiedOrCurrentTool</c>. The caller must hold the object model lock</remarks>
+    public Tool GetSpecifiedOrCurrent(Commands.Code code)
     {
-        foreach (Tool? tool in model.Tools)
+        int toolNumber;
+        if (code.TryGetUInt('P', out uint given))
         {
-            if (tool is not null && tool.Number == toolNumber)
+            toolNumber = (int)Math.Min(given, int.MaxValue);
+        }
+        else
+        {
+            toolNumber = model.State.CurrentTool;
+            if (toolNumber < 0)
             {
-                return tool;
+                throw new GCodeException("No tool number given and no current tool");
             }
         }
-        return null;
+        return Find(toolNumber) ?? throw new GCodeException("Invalid tool number");
     }
 
     /// <summary>
@@ -104,7 +135,7 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     /// caller must hold the object model lock
     /// </remarks>
     public Tool? CurrentOrDefault
-        => Current ?? model.Tools.Where(tool => tool is not null).MinBy(tool => tool!.Number);
+        => Current ?? model.Tools.FirstOrDefault(tool => tool is not null);
 
     /// <summary>
     /// Check if the specified heater is used by a current tool other than the specified one.
@@ -284,140 +315,214 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     }
 
     /// <summary>
-    /// Define or redefine a tool (M563)
+    /// Check a tool definition, as RepRapFirmware's <c>Tool::Create</c> does before it builds the tool
     /// </summary>
-    /// <param name="definition">What the code asked for</param>
-    /// <returns>An error if the tool could not be defined, else null</returns>
+    /// <param name="definition">What M563 asked for</param>
+    /// <returns>Why the tool cannot be created, or null if it can</returns>
     /// <remarks>
-    /// <para>
-    /// RepRapFirmware's <c>ManageTool</c>. Redefining a tool deletes the old one first, so a config.g
-    /// that is re-run does not accumulate duplicates, and a definition naming no drives, heaters or
-    /// mappings deletes the tool outright - which is how <c>M563 P0</c> with nothing else removes it.
-    /// </para>
-    /// <para>
-    /// The caller must hold the object model write lock and must have brought the machine to
-    /// standstill: the offsets a tool carries are part of the transform every queued move was planned
-    /// against, so changing them under a queued move moves the machine
-    /// </para>
+    /// Heaters and fans are only range-checked, so a tool may name ones config.g has not created yet. The caller must
+    /// hold the object model lock
     /// </remarks>
-    public string? Define(ToolDefinition definition)
+    public string? Validate(ToolDefinition definition)
     {
-        if (definition.Number < 0 || definition.Number >= MaxTools)
-        {
-            return $"Tool number must be between 0 and {MaxTools - 1}";
-        }
-
-        // Two of X, Y and Z mapped to the same axis would make the transform ambiguous: a coordinate
-        // in one would have to be two different machine positions at once
-        if (Overlaps(definition.XMap, definition.YMap) || Overlaps(definition.XMap, definition.ZMap)
-            || Overlaps(definition.YMap, definition.ZMap))
-        {
-            return "Cannot map two or more of X,Y,Z to the same axis";
-        }
-
         foreach (int extruder in definition.Extruders)
         {
             if (extruder < 0 || extruder >= model.Move.Extruders.Count)
             {
-                return $"Extruder {extruder} does not exist";
+                return "bad drive number";
             }
         }
-        if (definition.Extruders.Count > MaxExtrudersPerTool)
-        {
-            return $"A tool may drive at most {MaxExtrudersPerTool} extruders";
-        }
 
-        foreach (int heater in definition.Heaters)
+        foreach (int heaterNumber in definition.Heaters)
         {
-            if (heater < 0 || heater >= model.Heat.Heaters.Count)
+            if (heaterNumber < 0 || heaterNumber >= Heat.HeatManager.MaxHeaters)
             {
-                return $"Heater {heater} does not exist";
+                return "bad heater number";
+            }
+            HeaterFunction function = heatManager.GetHeaterFunction(heaterNumber);
+            if (function is HeaterFunction.Bed or HeaterFunction.Chamber)
+            {
+                return $"heater {heaterNumber} is already assigned as a {((function == HeaterFunction.Bed) ? "bed" : "chamber")} heater";
             }
         }
 
-        Remove(definition.Number);
-
-        Tool tool = new()
+        if (definition.Spindle > -1)
         {
-            Number = definition.Number,
-            Name = definition.Name ?? string.Empty,
-            FilamentExtruder = definition.FilamentExtruder,
-            Spindle = definition.Spindle,
-            State = ToolState.Off
-        };
-
-        foreach (int extruder in definition.Extruders)
-        {
-            tool.Extruders.Add(extruder);
+            if (definition.Spindle >= Spindles.SpindleManager.MaxSpindles)
+            {
+                return "bad spindle number";
+            }
+            if (spindleManager.Find(definition.Spindle) is null)
+            {
+                return "unconfigured spindle";
+            }
         }
-        foreach (int heater in definition.Heaters)
-        {
-            tool.Heaters.Add(heater);
-
-            // One active and one standby temperature per heater, starting at absolute zero (RRF Tool::Create)
-            tool.Active.Add(Heat.HeatManager.AbsoluteZero);
-            tool.Standby.Add(Heat.HeatManager.AbsoluteZero);
-        }
-        foreach (int fan in definition.Fans)
-        {
-            // TODO drive these once there is a Fan subsystem: M106 addresses a tool's fans
-            tool.Fans.Add(fan);
-        }
-
-        // The axis maps in the order the object model documents, which is the order of the visible
-        // axes: X, then Y, then Z
-        tool.Axes.Add([.. definition.XMap]);
-        tool.Axes.Add([.. definition.YMap]);
-        tool.Axes.Add([.. definition.ZMap]);
-
-        // One offset per axis, so that the transform can index it by axis without a bounds check on
-        // every move
-        for (int axis = 0; axis < model.Move.Axes.Count; axis++)
-        {
-            tool.Offsets.Add(0.0f);
-        }
-
-        // An even mix by default, which is what a single-extruder tool needs and what RepRapFirmware
-        // gives a multi-extruder one until M567 says otherwise
-        float share = definition.Extruders.Count > 0 ? 1.0f / definition.Extruders.Count : 0.0f;
-        foreach (int _ in definition.Extruders)
-        {
-            tool.Mix.Add(share);
-        }
-
-        // Kept in tool-number order so that a client listing them gets them in the order the operator
-        // thinks of them, rather than in definition order
-        int position = 0;
-        while (position < model.Tools.Count && model.Tools[position] is Tool existing && existing.Number < tool.Number)
-        {
-            position++;
-        }
-        model.Tools.Insert(position, tool);
         return null;
     }
 
     /// <summary>
-    /// Delete a tool, deselecting it first if it is the one in use
+    /// Create a tool and add it to <c>tools[]</c>, giving its heaters the tool function
     /// </summary>
-    /// <param name="toolNumber">The number</param>
-    /// <returns>True if there was such a tool</returns>
-    /// <remarks>The caller must hold the object model write lock</remarks>
-    public bool Remove(int toolNumber)
+    /// <param name="definition">What M563 asked for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Why the tool was refused, or null if it was created</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Tool::Create</c> and <c>Tool::AddTool</c>. Any tool with the same number must already have
+    /// been deleted. The caller must not hold the object model lock, and must have brought the machine to standstill
+    /// </remarks>
+    public async ValueTask<string?> CreateAsync(ToolDefinition definition, CancellationToken cancellationToken)
     {
-        Tool? tool = Find(toolNumber);
-        if (tool is null)
+        using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            return false;
+            if (Validate(definition) is string refusal)
+            {
+                return refusal;
+            }
+
+            Tool tool = new()
+            {
+                Number = definition.Number,
+                Name = definition.Name ?? string.Empty,
+                FilamentExtruder = (definition.FilamentExtruder >= 0 && definition.FilamentExtruder < MotionLimits.MaxExtruders)
+                                   ? definition.FilamentExtruder : -1,
+                Spindle = definition.Spindle,
+                SpindleRpm = 0,
+                State = ToolState.Off
+            };
+            tool.Retraction.Length = DefaultRetractLength;
+            tool.Retraction.Speed = tool.Retraction.UnretractSpeed = DefaultRetractSpeed;
+
+            // The initial mix ratio is 1:0:0
+            for (int index = 0; index < definition.Extruders.Count; index++)
+            {
+                tool.Extruders.Add(definition.Extruders[index]);
+                tool.Mix.Add((index == 0) ? 1.0f : 0.0f);
+            }
+            foreach (int heaterNumber in definition.Heaters)
+            {
+                tool.Heaters.Add(heaterNumber);
+                tool.Active.Add(Heat.HeatManager.AbsoluteZero);
+                tool.Standby.Add(Heat.HeatManager.AbsoluteZero);
+                tool.FeedForwardPwm.Add(0.0f);
+                tool.FeedForwardTemp.Add(0.0f);
+            }
+            foreach (int fan in definition.Fans)
+            {
+                tool.Fans.Add(fan);
+            }
+
+            // The axis maps in the order the object model documents: X, then Y, then Z
+            tool.Axes.Add([.. definition.XMap]);
+            tool.Axes.Add([.. definition.YMap]);
+            tool.Axes.Add([.. definition.ZMap]);
+
+            // One offset per axis, so that the transform can index it by axis without a bounds check on every move
+            for (int axis = 0; axis < model.Move.Axes.Count; axis++)
+            {
+                tool.Offsets.Add(0.0f);
+            }
+
+            model.Tools.SetAt(definition.Number, tool);
         }
 
-        if (model.State.CurrentTool == toolNumber)
+        // Heat::SetAsToolHeater
+        foreach (int heaterNumber in definition.Heaters)
         {
-            // Deselected without running tfree.g: the tool is being removed rather than put down, and
-            // a macro that addressed it would be addressing something that no longer exists
-            model.State.CurrentTool = NoTool;
+            await heatManager.SetFunctionAsync(heaterNumber, HeaterFunction.Tool, cancellationToken);
         }
-        model.Tools.Remove(tool);
-        return true;
+        return null;
+    }
+
+    /// <summary>
+    /// Delete a tool, deselecting it first if it is the current tool and then switching its heaters off
+    /// </summary>
+    /// <param name="channel">Channel of the code deleting the tool</param>
+    /// <param name="toolNumber">The tool, which need not exist</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// <para>
+    /// RepRapFirmware's <c>GCodes::ManageTool</c>, which deselects the tool without running any tool change macro
+    /// (<c>MovementState::SelectTool(-1)</c>, which puts it on standby), and <c>Tool::DeleteTool</c>, which switches
+    /// off every heater of the tool. <c>tools[]</c> then ends at the highest-numbered tool left.
+    /// </para>
+    /// <para>
+    /// The caller must not hold the object model lock, and must have brought the machine to standstill: the offsets a
+    /// tool carries are part of the transform every queued move was planned against
+    /// </para>
+    /// </remarks>
+    public async ValueTask DeleteAsync(DuetAPI.CodeChannel channel, int toolNumber, CancellationToken cancellationToken)
+    {
+        bool selected;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            selected = model.State.CurrentTool == toolNumber;
+        }
+        if (selected)
+        {
+            await SelectAsync(channel, NoTool, ToolChangeParameters.None, null, cancellationToken);
+        }
+
+        List<int> heaters = [];
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(toolNumber) is not Tool tool)
+            {
+                return;
+            }
+            heaters.AddRange(tool.Heaters);
+            model.Tools.ClearAt(toolNumber, trim: true);
+        }
+
+        foreach (int heaterNumber in heaters)
+        {
+            await heatManager.SwitchOffAsync(heaterNumber, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Set the speed a tool's spindle turns at, and the running spindle's speed if the tool is the current one
+    /// </summary>
+    /// <param name="toolNumber">The tool, which need not exist</param>
+    /// <param name="rpm">The speed, where 0 stops the spindle</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>An error if the speed is outside the spindle's range or a board refused it</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Tool::SetSpindleRpm</c>, which does nothing for a tool without a spindle. The caller must not
+    /// hold the object model lock
+    /// </remarks>
+    public async ValueTask<Message> SetSpindleRpmAsync(int toolNumber, int rpm, CancellationToken cancellationToken)
+    {
+        int spindleNumber;
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            if (Find(toolNumber) is not Tool { Spindle: > -1 } tool)
+            {
+                return new Message();
+            }
+            spindleNumber = tool.Spindle;
+
+            if (rpm != 0)
+            {
+                if (spindleManager.Find(spindleNumber) is not Spindle spindle || !Spindles.SpindleManager.IsValidRpm(spindle, rpm))
+                {
+                    return new Message(MessageType.Error, "Requested spindle RPM out of range");
+                }
+                tool.SpindleRpm = rpm;
+                if (model.State.CurrentTool != toolNumber)
+                {
+                    return new Message();
+                }
+            }
+            else
+            {
+                tool.SpindleRpm = 0;
+            }
+        }
+
+        // Stopping applies to the spindle whichever tool is current (Spindle::SetState(stopped))
+        return (rpm == 0)
+            ? await spindleManager.StopAsync(spindleNumber, cancellationToken)
+            : await spindleManager.SetConfiguredRpmAsync(spindleNumber, rpm, updateCurrentRpm: true, cancellationToken);
     }
 
     /// <summary>
@@ -511,7 +616,4 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
             logger.LogDebug("No {File} for tool {Tool}", fileName, toolNumber);
         }
     }
-
-    private static bool Overlaps(IReadOnlyList<int> first, IReadOnlyList<int> second)
-        => first.Any(second.Contains);
 }

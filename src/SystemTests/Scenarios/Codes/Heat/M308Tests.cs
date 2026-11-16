@@ -93,7 +93,6 @@ public class M308Tests : BenchFixture
     /// {S, P "temp0", Y "thermistor", T, B, C, R}
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308SendsAThermistorToItsBoardAndRecordsIt()
     {
         await using Bench bench = await Bench.StartAsync();
@@ -151,7 +150,6 @@ public class M308Tests : BenchFixture
         new(Expansion.SpiCs(Machines.DriverBoard, 0), "rtd-max31865", AnalogSensorType.MAX31865, "rtdmax31865"),
         new(Expansion.SpiCs(Machines.DriverBoard, 0), "thermocouple-max31855", AnalogSensorType.MAX31855, "thermocouplemax31855"),
         new(Expansion.SpiCs(Machines.DriverBoard, 0), "thermocouple-max31856", AnalogSensorType.MAX31856, "thermocouplemax31856"),
-        new(Expansion.SpiCs(Machines.DriverBoard, 0), "current-loop", AnalogSensorType.CurrentLoop, "currentloop"),
         new(Expansion.Dummy(Machines.DriverBoard), "mcu-temp", AnalogSensorType.McuTemp, "mcutemp"),
         new(Expansion.Dummy(Machines.DriverBoard), "drivers", AnalogSensorType.Drivers, "drivers"),
     ];
@@ -163,13 +161,12 @@ public class M308Tests : BenchFixture
     /// <remarks>
     /// GetReducedString (StringParser.cpp) lowercases and drops '-' and '_' for both Y and P, which is
     /// what CanMessageGenericConstructor sends: regression cases m308-linear-analog ("linearanalog"),
-    /// m308-rtd-max31865, m308-thermocouple-max31856, m308-current-loop-sensor, m308-mcu-temp-sensor
+    /// m308-rtd-max31865, m308-thermocouple-max31856, m308-mcu-temp-sensor
     /// and m308-drivers-sensor ("dummy" port). The wiki says case, '-' and '_' are not significant.
     /// RRF itself reports "remote" for every expansion-board sensor (RemoteSensor.h "TODO save the
     /// actual type"); the object model has to say what the sensor is to recreate it
     /// </remarks>
     [TestCaseSource(nameof(SensorTypes))]
-    [Category("KnownGap")]
     public async Task M308SendsTheReducedTypeNameAndRecordsTheType(string port, string typeName, AnalogSensorType type, string wireType)
     {
         await using Bench bench = await Bench.StartAsync();
@@ -200,7 +197,6 @@ public class M308Tests : BenchFixture
     /// are documented as the linear analog sensor's, and beta and c as the thermistor's
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308LinearAnalogRecordsItsRange()
     {
         const float low = 0.0f, high = 100.0f;
@@ -220,23 +216,22 @@ public class M308Tests : BenchFixture
             Assert.That(sensor?.HighReading, Is.EqualTo(high).Within(1e-3), "C is sensors.analog[2].highReading");
             Assert.That(sensor?.Beta, Is.Null, "a linear analog sensor has no beta");
             Assert.That(sensor?.C, Is.Null, "nor a Steinhart-Hart C");
+            Assert.That(sensor?.Filtered, Is.True, "F1 is sensors.analog[2].filtered");
         });
     }
 
     /// <summary>
     /// The SPI sensors' own parameters reach the board as written: an RTD's reference resistor, wire
-    /// count and mains frequency, a thermocouple's type letter and mains frequency, and a current
-    /// loop's temperatures at 4 and 20 mA and its ADC channel
+    /// count and mains frequency, and a thermocouple's type letter and mains frequency
     /// </summary>
     /// <remarks>
-    /// Regression cases m308-rtd-max31865 (R400 W2 F50), m308-thermocouple-max31856 (K"K" F50) and
-    /// m308-current-loop-sensor (L0 H500 C1). K is a single-character parameter (ParamDescriptor
-    /// char_p). The wiki also documents D for a current loop, which M308V1Params cannot carry
+    /// Regression cases m308-rtd-max31865 (R400 W2 F50) and m308-thermocouple-max31856 (K"K" F50). K is
+    /// a single-character parameter (ParamDescriptor char_p)
     /// </remarks>
     [Test]
     public async Task M308SendsTheSpiSensorParameters()
     {
-        const float rtdReference = 400.0f, loopLow = 0.0f, loopHigh = 500.0f, loopChannel = 1.0f;
+        const float rtdReference = 400.0f;
         const int wires = 2, mainsFrequency = 50;
         const char thermocoupleType = 'K';
         await using Bench bench = await Bench.StartAsync();
@@ -245,11 +240,9 @@ public class M308Tests : BenchFixture
             $"M308 S2 P\"{Expansion.SpiCs(Machines.DriverBoard, 1)}\" Y\"rtd-max31865\" R{rtdReference} W{wires} F{mainsFrequency}"));
         await bench.Host.ExecuteCodeAsync(Invariant(
             $"M308 S3 P\"{Expansion.SpiCs(Machines.DriverBoard, 0)}\" Y\"thermocouple-max31856\" K\"{thermocoupleType}\" F{mainsFrequency}"));
-        await bench.Host.ExecuteCodeAsync(Invariant(
-            $"M308 S4 P\"{Expansion.SpiCs(Machines.DriverBoard, 2)}\" Y\"current-loop\" L{loopLow} H{loopHigh} C{loopChannel}"));
 
         CanMessageM308V1 Sent(int sensor) => SentM308(bench).Single(sent => sent.Message.S == sensor).Message;
-        CanMessageM308V1 rtd = Sent(2), thermocouple = Sent(3), loop = Sent(4);
+        CanMessageM308V1 rtd = Sent(2), thermocouple = Sent(3);
         Assert.Multiple(() =>
         {
             Assert.That(rtd.P, Is.EqualTo("spi.cs1"), "an SPI sensor's port is its chip select");
@@ -258,9 +251,17 @@ public class M308Tests : BenchFixture
             Assert.That(rtd.F, Is.EqualTo(mainsFrequency), "F is the mains frequency");
             Assert.That(thermocouple.K, Is.EqualTo(thermocoupleType), "K is the thermocouple type letter");
             Assert.That(thermocouple.F, Is.EqualTo(mainsFrequency), "F is the mains frequency");
-            Assert.That(loop.L, Is.EqualTo((short)loopLow), "L is the temperature at 4 mA");
-            Assert.That(loop.H, Is.EqualTo((short)loopHigh), "H is the temperature at 20 mA");
-            Assert.That(loop.C, Is.EqualTo(loopChannel).Within(1e-3), "C is the ADC channel");
+        });
+
+        AnalogSensor? rtdSensor = await bench.Host.ReadModelAsync(model => SensorAt(model, 2));
+        AnalogSensor? thermocoupleSensor = await bench.Host.ReadModelAsync(model => SensorAt(model, 3));
+        Assert.Multiple(() =>
+        {
+            Assert.That(rtdSensor?.RRef, Is.EqualTo(rtdReference).Within(1e-3), "an RTD's R is sensors.analog[].rRef");
+            Assert.That(rtdSensor?.Wires, Is.EqualTo(wires), "W is sensors.analog[].wires");
+            Assert.That(rtdSensor?.MainsFrequency, Is.EqualTo(mainsFrequency), "F is sensors.analog[].mainsFrequency");
+            Assert.That(thermocoupleSensor?.ThermocoupleType, Is.EqualTo(thermocoupleType.ToString()), "K is sensors.analog[].thermocoupleType");
+            Assert.That(thermocoupleSensor?.MainsFrequency, Is.EqualTo(mainsFrequency));
         });
     }
 
@@ -273,7 +274,6 @@ public class M308Tests : BenchFixture
     /// case m308-sensor-name-and-report: the report sends paramMap 0x00080, S alone
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308WithOnlySAsksTheBoardForItsReport()
     {
         string boardReport = Invariant($"type thermistor using pin {ThermistorPort}, last error ok, reading 0.0, T:{R25:F1} B:{Beta:F1} C:0.00e+0 R:2200.0 L:0 H:0");
@@ -311,7 +311,6 @@ public class M308Tests : BenchFixture
     /// sensors.analog[].lowReading and .highReading document
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308WithoutYAmendsTheExistingSensor()
     {
         const int high = 10, low = -10;
@@ -338,6 +337,86 @@ public class M308Tests : BenchFixture
             Assert.That(sensor?.Name, Is.EqualTo("renamed"), "A renames the sensor");
             Assert.That(sensor?.LowReading, Is.Null, "a thermistor's L is an ADC correction, not a low reading");
             Assert.That(sensor?.HighReading, Is.Null, "a thermistor's H is an ADC correction, not a high reading");
+            Assert.That(sensor?.AdcLowOffset, Is.EqualTo(low), "L is sensors.analog[2].adcLowOffset");
+            Assert.That(sensor?.AdcHighOffset, Is.EqualTo(high), "H is sensors.analog[2].adcHighOffset");
+        });
+    }
+
+    /// <summary>
+    /// A thermistor's B without C resets C to 0, and a new port on the same board clears the ADC
+    /// corrections, as the board does with its own copy
+    /// </summary>
+    /// <remarks>
+    /// Thermistor::Configure: "if user changes B and doesn't define C, assume C=0", and a port change calls
+    /// InitPort, which clears the ADC corrections. The board receives only what the code gave
+    /// </remarks>
+    [Test]
+    public async Task M308ThermistorBResetsCAndANewPortClearsTheAdcCorrections()
+    {
+        const float newBeta = 3950.0f;
+        const int low = -10, high = 10;
+        string newPort = Expansion.Temp(Machines.DriverBoard, 1);
+        await using Bench bench = await Bench.StartAsync(Invariant($"{ThermistorSensor} C{ShCText} L{low} H{high}"));
+
+        await bench.Host.ExecuteCodeAsync(Invariant($"M308 S{SensorNumber} B{newBeta}"));
+        AnalogSensor? afterB = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
+        (_, CanMessageM308V1 sentB) = bench.CanMaster.LastCanMessage<CanMessageM308V1>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(sentB.B, Is.EqualTo(newBeta).Within(1e-3), "B is sent as written");
+            Assert.That(sentB.C, Is.Null, "and C is not sent, the board resets its own");
+            Assert.That(afterB?.Beta, Is.EqualTo(newBeta).Within(1e-3));
+            Assert.That(afterB?.C, Is.Zero, "B without C makes C 0");
+            Assert.That(afterB?.AdcLowOffset, Is.EqualTo(low), "the ADC corrections are untouched by B");
+        });
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M308 S{SensorNumber} P\"{newPort}\"");
+        AnalogSensor? afterP = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
+        (byte board, CanMessageM308V1 sentP) = bench.CanMaster.LastCanMessage<CanMessageM308V1>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.Not.StartWith("Error:"), "a port on the same board needs no Y");
+            Assert.That(board, Is.EqualTo(Machines.DriverBoard));
+            Assert.That(sentP.P, Is.EqualTo("temp1"), "the new port goes to the board");
+            Assert.That(sentP.Y, Is.Null);
+            Assert.That(afterP?.Port, Is.EqualTo(newPort), "sensors.analog[2].port follows");
+            Assert.That(afterP?.Type, Is.EqualTo(AnalogSensorType.Thermistor));
+            Assert.That(afterP?.Beta, Is.EqualTo(newBeta).Within(1e-3), "the coefficients stay");
+            Assert.That(afterP?.AdcLowOffset, Is.Null, "a new port clears the ADC corrections");
+            Assert.That(afterP?.AdcHighOffset, Is.Null);
+        });
+    }
+
+    /// <summary>
+    /// An amendment the board refuses is an error and leaves what the object model records about the
+    /// sensor as it was, apart from the name, which is this side's alone
+    /// </summary>
+    /// <remarks>
+    /// RemoteSensor::Configure applies A (ConfigureCommonParameters) before it sends the rest to the board,
+    /// which holds every other setting and keeps its own when it refuses
+    /// </remarks>
+    [Test]
+    public async Task M308KeepsTheSettingsOfARefusedAmendment()
+    {
+        const string refusal = "Bad thermistor parameters";
+        await using Bench bench = await Bench.With($"{ThermistorSensor} U1")
+                                             .WithController(canMaster => canMaster.OnCanMessage(
+                (ushort)CanMessageType.M308V1, (fake, header, payload) =>
+                {
+                    bool refused = CanMessageSerializer.Deserialize<CanMessageM308V1>(payload).Y is null;
+                    fake.InjectStandardReply(header, refused ? CodeResult.Error : CodeResult.Ok, refused ? refusal : string.Empty);
+                })).StartAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync(Invariant($"M308 S{SensorNumber} T1000 B3000 U2 A\"renamed\""));
+
+        AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.StartWith("Error:").And.Contain(refusal), "the board's refusal is the reply");
+            Assert.That(sensor?.R25, Is.EqualTo(R25).Within(1e-3), "sensors.analog[2].r25 keeps what the board still has");
+            Assert.That(sensor?.Beta, Is.EqualTo(Beta).Within(1e-3), "and so does beta");
+            Assert.That(sensor?.OffsetAdj, Is.EqualTo(1.0f), "and the offset adjustment");
+            Assert.That(sensor?.Name, Is.EqualTo("renamed"), "the name is set before the board is asked");
         });
     }
 
@@ -394,7 +473,6 @@ public class M308Tests : BenchFixture
     /// no list form
     /// </remarks>
     [TestCaseSource(nameof(RefusedLines))]
-    [Category("KnownGap")]
     public async Task M308RefusesBeforeTellingTheBoard(string line)
     {
         await using Bench bench = await Bench.StartAsync(ThermistorSensor);
@@ -425,7 +503,6 @@ public class M308Tests : BenchFixture
     /// and m308-error-bad-port record M308 S2 after the sensor is gone as that error, with no CAN
     /// </remarks>
     [TestCaseSource(nameof(ParametersWithoutY))]
-    [Category("KnownGap")]
     public async Task M308RefusesASensorThatDoesNotExist(string parameters)
     {
         await using Bench bench = await Bench.StartAsync();
@@ -456,7 +533,6 @@ public class M308Tests : BenchFixture
     /// (GetNumSensorsToReport). Deleting a missing sensor is harmless (its teardown)
     /// </remarks>
     [TestCaseSource(nameof(NilPorts))]
-    [Category("KnownGap")]
     public async Task M308PNilDeletesTheSensor(string nil)
     {
         await using Bench bench = await Bench.StartAsync(ThermistorSensor);
@@ -498,7 +574,6 @@ public class M308Tests : BenchFixture
     /// and ~RemoteSensor sends {S, P "nil"} to the board the old sensor was on
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308WithYReplacesTheSensor()
     {
         string newPort = Expansion.Temp(OtherBoard, 1);
@@ -533,7 +608,6 @@ public class M308Tests : BenchFixture
     /// Heat::ConfigureSensor: "Sensor type parameter needed when moving a sensor to a different board"
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308RefusesToMoveASensorToAnotherBoardWithoutY()
     {
         await using Bench bench = await Bench.StartAsync(ThermistorSensor);
@@ -560,7 +634,6 @@ public class M308Tests : BenchFixture
     /// then P"nil", then "Sensor 2 does not exist")
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308DropsASensorTheBoardRefuses()
     {
         const string refusal = "Unknown pin name 'temp9'";
@@ -594,7 +667,6 @@ public class M308Tests : BenchFixture
     /// </summary>
     /// <remarks>Heat::ConfigureSensor calls DeleteSensor before TemperatureSensor::Create</remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308ReplacementTheBoardRefusesLeavesNoSensor()
     {
         await using Bench bench = await Bench.With(ThermistorSensor)
@@ -648,7 +720,6 @@ public class M308Tests : BenchFixture
     /// Heat::ConfigureSensor treats like any other failure: the new sensor is deleted
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M308DropsASensorWhoseBoardNeverAnswers()
     {
         await using Bench bench = await Bench.With()
@@ -700,11 +771,7 @@ public class M308Tests : BenchFixture
     /// and reports type "mcutemp" with a live reading. Here the main board is DuetCANMaster, which
     /// reports its MCU temperature over SPI
     /// </remarks>
-    /// <remarks>
-    /// We probably need to decide what this means in DSF4. Ie is it the Pi CPU, DuetCANMaster, or Duet3Expansion?
-    /// <remarks/>
     [Test]
-    [Category("KnownGap")]
     public async Task M308CreatesTheMainBoardMcuTemperatureSensor()
     {
         const float mcuTemp = 40.5f;
@@ -728,10 +795,73 @@ public class M308Tests : BenchFixture
                                            timeoutMs: 5_000);
     }
 
+    /// <summary>
+    /// M308 S on the main board's MCU temperature sensor is answered here, since no expansion board holds
+    /// it, and U and V adjust the reading it takes from boards[0].mcuTemp
+    /// </summary>
+    /// <remarks>
+    /// TemperatureSensor::Configure reports through CopyBasicDetails when nothing changes; regression case
+    /// m308-mcu-temp-sensor: "Sensor 3 (main MCU) type Microcontroller embedded temperature sensor, last
+    /// error ok, reading 40.3". TemperatureSensor::SetResult applies t * (1 + V) + U
+    /// </remarks>
+    [Test]
+    public async Task M308ReportsAndAdjustsTheMainBoardMcuTemperatureSensor()
+    {
+        const float mcuTemp = 40.5f, offset = 1.5f;
+        await using Bench bench = await Bench.StartAsync("M308 S3 Y\"mcu-temp\" A\"main MCU\"");
+        bench.CanMaster.InjectControllerBoardStatus(mcuTemp: mcuTemp);
+        await bench.Host.WaitForModelAsync(model => SensorAt(model, 3)?.LastReading,
+                                           reading => reading is > mcuTemp - 0.1f and < mcuTemp + 0.1f,
+                                           "sensors.analog[3].lastReading following the controller", timeoutMs: 5_000);
+
+        string report = await bench.Host.ExecuteCodeAsync("M308 S3");
+        Assert.Multiple(() =>
+        {
+            Assert.That(report.Trim(), Is.EqualTo(Invariant($"Sensor 3 (main MCU) type Microcontroller embedded temperature sensor, last error ok, reading {mcuTemp:F1}")),
+                        "the report is CopyBasicDetails'");
+            Assert.That(SentM308(bench), Is.Empty, "and no board is asked");
+        });
+
+        string adjusted = await bench.Host.ExecuteCodeAsync(Invariant($"M308 S3 U{offset}"));
+        bench.CanMaster.InjectControllerBoardStatus(mcuTemp: mcuTemp);
+        await bench.Host.WaitForModelAsync(model => SensorAt(model, 3)?.LastReading,
+                                           reading => reading is > mcuTemp + offset - 0.1f and < mcuTemp + offset + 0.1f,
+                                           "sensors.analog[3].lastReading carrying the offset", timeoutMs: 5_000);
+        Assert.That(adjusted.Trim(), Is.Empty, "a change is not a report");
+        Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, 3)?.OffsetAdj), Is.EqualTo(offset), "U is sensors.analog[3].offsetAdj");
+        Assert.That(SentM308(bench), Is.Empty);
+    }
+
+    /// <summary>Types that need a port, and the drivers sensor, which board 0 has no drivers for</summary>
+    private static readonly string[] PortlessTypes = ["thermistor", "drivers", "no-such-type"];
+
+    /// <summary>
+    /// Y without P is a sensor on the main board, which reads only its MCU temperature: anything else is
+    /// refused and leaves no sensor
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware creates a local sensor, whose Configure refuses a missing port ("Missing port name
+    /// parameter") and whose Create refuses an unknown type ("Unknown sensor type name"); its main board has
+    /// drivers, which board 0 here does not (rrf-differences.md, "A port name has to name an expansion board")
+    /// </remarks>
+    [TestCaseSource(nameof(PortlessTypes))]
+    public async Task M308RefusesAMainBoardSensorOtherThanTheMcu(string typeName)
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M308 S{SensorNumber} Y\"{typeName}\"");
+
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(SentM308(bench), Is.Empty, "no board is asked");
+            Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null, "and no sensor is created");
+        });
+    }
+
     /// <summary>A board's report carries the sensor's error state as well as its reading</summary>
     /// <remarks>TemperatureSensor::SetResult stores lastResult; regression case m950-heater-on-expansion records openCircuit</remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task ASensorReportCarriesTheErrorState()
     {
         await using Bench bench = await Bench.StartAsync(ThermistorSensor);
@@ -752,7 +882,6 @@ public class M308Tests : BenchFixture
     /// Heat::ProcessRemoteSensorsReport looks each sensor up rather than creating it
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task ASensorReportIsTakenOnlyFromTheSensorsBoard()
     {
         const float reading = 23.5f, wrongReading = 99.0f, markerReading = 50.0f;
@@ -791,7 +920,6 @@ public class M308Tests : BenchFixture
     /// a report sets lastTemperature to BadErrorTemperature (2000) and lastResult to timeout
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     [Category("LongRunning")]
     public async Task ASensorWhoseBoardStopsReportingTimesOut()
     {
