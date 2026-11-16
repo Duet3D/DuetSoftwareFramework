@@ -292,7 +292,6 @@ public class M205M566Tests : BenchFixture
     /// </summary>
     /// <remarks>RRF reads P with GetUIValue (StringParser::ReadUIValue, unsigned decimal only), which throws "expected number" on a minus sign</remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M566RefusesANegativeJerkPolicy()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye, "M566 P1");
@@ -394,6 +393,33 @@ public class M205M566Tests : BenchFixture
             Assert.That(MoveCapture.MmPerSecond(moves[1].Header.StartSpeed), Is.EqualTo(expected).Within(0.01f),
                         "and the second starts at it");
         });
+    }
+
+    /// <summary>
+    /// The axis jerks M566 read before refusing its E list stand, and the planner uses them
+    /// </summary>
+    /// <remarks>
+    /// RRF GCodes2.cpp case 566 calls SetInstantDv for each axis before GetFloatArray throws on an E
+    /// list longer than there are extruders, so the axes keep their new values
+    /// </remarks>
+    [Test]
+    public async Task AxisJerksReadBeforeARefusedExtruderListAreUsed()
+    {
+        const float machineJerkMmPerMin = 300.0f;
+        await using Bench bench = await Bench.With(Machines.Xye)
+                                             .WithSd(sd => sd.WriteMacro("corner.g", CornerMacro))
+                                             .StartRelativeAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M566 X{machineJerkMmPerMin} Y{machineJerkMmPerMin} E1:2");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error"), "Machines.Xye has one extruder");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Jerk), Is.EqualTo(machineJerkMmPerMin).Within(1e-2));
+        });
+
+        IReadOnlyList<ScheduledMove> moves = await bench.RunMoveAsync("M98 P\"0:/macros/corner.g\"");
+        Assert.That(MoveCapture.MmPerSecond(moves[0].Header.EndSpeed), Is.EqualTo(machineJerkMmPerMin / 60.0f).Within(0.01f),
+                    "the corner is taken at the new jerk");
     }
 
     /// <summary>

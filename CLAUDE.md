@@ -167,10 +167,19 @@ A behaviour change is acceptable where RRF's behaviour is inconsistent with the 
 
 When a feature depends on another feature that is not implemented yet, write the feature in the structure its final implementation will have. Put a minimal shim in place of the missing piece only where one is needed, with a `// TODO` describing what has to be added. Do not build a temporary version of the feature around the gap: implementing something once only to reimplement it when the dependency lands is wasted work, and a substitute behaviour hides the gap that a `TODO` keeps visible.
 
+## Implementing features
+
+These rules apply to every feature, port or fix, not only to RRF ports. The aim is a code base that is maintainable, robust and ready for what comes next, with one way of doing each thing.
+
+- Before adding a mechanism (a helper, a parameter reader, a model-to-engine refresh, a CAN exchange, a test helper), search for an existing one that does the same or a similar job, in DSF and in the libraries it builds on (`DuetAPI`, `lib/`, `src/SystemTests/Host`). Use it if it fits.
+- If an existing mechanism nearly fits, or does the job less well than what you need, improve it and move its other users onto the improved version, rather than adding a second way alongside it. Keep two ways of doing a similar thing only where the difference is real, and say what it is in a comment on the one that differs.
+- Fix a defect where it lives, in the shared mechanism, not in the one caller where it showed up, and check that mechanism's other callers for the same defect. A `// TODO` noting the same problem in several places is a sign that the fix belongs in shared code.
+- Be robust to failure part-way: a code refused after it has written some settings must leave the object model, and everything derived from it (the planner, the expansion boards), consistent with each other.
+- Shared mechanisms get unit tests of their own. Behaviour a user can observe gets system scenarios, as described under Tests.
+
 ## Code conventions
 
 - Look for an existing setting, config value or parameter before writing a numeric literal.
-- Refactor to a shared base instead of duplicating functionality.
 - Comments describe the code as it is; never narrate what was removed or moved.
 - Keep comments short: one line by default, saying what the code is for or the one fact a reader cannot get from the code.
 - A comment is not a record of the investigation. Scenarios, chains of cause and effect and arguments that the code is safe go in the commit message.

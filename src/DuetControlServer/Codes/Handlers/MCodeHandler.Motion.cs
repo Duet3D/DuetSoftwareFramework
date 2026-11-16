@@ -28,11 +28,11 @@ namespace DuetControlServer.Codes.Handlers;
 /// <para>
 /// Most of these write the object model and nothing else: <c>move.axes[]</c>,
 /// <c>move.extruders[]</c> and <c>move.motionSystems[]</c> are the configuration, and
-/// <see cref="Motion.MotionParameters"/> is rebuilt from them by
-/// <see cref="Motion.MovePlanner.RefreshTuningAsync"/> - or, for the few that change what a
-/// microstep means, by <see cref="Motion.MovePlanner.ReconfigureAsync"/> at standstill. There is
-/// deliberately no second copy of a
-/// setting anywhere in this file.
+/// <see cref="Motion.MotionParameters"/> is rebuilt from them. A setting that every move carries
+/// with it is written through <see cref="UpdateMoveTuningAsync"/>, which rebuilds the snapshot even
+/// when the code is refused part-way; one that changes what a microstep means, or the engine's
+/// shape, goes through <see cref="Motion.MovePlanner.ReconfigureAsync"/> at standstill. There is
+/// deliberately no second copy of a setting anywhere in this file.
 /// </para>
 /// <para>
 /// The geometry is the exception, and is being made the rule: M665, M666 and M669 configure
@@ -176,15 +176,15 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message> HandleAccelerationsAsync(Commands.Code code, bool reduced, CancellationToken cancellationToken)
+    /// <remarks>
+    /// Accelerations are not held by the engine at all - every move carries its own in
+    /// MoveParamsHeader. RepRapFirmware takes no lock here either, except for the S-curve T parameter
+    /// </remarks>
+    private ValueTask<Message> HandleAccelerationsAsync(Commands.Code code, bool reduced, CancellationToken cancellationToken)
     {
-        bool seen = false;
-        string? report = null;
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        return UpdateMoveTuningAsync(move =>
         {
-            Move move = model.Move;
-
+            bool seen = false;
             foreach (Axis axis in move.Axes)
             {
                 if (code.TryGetFloat(axis.Letter, out float value))
@@ -220,26 +220,13 @@ internal partial class MCodeHandler
             // TODO M201 T (not M201.1): the S-curve acceleration time, set at standstill with all movement locks held
             // and must be >= 0; move.accelerationTime starts at 0 and the report ends with it (RRF GCodes2.cpp case 201)
 
-            if (!seen)
-            {
-                report = ReportPerDrive(move, reduced ? "Reduced accelerations (mm/sec^2): " : "Accelerations (mm/sec^2): ",
-                                        axis => (reduced ? axis.ReducedAcceleration : axis.Acceleration).ToString("F1", CultureInfo.InvariantCulture),
-                                        extruder => extruder.Acceleration.ToString("F1", CultureInfo.InvariantCulture));
-            }
-        }
-
-        if (!seen)
-        {
-            return new Message(MessageType.Success, report!);
-        }
-
-        // Accelerations are not held by the engine at all - every move carries its own in
-        // MoveParamsHeader - so this only has to bring the snapshot the next move is built from up to
-        // date. RepRapFirmware takes no lock here either, except for the S-curve T parameter
-        // TODO an E that throws after the axes were written skips this refresh, so the object model shows the
-        // new accelerations and moves keep the old ones; RRF's axis values take effect (same in M203, M205/M566)
-        await planner.RefreshTuningAsync(cancellationToken);
-        return new Message();
+            return seen
+                ? new Message()
+                : new Message(MessageType.Success,
+                              ReportPerDrive(move, reduced ? "Reduced accelerations (mm/sec^2): " : "Accelerations (mm/sec^2): ",
+                                             axis => (reduced ? axis.ReducedAcceleration : axis.Acceleration).ToString("F1", CultureInfo.InvariantCulture),
+                                             extruder => extruder.Acceleration.ToString("F1", CultureInfo.InvariantCulture)));
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -248,18 +235,15 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message> HandleMaxFeedratesAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleMaxFeedratesAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         // Values are in mm/min unless S1 says they are in mm/sec
         bool mmPerSec = code.GetInt('S', defaultValue: 0) == 1;
         float toMmPerMin = mmPerSec ? SecondsPerMinute : 1.0f;
 
-        bool seen = false;
-        string? report = null;
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        return UpdateMoveTuningAsync(move =>
         {
-            Move move = model.Move;
+            bool seen = false;
 
             // The minimum first, because the maximum rates are held at or above it
             if (code.TryGetFloat('I', out float minimumSpeed))
@@ -287,24 +271,19 @@ internal partial class MCodeHandler
                 seen = true;
             }
 
-            if (!seen)
+            if (seen)
             {
-                float fromMmPerMin = mmPerSec ? 1.0f / SecondsPerMinute : 1.0f;
-                report = ReportPerDrive(move, $"Max speeds ({(mmPerSec ? "mm/sec" : "mm/min")}): ",
-                                        axis => (axis.Speed * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture),
-                                        extruder => (extruder.Speed * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture))
-                         + ", min. speed "
-                         + (move.MinSpeed * SecondsPerMinute * fromMmPerMin).ToString("F2", CultureInfo.InvariantCulture);
+                return new Message();
             }
-        }
 
-        if (!seen)
-        {
-            return new Message(MessageType.Success, report!);
-        }
-
-        await planner.RefreshTuningAsync(cancellationToken);
-        return new Message();
+            float fromMmPerMin = mmPerSec ? 1.0f / SecondsPerMinute : 1.0f;
+            return new Message(MessageType.Success,
+                               ReportPerDrive(move, $"Max speeds ({(mmPerSec ? "mm/sec" : "mm/min")}): ",
+                                              axis => (axis.Speed * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture),
+                                              extruder => (extruder.Speed * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture))
+                               + ", min. speed "
+                               + (move.MinSpeed * SecondsPerMinute * fromMmPerMin).ToString("F2", CultureInfo.InvariantCulture));
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -376,20 +355,16 @@ internal partial class MCodeHandler
     /// the jerk used while printing; M566 is in mm/min and sets the machine limit, which also pulls
     /// the printing jerk down to it
     /// </remarks>
-    private async ValueTask<Message> HandleJerkAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleJerkAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         bool mmPerSec = code.MajorNumber == 205;
         bool setMax = code.MajorNumber == 566;
         float toMmPerMin = mmPerSec ? SecondsPerMinute : 1.0f;
         float minJerkMmPerMin = Move.MinimumJerk;
 
-        bool seenAxis = false, seenExtruder = false;
-        string? report = null;
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        return UpdateMoveTuningAsync(move =>
         {
-            Move move = model.Move;
-
+            bool seenAxis = false, seenExtruder = false;
             foreach (Axis axis in move.Axes)
             {
                 if (code.TryGetFloat(axis.Letter, out float value))
@@ -411,37 +386,64 @@ internal partial class MCodeHandler
                 seenExtruder = true;
             }
 
-            if (setMax && code.TryGetInt('P', out int jerkPolicy))
+            if (setMax && code.TryGetUInt('P', out uint jerkPolicy, max: int.MaxValue))
             {
-                move.JerkPolicy = jerkPolicy;
+                move.JerkPolicy = (int)jerkPolicy;
                 seenAxis = true;
             }
 
             // An extruder-only M566 reports nothing, matching RepRapFirmware: the report is per axis
             // and would say nothing about what was just set
-            if (!seenAxis && !seenExtruder)
+            if (seenAxis || seenExtruder)
             {
-                float fromMmPerMin = mmPerSec ? 1.0f / SecondsPerMinute : 1.0f;
-                report = ReportPerDrive(move, $"{(setMax ? "Maximum" : "Current")} jerk rates ({(mmPerSec ? "mm/sec" : "mm/min")}): ",
-                                        axis => ((setMax ? axis.Jerk : axis.PrintingJerk) * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture),
-                                        extruder => ((setMax ? extruder.Jerk : extruder.PrintingJerk) * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture));
-                if (setMax)
-                {
-                    report += $", jerk policy: {move.JerkPolicy}";
-                }
+                return new Message();
+            }
+
+            float fromMmPerMin = mmPerSec ? 1.0f / SecondsPerMinute : 1.0f;
+            string report = ReportPerDrive(move, $"{(setMax ? "Maximum" : "Current")} jerk rates ({(mmPerSec ? "mm/sec" : "mm/min")}): ",
+                                           axis => ((setMax ? axis.Jerk : axis.PrintingJerk) * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture),
+                                           extruder => ((setMax ? extruder.Jerk : extruder.PrintingJerk) * fromMmPerMin).ToString("F1", CultureInfo.InvariantCulture));
+            if (setMax)
+            {
+                report += $", jerk policy: {move.JerkPolicy}";
+            }
+            return new Message(MessageType.Success, report);
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Write settings that every move carries with it, then rebuild the planner's snapshot of them
+    /// </summary>
+    /// <param name="update">Writes the settings to <c>move</c> under the object model's write lock and
+    /// returns the reply</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The reply <paramref name="update"/> returned</returns>
+    /// <remarks>
+    /// The snapshot is rebuilt whatever <paramref name="update"/> does once it has run, because a value
+    /// refused part-way through a line leaves the ones read before it written, as in RepRapFirmware,
+    /// and the next move has to be built from what the object model says. Rebuilding after a report
+    /// changes nothing
+    /// </remarks>
+    private async ValueTask<Message> UpdateMoveTuningAsync(Func<Move, Message> update, CancellationToken cancellationToken)
+    {
+        bool updateRan = false;
+        Message result;
+        try
+        {
+            using (await model.AccessReadWriteAsync(cancellationToken))
+            {
+                updateRan = true;
+                result = update(model.Move);
             }
         }
-
-        if (report is not null)
+        catch when (updateRan)
         {
-            return new Message(MessageType.Success, report);
+            await planner.RefreshTuningAsync(CancellationToken.None);
+            throw;
         }
 
-        if (seenAxis || seenExtruder)
-        {
-            await planner.RefreshTuningAsync(cancellationToken);
-        }
-        return new Message();
+        await planner.RefreshTuningAsync(cancellationToken);
+        return result;
     }
 
     /// <summary>
@@ -1725,10 +1727,11 @@ internal partial class MCodeHandler
             toUpdate.Add(new RemoteDrivers.DriverValue<ShortPressureAdvanceParameters>(e.Driver, p));
         }
 
+        // The coefficient rides on each move built from here on, so the moves already queued keep the
+        // one they were built with
         List<RemoteDrivers.DriverValue<ShortPressureAdvanceParameters>> toUpdate = [];
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        Message result = await UpdateMoveTuningAsync(move =>
         {
-            Move move = model.Move;
             ShortPressureAdvanceParameters p = new();
             p.K[0] = (Half)k0;
             p.K[1] = (Half)k1;
@@ -1739,35 +1742,26 @@ internal partial class MCodeHandler
             {
                 foreach (int extruder in selected)
                 {
-                    Extruder e = move.Extruders[extruder];
-                    UpdateExtruder(e, p, toUpdate);
-
+                    UpdateExtruder(move.Extruders[extruder], p, toUpdate);
+                }
+            }
+            else if (toolManager.Current is Tool ct)
+            {
+                foreach (int extruder in ct.Extruders)
+                {
+                    UpdateExtruder(move.Extruders[extruder], p, toUpdate);
                 }
             }
             else
             {
-                if (toolManager.Current is Tool ct)
-                {
-                    foreach (int extruder in ct.Extruders)
-                    {
-                        Extruder e = move.Extruders[extruder];
-                        UpdateExtruder(e, p, toUpdate);
-                    }
-                }
-                else
-                {
-                    return new Message(MessageType.Error, "No tool selected");
-                }
+                return new Message(MessageType.Error, "No tool selected");
             }
-        }
-
-        // Nothing is pushed to the motion engine: the coefficient rides on each move built from here
-        // on, so the moves already queued keep the one they were built with
-        await planner.RefreshTuningAsync(cancellationToken);
-
-        if (toUpdate.Count == 0)
-        {
             return new Message();
+        }, cancellationToken);
+
+        if (result.Type == MessageType.Error || toUpdate.Count == 0)
+        {
+            return result;
         }
 
         IList<Message> replies = await RemoteDrivers.SetPressureAdvanceAsync(linkInterface, toUpdate, cancellationToken);
@@ -1786,18 +1780,19 @@ internal partial class MCodeHandler
     /// <c>M592 D0 A0.01</c> also resets B and the limit. Updating only the parameters present would
     /// give a different machine from the same G-code.
     /// </remarks>
-    private async ValueTask<Message> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleNonlinearExtrusionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
         int extruderNumber = code.GetInt('D');
 
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        // No standstill flush: RRF takes no movement lock for M592
+        return UpdateMoveTuningAsync(move =>
         {
-            if (extruderNumber < 0 || extruderNumber >= model.Move.Extruders.Count)
+            if (extruderNumber < 0 || extruderNumber >= move.Extruders.Count)
             {
                 return new Message(MessageType.Error, $"Invalid extruder number '{extruderNumber}'");
             }
 
-            ExtruderNonlinear nonlinear = model.Move.Extruders[extruderNumber].Nonlinear;
+            ExtruderNonlinear nonlinear = move.Extruders[extruderNumber].Nonlinear;
             bool seenA = code.TryGetFloat('A', out float a);
             bool seenB = code.TryGetFloat('B', out float b);
             bool seenLimit = code.TryGetFloat('L', out float limit);
@@ -1820,12 +1815,8 @@ internal partial class MCodeHandler
             nonlinear.A = seenA ? a : 0.0F;
             nonlinear.B = seenB ? b : 0.0F;
             nonlinear.UpperLimit = seenLimit ? limit : DefaultNonlinearExtrusionLimit;
-        }
-
-        // No standstill flush: RRF takes no movement lock for M592, and the coefficients ride on each
-        // move built from here on rather than being pushed to the engine
-        await planner.RefreshTuningAsync(cancellationToken);
-        return new Message();
+            return new Message();
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -1844,14 +1835,12 @@ internal partial class MCodeHandler
     /// The shaper's impulses are computed by the motion engine from the type, frequency and damping,
     /// so what this writes is the configuration rather than the impulses themselves
     /// </remarks>
-    private async ValueTask<Message> HandleInputShapingAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleInputShapingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        bool seen = false;
-        string? report = null;
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        return UpdateMoveTuningAsync(move =>
         {
-            InputShaping shaping = model.Move.Shaping;
+            bool seen = false;
+            InputShaping shaping = move.Shaping;
 
             // F and S are read before P, as RepRapFirmware reads them (AxisShaper.cpp Configure):
             // a frequency or damping outside its limits refuses the code before the type it was
@@ -1882,22 +1871,17 @@ internal partial class MCodeHandler
                 shaping.Type = InputShapingType.ZVD;
             }
 
-            if (!seen)
+            if (seen)
             {
-                report = shaping.Type == InputShapingType.None
-                    ? "Input shaping is disabled"
-                    : string.Format(CultureInfo.InvariantCulture, "Input shaping '{0}' at {1:F1}Hz damping factor {2:F2}",
-                                    shaping.Type.ToString().ToLowerInvariant(), shaping.Frequency, shaping.Damping);
+                return new Message();
             }
-        }
 
-        if (!seen)
-        {
-            return new Message(MessageType.Success, report!);
-        }
-
-        await planner.RefreshTuningAsync(cancellationToken);
-        return new Message();
+            return new Message(MessageType.Success,
+                               shaping.Type == InputShapingType.None
+                                   ? "Input shaping is disabled"
+                                   : string.Format(CultureInfo.InvariantCulture, "Input shaping '{0}' at {1:F1}Hz damping factor {2:F2}",
+                                                   shaping.Type.ToString().ToLowerInvariant(), shaping.Frequency, shaping.Damping));
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -2184,15 +2168,11 @@ internal partial class MCodeHandler
     /// <param name="code">The code</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
-    private async ValueTask<Message> HandleBacklashAsync(Commands.Code code, CancellationToken cancellationToken)
+    private ValueTask<Message> HandleBacklashAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        bool seen = false;
-        string? report = null;
-
-        using (await model.AccessReadWriteAsync(cancellationToken))
+        return UpdateMoveTuningAsync(move =>
         {
-            Move move = model.Move;
-
+            bool seen = false;
             foreach (Axis axis in move.Axes)
             {
                 if (code.TryGetFloat(axis.Letter, out float backlash))
@@ -2208,25 +2188,19 @@ internal partial class MCodeHandler
                 seen = true;
             }
 
-            if (!seen)
+            if (seen)
             {
-                StringBuilder builder = new("Backlash correction (mm)");
-                foreach (Axis axis in move.Axes)
-                {
-                    builder.Append(CultureInfo.InvariantCulture, $" {axis.Letter}: {axis.Backlash:F3}");
-                }
-                builder.Append(CultureInfo.InvariantCulture, $", correction distance multiplier {move.BacklashFactor}");
-                report = builder.ToString();
+                return new Message();
             }
-        }
 
-        if (!seen)
-        {
-            return new Message(MessageType.Success, report!);
-        }
-
-        await planner.RefreshTuningAsync(cancellationToken);
-        return new Message();
+            StringBuilder builder = new("Backlash correction (mm)");
+            foreach (Axis axis in move.Axes)
+            {
+                builder.Append(CultureInfo.InvariantCulture, $" {axis.Letter}: {axis.Backlash:F3}");
+            }
+            builder.Append(CultureInfo.InvariantCulture, $", correction distance multiplier {move.BacklashFactor}");
+            return new Message(MessageType.Success, builder.ToString());
+        }, cancellationToken);
     }
 
     /// <summary>

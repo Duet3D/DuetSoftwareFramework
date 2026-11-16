@@ -396,23 +396,10 @@ public class CodeParameter
     {
         if (codeParameter is not null)
         {
-            if (codeParameter.ParsedValue is uint uintValue)
+            if (TryConvertToUInt(codeParameter.ParsedValue, out uint value))
             {
-                return uintValue;
+                return value;
             }
-            if (codeParameter.ParsedValue is DriverId driverIdValue)
-            {
-                return driverIdValue;
-            }
-            if (codeParameter.ParsedValue is int intValue)
-            {
-                return Convert.ToUInt32(intValue);
-            }
-            if (codeParameter.ParsedValue is float floatValue)
-            {
-                return Convert.ToUInt32(floatValue);
-            }
-            // long won't fit
         }
         throw new InvalidParameterTypeException(codeParameter, typeof(uint));
     }
@@ -429,23 +416,10 @@ public class CodeParameter
         {
             return null;
         }
-        if (codeParameter.ParsedValue is uint uintValue)
+        if (TryConvertToUInt(codeParameter.ParsedValue, out uint value))
         {
-            return uintValue;
+            return value;
         }
-        if (codeParameter.ParsedValue is DriverId driverIdValue)
-        {
-            return driverIdValue;
-        }
-        if (codeParameter.ParsedValue is int intValue)
-        {
-            return Convert.ToUInt32(intValue);
-        }
-        if (codeParameter.ParsedValue is float floatValue)
-        {
-            return Convert.ToUInt32(floatValue);
-        }
-        // long won't fit
         throw new InvalidParameterTypeException(codeParameter, typeof(uint?));
     }
 
@@ -685,36 +659,56 @@ public class CodeParameter
         {
             return uintArray;
         }
-        if (codeParameter.ParsedValue is uint uintValue)
-        {
-            return [uintValue];
-        }
         if (codeParameter.ParsedValue is DriverId[] driverIdArray)
         {
             return driverIdArray.Select(value => (uint)value).ToArray();
         }
-        if (codeParameter.ParsedValue is DriverId driverIdValue)
+        if (codeParameter.ParsedValue is Array array)
         {
-            return [driverIdValue];
+            uint[] result = new uint[array.Length];
+            for (int i = 0; i < array.Length; i++)
+            {
+                if (!TryConvertToUInt(array.GetValue(i), out result[i]))
+                {
+                    throw new InvalidParameterTypeException(codeParameter, typeof(uint[]));
+                }
+            }
+            return result;
         }
-        if (codeParameter.ParsedValue is int intValue && intValue >= 0)
+        if (TryConvertToUInt(codeParameter.ParsedValue, out uint value))
         {
-            return [Convert.ToUInt32(intValue)];
+            return [value];
         }
-        if (codeParameter.ParsedValue is int[] intArray && intArray.All(value => value >= 0))
-        {
-            return intArray.Select(Convert.ToUInt32).ToArray();
-        }
-        if (codeParameter.ParsedValue is float floatValue && floatValue >= 0F)
-        {
-            return [Convert.ToUInt32(floatValue)];
-        }
-        if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(value => value >= 0F))
-        {
-            return floatArray.Select(Convert.ToUInt32).ToArray();
-        }
-        // long won't fit
         throw new InvalidParameterTypeException(codeParameter, typeof(uint[]));
+    }
+
+    /// <summary>
+    /// Convert one parsed value to an unsigned integer, refusing a value it cannot hold
+    /// </summary>
+    /// <param name="parsedValue">Parsed value</param>
+    /// <param name="result">Converted value</param>
+    /// <returns>True if the value is a whole-number type or a float within the range of uint</returns>
+    /// <remarks>A float is rounded as <see cref="Convert.ToUInt32(float)"/> rounds it; a long does not fit</remarks>
+    private static bool TryConvertToUInt(object? parsedValue, out uint result)
+    {
+        switch (parsedValue)
+        {
+            case uint uintValue:
+                result = uintValue;
+                return true;
+            case DriverId driverIdValue:
+                result = driverIdValue;
+                return true;
+            case int intValue when intValue >= 0:
+                result = (uint)intValue;
+                return true;
+            case float floatValue when floatValue >= 0F && (double)floatValue <= uint.MaxValue:
+                result = Convert.ToUInt32(floatValue);
+                return true;
+            default:
+                result = default;
+                return false;
+        }
     }
 
     /// <summary>

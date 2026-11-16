@@ -1,3 +1,4 @@
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
@@ -16,6 +17,20 @@ public class Parameter
 
         long[] longArray = (long[])parameter;
         Assert.That(longArray, Is.EqualTo(new long[] { 4000000000L, 1L }));
+    }
+
+    [TestCase("-1")]
+    [TestCase("-0.5")]
+    [TestCase("5e9")]
+    public void UIntRefusesAValueOutsideItsRange(string value)
+    {
+        CodeParameter parameter = new('P', value, false, false);
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<InvalidParameterTypeException>(() => _ = (uint)parameter);
+            Assert.Throws<InvalidParameterTypeException>(() => _ = (uint?)parameter);
+            Assert.Throws<InvalidParameterTypeException>(() => _ = (uint[]?)parameter);
+        });
     }
 
     [Test]
