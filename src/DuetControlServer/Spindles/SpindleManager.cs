@@ -123,8 +123,28 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     /// is refused stops the rest: a spindle that is turning the wrong way must not then be given a
     /// speed
     /// </remarks>
-    public async ValueTask<Message> SetSpeedAsync(int spindleNumber, int rpm, bool reverse,
-                                                  CancellationToken cancellationToken)
+    public ValueTask<Message> SetSpeedAsync(int spindleNumber, int rpm, bool reverse,
+                                            CancellationToken cancellationToken)
+        => DriveAsync(spindleNumber, rpm, reverse, setConfiguredRpm: true, cancellationToken);
+
+    /// <summary>
+    /// Stop a spindle, keeping the speed it was configured to turn at
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>Spindle::SetState(SpindleState::stopped)</c></remarks>
+    public ValueTask<Message> StopAsync(int spindleNumber, CancellationToken cancellationToken)
+        => DriveAsync(spindleNumber, 0, reverse: false, setConfiguredRpm: false, cancellationToken);
+
+    /// <summary>
+    /// Write a spindle's outputs for a speed and direction
+    /// </summary>
+    /// <param name="spindleNumber">The spindle</param>
+    /// <param name="rpm">Speed to turn at, 0 to stop</param>
+    /// <param name="reverse">Whether to turn counter-clockwise</param>
+    /// <param name="setConfiguredRpm">Whether the speed also becomes <c>spindles[].active</c>, the configured RPM</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>What the boards said</returns>
+    private async ValueTask<Message> DriveAsync(int spindleNumber, int rpm, bool reverse, bool setConfiguredRpm,
+                                                CancellationToken cancellationToken)
     {
         SpindlePorts ports;
         float pwm;
@@ -146,7 +166,10 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
             }
 
             pwm = PwmForRpm(spindle, rpm);
-            spindle.Active = rpm;
+            if (setConfiguredRpm)
+            {
+                spindle.Active = rpm;
+            }
             spindle.Current = rpm;
             spindle.State = rpm == 0 ? SpindleState.Stopped
                             : reverse ? SpindleState.Reverse : SpindleState.Forward;
@@ -185,12 +208,6 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
     }
 
     /// <summary>
-    /// Stop a spindle
-    /// </summary>
-    public ValueTask<Message> StopAsync(int spindleNumber, CancellationToken cancellationToken)
-        => SetSpeedAsync(spindleNumber, 0, reverse: false, cancellationToken);
-
-    /// <summary>
     /// Whether a spindle can turn at a speed
     /// </summary>
     /// <remarks>RepRapFirmware's <c>Spindle::IsValidRpm</c>. The caller must hold the object model lock</remarks>
@@ -226,20 +243,9 @@ public sealed class SpindleManager(Model.ObjectModel model, GpioManager gpioMana
         {
             return new Message();
         }
-        if (state is SpindleState.Forward or SpindleState.Reverse)
-        {
-            return await SetSpeedAsync(spindleNumber, rpm, state == SpindleState.Reverse, cancellationToken);
-        }
-
-        Message reply = await StopAsync(spindleNumber, cancellationToken);
-        using (await model.AccessReadWriteAsync(cancellationToken))
-        {
-            if (Find(spindleNumber) is Spindle spindle)
-            {
-                spindle.Active = rpm;
-            }
-        }
-        return reply;
+        return (state is SpindleState.Forward or SpindleState.Reverse)
+            ? await SetSpeedAsync(spindleNumber, rpm, state == SpindleState.Reverse, cancellationToken)
+            : await StopAsync(spindleNumber, cancellationToken);
     }
 
     /// <summary>

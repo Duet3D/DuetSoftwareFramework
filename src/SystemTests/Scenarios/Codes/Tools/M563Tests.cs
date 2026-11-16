@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using DuetControlServer.Heat;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Spindles;
 using DuetControlServer.Tools;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
@@ -433,6 +434,43 @@ public class M563Tests : BenchFixture
 
         await host.ExecuteCodeAsync("M563 P0 R-1 D-1 H-1");
         Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "M563 P0 R-1 D-1 H-1 deletes the tool (RRF GCodes::ManageTool)");
+    }
+
+    /// <summary>The ways M563 replaces the selected spindle tool: deleting it, and redefining it</summary>
+    private static readonly TestCaseData[] SpindleToolReplacements =
+    [
+        new TestCaseData("M563 P0 R-1 D-1 H-1", 0).SetArgDisplayNames("deleted"),
+        new TestCaseData($"M563 P0 R{Spindle} S\"Renamed\"", 1).SetArgDisplayNames("redefined"),
+    ];
+
+    /// <summary>
+    /// Deleting or redefining the selected tool stops its running spindle, which keeps its configured RPM
+    /// </summary>
+    /// <remarks>
+    /// GCodes::ManageTool deselects the tool with SelectTool(-1), whose Tool::Standby sets the spindle's state to
+    /// stopped (Tool.cpp, following NIST M6); Spindle::SetState leaves the configured RPM alone
+    /// </remarks>
+    [TestCaseSource(nameof(SpindleToolReplacements))]
+    public async Task M563StopsTheSpindleOfTheSelectedTool(string code, int toolsLeft)
+    {
+        const int rpm = 5000;
+        await using Bench bench = await Bench.StartAsync(SpindleConfig, $"M563 P0 R{Spindle}\nT0\nM3 S{rpm}");
+        DcsTestHost host = bench.Host;
+        Assert.That(await host.ReadModelAsync(model => model.Spindles[Spindle]!.State), Is.EqualTo(SpindleState.Forward),
+                    "precondition: the selected tool's spindle is running");
+
+        await host.ExecuteCodeAsync(code);
+        Spindle spindle = await host.ReadModelAsync(model => model.Spindles[Spindle]!);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(spindle.State, Is.EqualTo(SpindleState.Stopped), "the spindle is stopped (RRF Tool::Standby)");
+            Assert.That(spindle.Current, Is.Zero, "and turns at 0 rpm");
+            Assert.That(spindle.Active, Is.EqualTo(rpm), "but keeps its configured RPM (RRF Spindle::SetState)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageWriteGpio>().Select(write => (write.Board, write.Message.PortNumber, write.Message.Pwm)),
+                        Is.EqualTo(new[] { (Machines.DriverBoard, (byte)SpindleManager.PortNumberFor(Spindle, 0), 0.0f) }),
+                        "its PWM port is written to 0");
+            Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.EqualTo(toolsLeft), "tools[] after the code");
+        });
     }
 
     /// <summary>A definition RRF's Tool::Create or ManageTool rejects is an error and creates no tool</summary>

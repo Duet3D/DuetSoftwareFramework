@@ -512,9 +512,10 @@ public class M308Tests : BenchFixture
     /// </summary>
     /// <remarks>
     /// Heat::ConfigureSensor opens with gb.MustSee('S') and refuses S >= MaxSensors; the limits are
-    /// ConfigureCommonParameters' and PopulateFromCommand's, which throw before the message is sent.
-    /// Regression case error-missing-parameters-heaters records the bare M308 as an error. There is
-    /// no list form
+    /// ConfigureCommonParameters' and PopulateFromCommand's, which throw before an existing sensor's
+    /// board is sent anything. Regression case error-missing-parameters-heaters records the bare M308
+    /// as an error. There is no list form. A new sensor refused this way is
+    /// <see cref="M308ReleasesBothBoardsOfARefusedReplacement"/>
     /// </remarks>
     [TestCaseSource(nameof(RefusedLines))]
     public async Task M308RefusesBeforeTellingTheBoard(string line)
@@ -533,6 +534,38 @@ public class M308Tests : BenchFixture
                         "and the existing one keeps its offset adjustment");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)?.SlopeAdj), Is.Zero,
                         "and its slope adjustment");
+        });
+    }
+
+    /// <summary>Settings a new sensor is refused for before its board is asked</summary>
+    private static readonly string[] RefusedNewSensorSettings = [" U20.5", " V0.25", " K\"KK\""];
+
+    /// <summary>
+    /// A new sensor whose settings are refused releases the old sensor's port and then its own, and leaves no
+    /// sensor
+    /// </summary>
+    /// <remarks>
+    /// Heat::ConfigureSensor deletes the old sensor, creates the RemoteSensor and only then configures it; the
+    /// GCodeException its Configure throws is caught, the new sensor deleted and ~RemoteSensor sends
+    /// M308 S P"nil" to the board it was created on
+    /// </remarks>
+    [TestCaseSource(nameof(RefusedNewSensorSettings))]
+    public async Task M308ReleasesBothBoardsOfARefusedReplacement(string settings)
+    {
+        await using Bench bench = await Bench.StartAsync(ThermistorSensor);
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M308 S{SensorNumber} P\"{ThermistorPort}\" Y\"thermistor\"{settings}");
+
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"), "the new sensor is refused");
+            Assert.That(SentM308(bench).Select(sent => (sent.Board, (int?)sent.Message.S, sent.Message.P)),
+                        Is.EqualTo(new[]
+                        {
+                            (Machines.DriverBoard, (int?)SensorNumber, "nil"),
+                            (Machines.DriverBoard, (int?)SensorNumber, "nil"),
+                        }), "the old sensor's board and then the new one's are told to release the sensor");
+            Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null, "and no sensor is left");
         });
     }
 

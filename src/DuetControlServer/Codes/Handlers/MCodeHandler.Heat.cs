@@ -70,8 +70,9 @@ internal partial class MCodeHandler
     /// <returns>The result</returns>
     /// <remarks>
     /// The old sensor is deleted first, whether or not the new one can be made, and the new one starts from
-    /// nothing rather than from the old one's settings. A sensor its board refuses, or whose board does not
-    /// answer, is deleted again (<c>Heat::ConfigureSensor</c>, <c>~RemoteSensor</c>)
+    /// nothing rather than from the old one's settings. A sensor whose settings are refused, whose board refuses
+    /// it or whose board does not answer is released on that board again (<c>Heat::ConfigureSensor</c>, which
+    /// creates the sensor before configuring it, and <c>~RemoteSensor</c>)
     /// </remarks>
     private async ValueTask<Message> CreateSensorAsync(Commands.Code code, int sensorNumber, string? port, string typeName,
                                                        CancellationToken cancellationToken)
@@ -79,10 +80,10 @@ internal partial class MCodeHandler
         await DeleteSensorAsync(sensorNumber, cancellationToken);
 
         AnalogSensorType type = AnalogSensorTypeConverter.Parse(typeName);
-        SensorSettings settings = SensorSettings.Read(code, type, portChanged: true);
         if (port is null)
         {
-            return await CreateMainBoardSensorAsync(sensorNumber, type, typeName, settings, cancellationToken);
+            return await CreateMainBoardSensorAsync(sensorNumber, type, typeName,
+                                                    SensorSettings.Read(code, type, portChanged: true), cancellationToken);
         }
 
         if (!IoPorts.TrySplitPort(port, "Sensor port", out byte board, out _, out string? error))
@@ -90,8 +91,19 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, error);
         }
 
+        SensorSettings settings;
         CanMessageM308V1 message = default;
-        message.FromCode(code);
+        try
+        {
+            settings = SensorSettings.Read(code, type, portChanged: true);
+            message.FromCode(code);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            await ReleaseSensorAsync(board, sensorNumber, cancellationToken);
+            throw;
+        }
+
         AnalogSensor sensor;
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -268,9 +280,8 @@ internal partial class MCodeHandler
     /// <param name="cancellationToken">Cancellation token</param>
     /// <param name="expected">The sensor to delete, or null for whichever holds the number</param>
     /// <remarks>
-    /// RepRapFirmware's <c>Heat::DeleteSensor</c> and <c>~RemoteSensor</c>, which sends the board
-    /// <c>M308 S P"nil"</c>. What the board says to that is not read: a destructor cannot fail, so a board
-    /// that is unreachable or has already forgotten the sensor must not keep it alive here
+    /// RepRapFirmware's <c>Heat::DeleteSensor</c>. The sensor leaves the object model whatever its board says to
+    /// <see cref="ReleaseSensorAsync"/>, as a destructor cannot fail
     /// </remarks>
     private async ValueTask DeleteSensorAsync(int sensorNumber, CancellationToken cancellationToken, AnalogSensor? expected = null)
     {
@@ -285,6 +296,21 @@ internal partial class MCodeHandler
             sensorManager.Delete(sensorNumber);
         }
 
+        await ReleaseSensorAsync(board, sensorNumber, cancellationToken);
+    }
+
+    /// <summary>
+    /// Tell a board to free the port of a sensor number
+    /// </summary>
+    /// <param name="board">The board</param>
+    /// <param name="sensorNumber">The sensor</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// <c>~RemoteSensor</c>'s <c>M308 S P"nil"</c>, whose reply is not read: a board that is unreachable or
+    /// has no such sensor cannot be made to let go of it. The caller must not hold the object model lock
+    /// </remarks>
+    private async ValueTask ReleaseSensorAsync(byte board, int sensorNumber, CancellationToken cancellationToken)
+    {
         if (!CanAddresses.HasNoHardware(board))
         {
             CanMessageM308V1 release = default;

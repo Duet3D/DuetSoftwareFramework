@@ -281,13 +281,13 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     /// Switch a tool's heaters to their active temperatures and make the tool active
     /// </summary>
     /// <remarks>
-    /// RepRapFirmware's <c>Tool::Activate</c>. The tool must already be the selected tool. The caller must not hold the
-    /// object model lock
+    /// RepRapFirmware's <c>Tool::Activate</c>, which also stops the tool's spindle and gives it the tool's RPM to start
+    /// at. The tool must already be the selected tool. The caller must not hold the object model lock
     /// </remarks>
     public async ValueTask ActivateAsync(int toolNumber, CancellationToken cancellationToken)
     {
-        // TODO RRF's Tool::Activate also stops the tool's spindle and restores its configured RPM
         await HeatersToActiveOrStandbyAsync(toolNumber, true, cancellationToken);
+        await StopSpindleAsync(toolNumber, restoreToolRpm: true, cancellationToken);
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             if (Find(toolNumber) is Tool tool)
@@ -300,17 +300,55 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     /// <summary>
     /// Switch a tool's heaters to their standby temperatures and put the tool on standby
     /// </summary>
-    /// <remarks>RepRapFirmware's <c>Tool::Standby</c>. The caller must not hold the object model lock</remarks>
+    /// <remarks>
+    /// RepRapFirmware's <c>Tool::Standby</c>, which also stops the tool's spindle. The caller must not hold the object
+    /// model lock
+    /// </remarks>
     public async ValueTask StandbyAsync(int toolNumber, CancellationToken cancellationToken)
     {
-        // TODO RRF's Tool::Standby also stops the tool's spindle
         await HeatersToActiveOrStandbyAsync(toolNumber, false, cancellationToken);
+        await StopSpindleAsync(toolNumber, restoreToolRpm: false, cancellationToken);
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             if (Find(toolNumber) is Tool tool)
             {
                 tool.State = ToolState.Standby;
             }
+        }
+    }
+
+    /// <summary>
+    /// Stop a tool's spindle, if it has one, as a tool change does
+    /// </summary>
+    /// <param name="toolNumber">The tool</param>
+    /// <param name="restoreToolRpm">Whether the spindle then takes the tool's RPM as the speed it starts at</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <remarks>
+    /// <c>Tool::Activate</c> and <c>Tool::Standby</c>, following the NIST M6 rule that the spindle is stopped once a
+    /// tool change is complete. What the spindle's boards say is reported rather than failing the tool change, as a
+    /// heater's is. The caller must not hold the object model lock
+    /// </remarks>
+    private async ValueTask StopSpindleAsync(int toolNumber, bool restoreToolRpm, CancellationToken cancellationToken)
+    {
+        int spindleNumber, toolRpm;
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            if (Find(toolNumber) is not Tool { Spindle: >= 0 } tool)
+            {
+                return;
+            }
+            spindleNumber = tool.Spindle;
+            toolRpm = tool.SpindleRpm;
+        }
+
+        Message reply = await spindleManager.StopAsync(spindleNumber, cancellationToken);
+        if (reply.Succeeded() && restoreToolRpm)
+        {
+            reply = await spindleManager.SetConfiguredRpmAsync(spindleNumber, toolRpm, updateCurrentRpm: false, cancellationToken);
+        }
+        if (reply.Type != MessageType.Success)
+        {
+            await eventLogger.LogOutputAsync(reply, cancellationToken);
         }
     }
 
@@ -422,6 +460,8 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
                 tool.Offsets.Add(0.0f);
             }
 
+            // TODO RRF's Tool::Create also gives the filament extruder the filament loaded in it, from the Filament
+            // instance shared by every tool on that extruder (filaments.csv); that needs the filament subsystem (M701-M703)
             model.Tools.SetAt(definition.Number, tool);
         }
 
@@ -519,10 +559,16 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
             }
         }
 
-        // Stopping applies to the spindle whichever tool is current (Spindle::SetState(stopped))
-        return (rpm == 0)
-            ? await spindleManager.StopAsync(spindleNumber, cancellationToken)
-            : await spindleManager.SetConfiguredRpmAsync(spindleNumber, rpm, updateCurrentRpm: true, cancellationToken);
+        if (rpm != 0)
+        {
+            return await spindleManager.SetConfiguredRpmAsync(spindleNumber, rpm, updateCurrentRpm: true, cancellationToken);
+        }
+
+        // Stopping applies to the spindle whichever tool is current, and clears the speed it would start at
+        Message reply = await spindleManager.StopAsync(spindleNumber, cancellationToken);
+        return reply.Succeeded()
+            ? await spindleManager.SetConfiguredRpmAsync(spindleNumber, 0, updateCurrentRpm: false, cancellationToken)
+            : reply;
     }
 
     /// <summary>
