@@ -28,6 +28,31 @@ public partial class DriverConfig : ModelObject, IStaticModelObject
     private int? _blankingTime;
 
     /// <summary>
+    /// Chopper control register of the driver (M569 C), or null if it has not been set
+    /// </summary>
+    /// <remarks>
+    /// The off time, blanking time and hysteresis start and end are fields of this register. Once it
+    /// has been set, setting one of them on its own (M569 F, B or Y) changes it here too, and setting
+    /// it changes them
+    /// </remarks>
+    public uint? ChopperControl
+    {
+        get => _chopperControl;
+        set => SetPropertyValue(ref _chopperControl, value);
+    }
+    private uint? _chopperControl;
+
+    /// <summary>
+    /// Brake of the driver (M569.7)
+    /// </summary>
+    public DriverBrake Brake { get; } = new DriverBrake();
+
+    /// <summary>
+    /// Closed loop settings of the driver (M569.1)
+    /// </summary>
+    public DriverClosedLoopConfig ClosedLoop { get; } = new DriverClosedLoopConfig();
+
+    /// <summary>
     /// coolStep threshold, as a microstep interval (M569 H)
     /// </summary>
     public int? CoolStepThreshold
@@ -112,4 +137,9 @@ public partial class DriverConfig : ModelObject, IStaticModelObject
     /// Step pulse timings in microseconds, as step time, step interval, direction setup and direction hold (M569 T)
     /// </summary>
     public ObservableCollection<float> StepTiming { get; } = [];
+
+    /// <summary>
+    /// Sine table waveform correction of the driver, one entry per corrected harmonic (M569.2 S, J and O)
+    /// </summary>
+    public StaticModelCollection<DriverWaveformCorrection> WaveformCorrection { get; } = [];
 }

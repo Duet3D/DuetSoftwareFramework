@@ -252,6 +252,19 @@ public class M569Point5Tests : BenchFixture
                         "the board is never asked for a collection there is nothing to collect");
         });
     }
+
+    /// <summary>
+    /// M569.5 without P is refused before anything reaches the bus
+    /// </summary>
+    /// <remarks>RRF GCodes3.cpp ConfigureDriver <c>gb.MustSee('P')</c></remarks>
+    [Test]
+    public async Task M569Point5WithoutPIsRefused()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 S200 D{Filter}")).TrimEnd(), Is.EqualTo("Error: M569.5: missing parameter 'P'"));
+        Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
+    }
 }
 
 /// <summary>

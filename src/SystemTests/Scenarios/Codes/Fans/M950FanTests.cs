@@ -414,4 +414,129 @@ public class M950FanTests : BenchFixture
                         "and a report for a fan that was never created adds nothing to fans[]");
         });
     }
+
+    /// <summary>
+    /// A board that refuses a fan's port leaves the fan number empty, rather than a fan in the object
+    /// model that no board drives
+    /// </summary>
+    /// <remarks>
+    /// FansManager::ConfigureFanPort keeps the new RemoteFan only when ConfigurePort succeeds, and the
+    /// fan that held the number was deleted before it
+    /// </remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task ARefusedFanPortLeavesNoFan()
+    {
+        await using Bench bench = await Bench.StartAsync(Fan0Config);
+        bench.CanMaster.AnswerWith<CanMessageM950Fan>(message => message.C == "out6"
+            ? (CodeResult.Error, "Pin 1.out6 is not free")
+            : (CodeResult.Ok, string.Empty));
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 6)}\"");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error:").And.Contain("is not free"), "the board's refusal is the result");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
+                        "and fans[0] is empty: the old fan was deleted and the new one refused");
+        });
+    }
+
+    /// <summary>
+    /// M950 F Q with no port that the board refuses leaves fans[].frequency at what the board still has
+    /// </summary>
+    /// <remarks>RemoteFan::SetFanParameters updates its copy only when the board's reply Succeeded</remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task ARefusedFanFrequencyChangeIsNotRecorded()
+    {
+        await using Bench bench = await Bench.StartAsync(Fan0Config);
+        bench.CanMaster.ReportWith<CanMessageM950Fan>("Frequency out of range", CodeResult.Error);
+
+        string reply = await bench.Host.ExecuteCodeAsync("M950 F0 Q100 K4");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"), "the board's refusal is the result");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.Frequency), Is.EqualTo(500),
+                        "fans[0].frequency keeps the frequency the board still has");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.TachoPpr), Is.EqualTo(2.0).Within(1e-3),
+                        "and fans[0].tachoPpr its pulses per revolution");
+        });
+    }
+
+    /// <summary>
+    /// M950 F Q is clamped to the range a PWM frequency can have rather than refused
+    /// </summary>
+    /// <remarks>FansManager::ConfigureFanPort reads Q with GetPwmFrequency, which constrains it to 1..65535</remarks>
+    [TestCase(0, 1)]
+    [TestCase(100000, 65535)]
+    [Category("KnownGap")]
+    public async Task M950ClampsTheFanFrequency(int requested, int expected)
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 3)}\" Q{requested}");
+        (_, CanMessageM950Fan sent) = bench.CanMaster.LastCanMessage<CanMessageM950Fan>();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(sent.Q, Is.EqualTo(expected), "the board is sent the clamped frequency");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.Frequency), Is.EqualTo(expected),
+                        "and fans[0].frequency records it");
+        });
+    }
+
+    /// <summary>
+    /// The fan port name is reduced as RepRapFirmware reads it, and the reduced form is what is
+    /// recorded and sent
+    /// </summary>
+    /// <remarks>FansManager::ConfigureFanPort reads C with GetReducedString</remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task M950ReducesTheFanPortName()
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Machines.DriverBoard}.OUT_3+IO1.In\"");
+        (_, CanMessageM950Fan sent) = bench.CanMaster.LastCanMessage<CanMessageM950Fan>();
+        Assert.Multiple(async () =>
+        {
+            Assert.That(sent.C, Is.EqualTo("out3+io1.in"), "the board is sent the reduced names");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.Port),
+                        Is.EqualTo($"{Expansion.Out(Machines.DriverBoard, 3)}+io1.in"), "and fans[0].port records them");
+        });
+    }
+
+    /// <summary>
+    /// M950 F with no other parameter answers with what the fan's board reports
+    /// </summary>
+    /// <remarks>
+    /// The regression reference m950-fan-on-expansion records the board's
+    /// <c>Fan 0 pin 3.out3 frequency 100Hz, no tacho</c> as the code's reply
+    /// </remarks>
+    [Test]
+    public async Task M950RepliesWithTheBoardsFanReport()
+    {
+        const string report = "Fan 0 pin 1.out3 frequency 500Hz, no tacho";
+        await using Bench bench = await Bench.StartAsync(Fan0Config);
+        bench.CanMaster.ReportWith<CanMessageM950Fan>(report);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M950 F0")).Trim(), Is.EqualTo(report));
+    }
+
+    /// <summary>
+    /// A board that will not release a deleted fan's pin does not keep the fan alive
+    /// </summary>
+    /// <remarks><c>~RemoteFan</c> sends C"nil" and ignores the reply</remarks>
+    [Test]
+    public async Task AFanIsDeletedWhateverItsBoardSaysAboutIt()
+    {
+        await using Bench bench = await Bench.StartAsync(Fan0Config);
+        bench.CanMaster.ReportWith<CanMessageM950Fan>("Board 1 doesn't have fan 0", CodeResult.Error);
+
+        string reply = await bench.Host.ExecuteCodeAsync("M950 F0 C\"nil\"");
+        await Assert.MultipleAsync(async () =>
+        {
+            Assert.That(reply.Trim(), Is.Empty, "the delete succeeds");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null, "and fans[0] is empty");
+        });
+    }
 }

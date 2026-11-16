@@ -5,6 +5,14 @@
 /// </summary>
 public partial class Heater : ModelObject, IStaticModelObject
 {
+    /// <summary>PWM frequency of a heater created by M950 H without Q (in Hz)</summary>
+    /// <remarks>RepRapFirmware's <c>DefaultHeaterPwmFreq</c></remarks>
+    public const int DefaultFrequency = 250;
+
+    /// <summary>Highest PWM frequency a heater may be driven at (in Hz)</summary>
+    /// <remarks>RepRapFirmware's <c>MaxHeaterPwmFrequency</c>, which keeps the MOSFETs from overheating</remarks>
+    public const int MaxFrequency = 1000;
+
     /// <summary>
     /// Active temperature of the heater (in C)
     /// </summary>
@@ -152,6 +160,20 @@ public partial class Heater : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _frequency, value);
     }
     private float _frequency;
+
+    /// <summary>
+    /// Sensor number the heater reads the ambient temperature from, or -1 if it has none
+    /// </summary>
+    /// <remarks>
+    /// Set by M950 H B. The heater model estimates the cooling against this rather than against a fixed
+    /// room temperature, which matters for a tool heater working inside a heated chamber
+    /// </remarks>
+    public int AmbientSensor
+    {
+        get => _ambientSensor;
+        set => SetPropertyValue(ref _ambientSensor, value);
+    }
+    private int _ambientSensor = -1;
 
     /// <summary>
     /// Sensor number of this heater or -1 if not configured

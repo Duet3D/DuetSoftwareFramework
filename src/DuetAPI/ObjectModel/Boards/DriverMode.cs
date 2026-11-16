@@ -31,7 +31,12 @@ public enum DriverMode
     Direct = 4,
 
     /// <summary>
+    /// Direct mode with assisted open loop control (closed loop expansion boards only)
+    /// </summary>
+    AssistedOpen = 5,
+
+    /// <summary>
     /// Driver mode is unknown
     /// </summary>
-    Unknown = 5
+    Unknown = 6
 }

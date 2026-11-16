@@ -9,7 +9,7 @@ using NUnit.Framework;
 namespace SystemTests.Scenarios.Codes.Drivers;
 
 /// <summary>
-/// M569 and its sub-codes against the rig the regression suite records on
+/// M569 against the rig the regression suite records on
 /// (<see cref="DriversRig"/>). Each scenario is the bench half of a case in
 /// <c>lib/DuetRegressionTesting/testcases/drivers</c>: the same G-code, the reply its reference
 /// holds, the CAN message it puts on the bus and the object model delta it leaves behind
@@ -23,7 +23,7 @@ namespace SystemTests.Scenarios.Codes.Drivers;
 /// delta that records the setting
 /// </remarks>
 [TestFixture]
-[GCode("M569", "M569.1", "M569.2", "M569.4", "M569.6", "M569.7")]
+[GCode("M569")]
 public class M569Tests : BenchFixture
 {
     /// <summary>
@@ -33,16 +33,6 @@ public class M569Tests : BenchFixture
     private static readonly string ClosedLoopBoardReport =
         $"Driver {DriversRig.ClosedLoopDriver(0)} runs forwards, active low enable, mode spreadCycle, ccr 0x08053, toff 3, tblank 1, "
         + "thigh 200 (46.9 mm/sec), gs 32, iRun/iHold 0/0, current 25.4, hstart/hend/hdec 5/0/0, pos 264";
-
-    /// <summary>The M569 sub-codes DSF does not support, on a driver of the main board</summary>
-    private static readonly string[] UnsupportedSubCodes =
-    [
-        $"M569.3 P{DriversRig.MainDriver(0)}",
-        $"M569.3 P{DriversRig.MainDriver(0)} S",
-        $"M569.8 P{DriversRig.MainDriver(0)}",
-        $"M569.9 P{DriversRig.MainDriver(0)}",
-        $"M569.9 P{DriversRig.MainDriver(0)} R0.075 S4.4",
-    ];
 
     /// <summary>
     /// M569 with no P is refused before anything reaches the bus, in RepRapFirmware's wording
@@ -67,29 +57,6 @@ public class M569Tests : BenchFixture
                         "the guard is RRF's GCodeBuffer::MustSee, whose wording the reference holds");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569>(), Is.Empty,
                         "and it fires before an unaddressed command reaches a driver");
-        });
-    }
-
-    /// <summary>
-    /// M569.2 with a register value but no register number is refused, again before the bus
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/error-missing-parameters-drivers-m569.yaml</c>, last line. RRF
-    /// CanInterface.cpp:1076 requires R whenever V is given, because a value with no register to
-    /// write it to would otherwise degenerate into a report
-    /// </remarks>
-    [Test]
-    public async Task M569Point2WithoutRIsRefused()
-    {
-        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
-
-        string reply = await bench.Host.ExecuteCodeAsync($"M569.2 P{Expansion.Driver(DriversRig.MainDriverBoard, 0)} V4");
-        Assert.Multiple(() =>
-        {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.2: missing parameter 'R'"),
-                        "a register value with no register number is refused (RRF CanInterface.cpp:1076)");
-            Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point2>(), Is.Empty,
-                        "and nothing is sent, so the command does not degenerate into a report");
         });
     }
 
@@ -234,30 +201,315 @@ public class M569Tests : BenchFixture
     }
 
     /// <summary>
-    /// M569's C parameter never leaves this side, so the command degenerates into a report
+    /// M569 C writes the chopper control register, which is recorded along with the off time,
+    /// blanking time and hysteresis it contains
     /// </summary>
     /// <remarks>
-    /// <c>testcases/drivers/m569-chopper-control-register.yaml</c>, which is marked known_bad against
-    /// RepRapFirmware: C is not in the M569 CAN parameter table (CANlib CanMessageGenericTables.h:64-78),
-    /// so the message is built without it and the board answers the bare query with its report. The
-    /// local-driver path does apply it, and there are no local drivers here
+    /// <c>testcases/drivers/m569-chopper-control-register.yaml</c>: its reference, recorded on 3.7.0,
+    /// carries C in the message (paramMap 0x00801), the board answers with nothing, and the report
+    /// after it reads "ccr 0x010144, toff 4, tblank 2, ... hstart/hend/hdec 4/2/0". C has been in the
+    /// M569 parameter table since 3.7.0-rc.2 (CANlib CanMessageGenericTables.h); the case's known_bad
+    /// mark describes rc.1
     /// </remarks>
     [Test]
-    public async Task M569ChopperControlRegisterDoesNotReachARemoteDriver()
+    [Category("KnownGap")]
+    public async Task M569CSetsTheChopperControlRegister()
     {
-        await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569>(ClosedLoopBoardReport))
-                                             .StartAsync();
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.MainDriverBoard;
 
-        string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 3)} C65860");
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 3)} C65860")).Trim(), Is.Empty,
+                    "the board took the register");
 
-        (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
+        (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.Multiple(() =>
         {
-            Assert.That(sent.P, Is.EqualTo(3), "the driver is still addressed");
-            Assert.That(reply.TrimEnd(), Is.EqualTo(ClosedLoopBoardReport),
-                        "but nothing was set, so the board answers as it would a bare query");
+            Assert.That(sentTo, Is.EqualTo(board), "the message goes to the board P names");
+            Assert.That(sent.P, Is.EqualTo(3), "carrying the local driver number");
+            Assert.That(sent.C, Is.EqualTo(65860u), "and the whole register value in C");
+        });
+
+        DriverConfig config = await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![3].Config);
+        Assert.Multiple(() =>
+        {
+            Assert.That(config.ChopperControl, Is.EqualTo(65860u), "boards[].drivers[].config.chopperControl records it");
+            Assert.That(config.OffTime, Is.EqualTo(4), "and the fields it contains, as the board reports them: toff 4");
+            Assert.That(config.BlankingTime, Is.EqualTo(2), "tblank 2");
+            Assert.That(config.Hysteresis.Start, Is.EqualTo(4), "hstart 4");
+            Assert.That(config.Hysteresis.End, Is.EqualTo(2), "hend 2");
+        });
+    }
+
+    /// <summary>
+    /// F, B and Y after C change their fields of the recorded register, so the model never holds a
+    /// register that disagrees with the fields
+    /// </summary>
+    /// <remarks>
+    /// The board applies F, B and Y to the register C set (Duet3Expansion TmcDriverState::SetRegister),
+    /// so a board reconfigured from the model has to be given the register as it now is. The values
+    /// are those of <c>m569-chopper-off-time.yaml</c>, <c>m569-blanking-time.yaml</c> and
+    /// <c>m569-hysteresis.yaml</c> applied to the default register 0x008053
+    /// </remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task M569FBAndYChangeTheRecordedChopperControlRegister()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+        string driver = Expansion.Driver(DriversRig.MainDriverBoard, 2);
+
+        await bench.Host.ExecuteCodeAsync($"M569 P{driver} C{0x008053}");
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{driver} F5 B3 Y4:2")).Trim(), Is.Empty);
+
+        DriverConfig config = await bench.Host.ReadModelAsync(model => model.Boards[DriversRig.MainDriverBoard].Drivers![2].Config);
+        Assert.Multiple(() =>
+        {
+            Assert.That(config.ChopperControl, Is.EqualTo(0x018145u), "toff 5, tblank 3 and hstart/hend 4/2 in the register");
+            Assert.That(config.OffTime, Is.EqualTo(5));
+            Assert.That(config.BlankingTime, Is.EqualTo(3));
+            Assert.That(config.Hysteresis.Start, Is.EqualTo(4));
+            Assert.That(config.Hysteresis.End, Is.EqualTo(2));
+        });
+
+        await bench.Host.ExecuteCodeAsync($"M569 P{driver} C65860");
+        config = await bench.Host.ReadModelAsync(model => model.Boards[DriversRig.MainDriverBoard].Drivers![2].Config);
+        Assert.Multiple(() =>
+        {
+            Assert.That(config.ChopperControl, Is.EqualTo(65860u), "a later C replaces the whole register");
+            Assert.That(config.OffTime, Is.EqualTo(4), "and the fields F, B and Y had set with it");
+            Assert.That(config.BlankingTime, Is.EqualTo(2));
+            Assert.That(config.Hysteresis.Start, Is.EqualTo(4));
+            Assert.That(config.Hysteresis.End, Is.EqualTo(2));
+        });
+    }
+
+    /// <summary>
+    /// F, B and Y without a C before them are recorded on their own, with no register to change
+    /// </summary>
+    [Test]
+    public async Task M569FieldsWithoutCLeaveTheRegisterUnset()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(DriversRig.MainDriverBoard, 2)} F5");
+        DriverConfig config = await bench.Host.ReadModelAsync(model => model.Boards[DriversRig.MainDriverBoard].Drivers![2].Config);
+        Assert.Multiple(() =>
+        {
+            Assert.That(config.OffTime, Is.EqualTo(5));
+            Assert.That(config.ChopperControl, Is.Null,
+                        "the rest of the register is the board's default, which this side does not know");
+        });
+    }
+
+    /// <summary>
+    /// Y with three values sets the hysteresis decrement too
+    /// </summary>
+    /// <remarks><c>testcases/drivers/m569-hysteresis.yaml</c> uses the two-value form; the third is hdec</remarks>
+    [Test]
+    public async Task M569YWithThreeValuesSetsTheDecrement()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+        const byte board = DriversRig.MainDriverBoard;
+
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 4)} Y4:2:1")).Trim(), Is.Empty);
+
+        (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
+        Assert.That(sent.Y, Is.EqualTo(new uint[] { 4, 2, 1 }), "all three values reach the board");
+
+        DriverHysteresis hysteresis = await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![4].Config.Hysteresis);
+        Assert.Multiple(() =>
+        {
+            Assert.That(hysteresis.Start, Is.EqualTo(4));
+            Assert.That(hysteresis.End, Is.EqualTo(2));
+            Assert.That(hysteresis.Decrement, Is.EqualTo(1));
+        });
+    }
+
+    /// <summary>
+    /// M569 R sets the enable polarity: 1 active high, 0 active low, -1 always disabled
+    /// </summary>
+    /// <remarks><c>testcases/drivers/m569-enable-polarity.yaml</c> sends R1, R-1 and, in its teardown, R0</remarks>
+    [TestCase(1)]
+    [TestCase(0)]
+    [TestCase(-1)]
+    public async Task M569RSetsTheEnablePolarity(int polarity)
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+        const byte board = DriversRig.MainDriverBoard;
+
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} R{polarity}")).Trim(), Is.Empty);
+
+        (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
+        Assert.That(sent.R, Is.EqualTo(polarity), "R reaches the board as a signed value");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config.EnablePolarity),
+                    Is.EqualTo(polarity), "and boards[].drivers[].config.enablePolarity records it");
+    }
+
+    /// <summary>
+    /// A current scaler below 16 is taken with a warning from the board, and is recorded because the
+    /// board took it
+    /// </summary>
+    /// <remarks>
+    /// <c>testcases/drivers/m569-irun-scaler.yaml</c> sends U16 and U31, which the board takes
+    /// silently. Below 16 Duet3Expansion Move::ProcessM569 applies the value and returns
+    /// <c>GCodeResult::warning</c>, and RepRapFirmware stores what it stores under
+    /// <c>res &lt;= GCodeResult::warning</c> (GCodes3.cpp ConfigureDriver)
+    /// </remarks>
+    [Test]
+    public async Task M569ULowCurrentScalerIsAWarningAndIsRecorded()
+    {
+        const byte board = DriversRig.MainDriverBoard;
+        string warning = $"Current scaler = 8 for driver 0 might result in poor microstep performance. Recommended minimum is 16.";
+        await using Bench bench = await Bench.With(DriversRig.Config)
+                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569>(
+                message => message.U is >= 0 and < 16 ? warning : string.Empty,
+                CodeResult.Warning)).StartAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} U8");
+        Assert.That(reply.TrimEnd(), Is.EqualTo($"Warning: M569: {warning}"), "the board's warning is reported as a warning");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config.CurrentScaler),
+                    Is.EqualTo(8), "and the scaler it applied is recorded");
+    }
+
+    /// <summary>
+    /// A board that refuses part of an M569 has nothing recorded for any of it
+    /// </summary>
+    /// <remarks>
+    /// Duet3Expansion Move::ProcessM569 refuses a T with two or three values ("bad timing parameter,
+    /// expected 1 or 4 values") after it has applied S and R, and RepRapFirmware stores the direction
+    /// only when the board did not refuse (GCodes3.cpp ConfigureDriver, <c>res &lt;= GCodeResult::warning</c>)
+    /// </remarks>
+    [Test]
+    public async Task M569RefusedByTheBoardRecordsNothing()
+    {
+        const byte board = DriversRig.MainDriverBoard;
+        const string refusal = "bad timing parameter, expected 1 or 4 values";
+        await using Bench bench = await Bench.With(DriversRig.Config)
+                                             .WithController(canMaster => canMaster.OnCanMessage(
+                (ushort)CanMessageType.M569, (fake, header, payload) =>
+                {
+                    bool refused = CanMessageSerializer.Deserialize<CanMessageM569>(payload).T is { Length: not (1 or 4) };
+                    fake.InjectStandardReply(header, refused ? CodeResult.Error : CodeResult.Ok, refused ? refusal : string.Empty);
+                })).StartAsync();
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} S0 T2:2");
+        Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569: {refusal}"), "the board's refusal is the code's error");
+
+        DriverConfig config = await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config);
+        Assert.Multiple(() =>
+        {
+            Assert.That(config.Direction, Is.True, "the direction stays as the rig's config set it");
+            Assert.That(config.StepTiming, Is.Empty, "and no timing is recorded");
+        });
+    }
+
+    /// <summary>
+    /// A driver on a board that is not on the bus is an error naming the board, and nothing is recorded
+    /// </summary>
+    /// <remarks>
+    /// <c>testcases/drivers/error-bad-driver.yaml</c>, last line: <c>M569 P99.0</c> sits out the
+    /// response timeout and its reference reads "Error: M569: Timed out awaiting response from board
+    /// 99 to request type 6018". The case's known_bad mark says RepRapFirmware reports this at
+    /// severity ok, which the reference recorded on 3.7.0 does not show
+    /// </remarks>
+    [Test]
+    public async Task M569OnABoardThatIsNotOnTheBusIsAnError()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        bench.CanMaster.ScriptCanSendStatus(CanStatus.ResponseTimeout);
+        string reply = await bench.Host.ExecuteCodeAsync("M569 P99.0 S0", timeoutMs: 5_000);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error: M569:"), "a board that does not answer is an error");
+            Assert.That(reply, Does.Contain("board 99"), "naming the board");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Boards.Any(b => b?.CanAddress == 99)),
+                        Is.False, "and no board is created for it");
+        });
+    }
+
+    /// <summary>
+    /// A driver on board 0 is refused before anything reaches the bus
+    /// </summary>
+    /// <remarks>
+    /// <c>testcases/drivers/error-bad-driver.yaml</c>, first line: <c>M569 P0.99</c> is an error in
+    /// RepRapFirmware too, where board 0 has its own drivers and 99 is out of range. Here board 0 runs
+    /// DuetCANMaster and has no drivers at all, so every driver number on it is refused
+    /// </remarks>
+    [TestCase(0)]
+    [TestCase(99)]
+    public async Task M569OnTheMainBoardIsRefused(int driver)
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M569 P0.{driver} S0");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Does.StartWith("Error: M569:"), "the driver is refused as an error");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM569>(), Is.Empty, "before anything is sent");
+        });
+    }
+
+    /// <summary>
+    /// Every driver of every board answers its own query, addressed to its board with its local number
+    /// </summary>
+    /// <remarks>
+    /// <c>testcases/drivers/m569-report-all-drivers.yaml</c> queries each driver in turn, changing
+    /// nothing; each reply is that driver's report
+    /// </remarks>
+    [Test]
+    public async Task M569QueriesEachDriverOfEachBoard()
+    {
+        await using Bench bench = await Bench.With(DriversRig.Config)
+                                             .WithController(canMaster => canMaster.OnCanMessage(
+                (ushort)CanMessageType.M569, (fake, header, payload) =>
+                {
+                    CanMessageM569 message = CanMessageSerializer.Deserialize<CanMessageM569>(payload);
+                    fake.InjectStandardReply(header, CodeResult.Ok,
+                                             message.S is null ? $"Driver {header.DstAddress}.{message.P} runs forwards" : string.Empty);
+                })).StartAsync();
+
+        foreach ((byte board, byte drivers) in DriversRig.BoardDrivers)
+        {
+            for (int driver = 0; driver < drivers; driver++)
+            {
+                string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, driver)}");
+                (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
+                Assert.Multiple(() =>
+                {
+                    Assert.That(reply.TrimEnd(), Is.EqualTo($"Driver {Expansion.Driver(board, driver)} runs forwards"),
+                                "the reply is the report of the driver asked about");
+                    Assert.That(sentTo, Is.EqualTo(board));
+                    Assert.That(sent.P, Is.EqualTo(driver));
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// A list of drivers configures only the first, as RepRapFirmware does for M569 with no sub-code
+    /// </summary>
+    /// <remarks>
+    /// RRF GCodes3.cpp ConfigureDriver reads P as a driver array but leaves its loop after the first
+    /// driver unless the sub-code is .3, .4 or .8, and CanMessageGenericConstructor reads only the
+    /// first driver of P into the message
+    /// </remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task M569WithADriverListConfiguresOnlyTheFirst()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+        const byte board = DriversRig.MainDriverBoard;
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 3)}:{Expansion.Driver(board, 4)} S0");
+        Assert.That(reply.Trim(), Is.Empty);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(bench.CanMaster.CanMessages<CanMessageM569>().Select(sent => sent.Message.P), Is.EqualTo(new byte?[] { 3 }),
+                        "one message, for the first driver");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![3].Config.Direction), Is.False);
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![4].Config.Direction), Is.True,
+                        "the second driver is left alone");
         });
     }
 
@@ -272,16 +524,15 @@ public class M569Tests : BenchFixture
     /// <c>boards[].drivers[].config.mode</c>. The stealthChop case carries V, the tpwmthrs
     /// changeover threshold, in the same command.
     /// <para>
-    /// What is stored is the number D was given. D4 is <c>DriverMode::direct</c> and D5 is
-    /// <c>direct + 1</c>, which the closed loop controller reads as assisted open loop
-    /// (Duet3Expansion Move.cpp:1652) - the driver mode enumeration has no name of its own for it, in
-    /// RepRapFirmware either, so 5 lands on the value after <c>direct</c>
+    /// What is stored is the number D was given, which RepRapFirmware reports as it is
+    /// (DriverData::StoreMode): D4 is <c>DriverMode::direct</c>, closed loop, and D5
+    /// <c>DriverMode::assistedOpen</c>, whose reference delta is <c>config.mode 2 -&gt; 5</c>
     /// </para>
     /// </remarks>
     [TestCase(2, DriverMode.SpreadCycle)]
     [TestCase(3, DriverMode.StealthChop)]
     [TestCase(4, DriverMode.Direct)]
-    [TestCase(5, DriverMode.Unknown)]
+    [TestCase(5, DriverMode.AssistedOpen)]
     public async Task M569DSelectsTheDriverMode(int mode, DriverMode expected)
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
@@ -348,269 +599,50 @@ public class M569Tests : BenchFixture
     }
 
     /// <summary>
-    /// M569.1 carries the closed loop configuration to the board, and a bare form reports from it
+    /// The single-value T form reaches the board as one value, which stands for all four timings
     /// </summary>
     /// <remarks>
-    /// <c>testcases/drivers/m569-1-magnetic-encoder.yaml</c>, <c>m569-1-quadrature-encoder.yaml</c>,
-    /// <c>m569-1-feedforward.yaml</c>, <c>m569-1-error-thresholds.yaml</c>,
-    /// <c>m569-1-torque-constant.yaml</c>, <c>m569-1-deadband.yaml</c> and <c>m569-1-report.yaml</c>.
-    /// Every parameter belongs to the closed loop controller on the board, so the code is repackaged
-    /// rather than interpreted and the report is the board's own
+    /// The message carries the value as the code gave it and the board copies it to the other three
+    /// (Duet3Expansion Move::ProcessM569, <c>numTimings == 1</c>), so all four are recorded
     /// </remarks>
     [Test]
-    public async Task M569Point1ConfiguresClosedLoopControl()
-    {
-        const string report = "Encoder type: rotaryQuadrature\nQuadrature encoder pulses/rev: 1000.00\n"
-                              + "PID parameters P=80.0 I=0.050 D=0.020 V=500.0 A=100.0, torque constant 0.75Nm/A\n"
-                              + "Warning/error threshold 1.50/3.00, standstill deadband 0.500";
-        await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point1>(
-                message => message.T is null ? report : string.Empty)).StartAsync();
-        const byte board = DriversRig.ClosedLoopBoard;
-
-        Assert.That((await bench.Host.ExecuteCodeAsync(
-                        $"M569.1 P{Expansion.Driver(board, 0)} T2 C1000 S200 R80 I0.05 D0.02 V500 A100 Q0.75 E1.5:3.0 B0.5")).Trim(),
-                    Is.Empty, "the board took the configuration");
-
-        (byte sentTo, CanMessageM569Point1 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point1>();
-        Assert.Multiple(() =>
-        {
-            Assert.That(sentTo, Is.EqualTo(board), "the message goes to the board carrying the driver");
-            Assert.That(sent.P, Is.EqualTo(0), "P is the local driver number");
-            Assert.That(sent.T, Is.EqualTo(2), "T is the encoder type (m569-1-quadrature-encoder.yaml)");
-            Assert.That(sent.C, Is.EqualTo(1000.0f).Within(1e-3), "C is counts per revolution");
-            Assert.That(sent.S, Is.EqualTo(200), "S is the motor steps per revolution");
-            Assert.That(sent.R, Is.EqualTo(80.0f).Within(1e-3), "R, I and D are the PID constants");
-            Assert.That(sent.I, Is.EqualTo(0.05f).Within(1e-4));
-            Assert.That(sent.D, Is.EqualTo(0.02f).Within(1e-4));
-            Assert.That(sent.V, Is.EqualTo(500.0f).Within(1e-3),
-                        "V and A are the feedforward constants (m569-1-feedforward.yaml)");
-            Assert.That(sent.A, Is.EqualTo(100.0f).Within(1e-3));
-            Assert.That(sent.Q, Is.EqualTo(0.75f).Within(1e-4),
-                        "Q is the torque constant (m569-1-torque-constant.yaml)");
-            Assert.That(sent.E, Is.EqualTo(new[] { 1.5f, 3.0f }),
-                        "E is the warning and error threshold pair, in that order "
-                        + "(m569-1-error-thresholds.yaml)");
-            Assert.That(sent.B, Is.EqualTo(0.5f).Within(1e-4),
-                        "B is the standstill deadband (m569-1-deadband.yaml)");
-        });
-
-        string reply = await bench.Host.ExecuteCodeAsync($"M569.1 P{Expansion.Driver(board, 0)}");
-        Assert.That(reply.TrimEnd(), Is.EqualTo(report),
-                    "and a bare M569.1 P answers with the board's multi-line report, unflattened "
-                    + "(m569-1-report.yaml)");
-    }
-
-    /// <summary>
-    /// M569.1 B takes a negative value, which restores the automatic standstill deadband
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/m569-1-deadband.yaml</c>: B0.5 overrides, B0 disables and B-1 goes back to
-    /// automatic, so the parameter has to stay signed all the way to the board
-    /// </remarks>
-    [Test]
-    public async Task M569Point1DeadbandTakesANegativeValue()
+    public async Task M569TWithOneValueSetsEveryTiming()
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+        const byte board = DriversRig.MainDriverBoard;
 
-        await bench.Host.ExecuteCodeAsync($"M569.1 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} B-1");
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 4)} T3")).Trim(), Is.Empty);
 
-        (_, CanMessageM569Point1 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point1>();
-        Assert.That(sent.B, Is.EqualTo(-1.0f).Within(1e-4),
-                    "B-1 means automatic and must not be re-typed as unsigned on the way out");
+        (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
+        Assert.That(sent.T, Is.EqualTo(new[] { 3.0f }), "the single value is sent as it was given");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![4].Config.StepTiming.ToArray()),
+                    Is.EqualTo(new[] { 3.0f, 3.0f, 3.0f, 3.0f }), "and recorded as the four timings the board applies");
     }
 
     /// <summary>
-    /// M569.2 reads and writes a driver register, and carries the waveform correction added at 3.7
+    /// A mode the driver does not support is refused by the board and the recorded mode stays as it was
     /// </summary>
     /// <remarks>
-    /// <c>testcases/drivers/m569-2-read-register.yaml</c>, <c>m569-2-write-register.yaml</c> and
-    /// <c>m569-2-waveform-correction.yaml</c>. The whole result of a read is the value the board
-    /// replies with, so the report travels back unchanged
+    /// Duet3Expansion Move::ProcessM569 answers "Driver 1.0 does not support mode '...'" when
+    /// SmartDrivers::SetDriverMode fails, and RepRapFirmware stores the mode only when the board took
+    /// it (GCodes3.cpp ConfigureDriver)
     /// </remarks>
     [Test]
-    public async Task M569Point2ReadsWritesAndCorrects()
+    public async Task M569DRefusedByTheBoardLeavesTheMode()
     {
-        const string registerReport = "Register 0x6c value 0x14008055";
+        const byte board = DriversRig.MainDriverBoard;
+        string refusal = $"Driver {Expansion.Driver(board, 0)} does not support mode 'unknown'";
         await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point2>(
-                message => message.V is null && message.R is not null ? registerReport : string.Empty)).StartAsync();
-        const byte board = DriversRig.ClosedLoopBoard;
+                                             .WithController(canMaster => canMaster.OnCanMessage(
+                (ushort)CanMessageType.M569, (fake, header, payload) =>
+                {
+                    bool refused = CanMessageSerializer.Deserialize<CanMessageM569>(payload).D is > 5;
+                    fake.InjectStandardReply(header, refused ? CodeResult.Error : CodeResult.Ok, refused ? refusal : string.Empty);
+                })).StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.2 P{Expansion.Driver(board, 0)} R108 V335577173")).Trim(), Is.Empty,
-                    "a register write is acknowledged silently");
-        (_, CanMessageM569Point2 written) = bench.CanMaster.LastCanMessage<CanMessageM569Point2>();
-        Assert.Multiple(() =>
-        {
-            Assert.That(written.R, Is.EqualTo(108), "R is the register number");
-            Assert.That(written.V, Is.EqualTo(335577173), "V is the 32-bit value to write");
-        });
-
-        string read = await bench.Host.ExecuteCodeAsync($"M569.2 P{Expansion.Driver(board, 0)} R108");
-        Assert.That(read.TrimEnd(), Is.EqualTo(registerReport), "and a read answers with the board's value");
-
-        await bench.Host.ExecuteCodeAsync($"M569.2 P{Expansion.Driver(DriversRig.MainDriverBoard, 5)} S4 J1.28 O180");
-        (_, CanMessageM569Point2 correction) = bench.CanMaster.LastCanMessage<CanMessageM569Point2>();
-        Assert.Multiple(() =>
-        {
-            Assert.That(correction.S, Is.EqualTo(4), "S is the harmonic being corrected");
-            Assert.That(correction.J, Is.EqualTo(1.28f).Within(1e-4), "J its magnitude in degrees");
-            Assert.That(correction.O, Is.EqualTo(180.0f).Within(1e-3), "O its phase in degrees");
-            Assert.That(correction.R, Is.Null, "and no register access, which this form did not ask for");
-            Assert.That(correction.V, Is.Null);
-        });
-    }
-
-    /// <summary>
-    /// M569.3, M569.8 and M569.9 are recognised, parse their driver, and are then declined as errors
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/m569-3-read-encoder.yaml</c>, <c>m569-8-read-motor-force.yaml</c> and
-    /// <c>m569-9-sense-resistor.yaml</c>. The first two need ODrives on the secondary CAN bus and
-    /// Hangprinter kinematics (RRF CanInterface.cpp:1086-1094) and the third exists only in the STM32
-    /// port, so all three take the not-supported path - as an error, which is the severity the
-    /// references record, and without anything reaching the bus
-    /// </remarks>
-    [TestCaseSource(nameof(UnsupportedSubCodes))]
-    [Category("KnownGap")]
-    public async Task M569UnsupportedSubCodesAreErrors(string code)
-    {
-        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
-
-        string reply = await bench.Host.ExecuteCodeAsync(code);
-        string subCode = code[..code.IndexOf(' ')];
-        Assert.Multiple(() =>
-        {
-            Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: {subCode}: Command is not supported"),
-                        "the command is declined as an error, not a warning");
-            Assert.That(bench.CanMaster.Transfers.Count, Is.GreaterThanOrEqualTo(0),
-                        "and the driver it names is parsed first, so a bad driver is still refused");
-        });
-    }
-
-    /// <summary>
-    /// M569.4 puts a driver into torque mode, and the missing-T error the board raises travels back
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/m569-4-torque-mode.yaml</c>, <c>m569-4-torque-mode-speed-limit.yaml</c>
-    /// and <c>m569-4-error-missing-t.yaml</c>. Unlike the missing-P guard this one is not caught on
-    /// this side: the command is forwarded and the board reports the missing parameter, which is a
-    /// whole error round trip
-    /// </remarks>
-    [Test]
-    public async Task M569Point4CommandsATorque()
-    {
-        await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point4>(
-                message => message.T is null ? "missing T parameter" : string.Empty)).StartAsync();
-        const byte board = DriversRig.ClosedLoopBoard;
-
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.4 P{Expansion.Driver(board, 0)} T0.001 V50")).Trim(), Is.Empty,
-                    "the board took the torque");
-
-        (byte sentTo, CanMessageM569Point4 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point4>();
-        Assert.Multiple(() =>
-        {
-            Assert.That(sentTo, Is.EqualTo(board));
-            Assert.That(sent.T, Is.EqualTo(0.001f).Within(1e-6), "T is the commanded torque");
-            Assert.That(sent.V, Is.EqualTo(50.0f).Within(1e-3),
-                        "V is the maximum speed in full steps per second (m569-4-torque-mode-speed-limit.yaml)");
-        });
-    }
-
-    /// <summary>
-    /// An error the board raises about M569.4 comes back as an error naming the sub-code
-    /// </summary>
-    /// <remarks><c>testcases/drivers/m569-4-error-missing-t.yaml</c></remarks>
-    [Test]
-    public async Task M569Point4WithoutTIsRefusedByTheBoard()
-    {
-        await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point4>("missing T parameter",
-                                                                                       CodeResult.Error)).StartAsync();
-
-        string reply = await bench.Host.ExecuteCodeAsync($"M569.4 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}");
-        Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.4: missing T parameter"),
-                    "the board's refusal is carried back over CAN and reported as an error");
-    }
-
-    /// <summary>
-    /// M569.6 runs a closed loop tuning manoeuvre, and both of its refusals are errors
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/m569-6-closed-loop-tuning-move.yaml</c>: V1 is basic tuning, which the
-    /// board refuses for an absolute encoder, and the form with no V reports the last calibration
-    /// </remarks>
-    [Test]
-    public async Task M569Point6ReportsTheBoardsTuningVerdict()
-    {
-        await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point6>(
-                message => message.V is null
-                    ? $"Driver {DriversRig.ClosedLoopDriver(0)} calibration failed (no reason available)"
-                    : "basic tuning is not applicable to absolute encoders",
-                CodeResult.Error)).StartAsync();
-        const byte board = DriversRig.ClosedLoopBoard;
-
-        Assert.Multiple(async () =>
-        {
-            Assert.That((await bench.Host.ExecuteCodeAsync($"M569.6 P{Expansion.Driver(board, 0)} V1")).TrimEnd(),
-                        Is.EqualTo("Error: M569.6: basic tuning is not applicable to absolute encoders"));
-            Assert.That((await bench.Host.ExecuteCodeAsync($"M569.6 P{Expansion.Driver(board, 0)}")).TrimEnd(),
-                        Is.EqualTo($"Error: M569.6: Driver {DriversRig.ClosedLoopDriver(0)} calibration failed (no reason available)"));
-        });
-    }
-
-    /// <summary>
-    /// M569.7 binds an output port to the driver's brake, with a delay and a PWM voltage limit
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/m569-7-motor-brake-port.yaml</c>. The port name reaches the board with
-    /// its board address stripped, because the board it is sent to is the board it is on
-    /// </remarks>
-    [Test]
-    public async Task M569Point7BindsTheBrakePort()
-    {
-        string report = $"Driver {DriversRig.ClosedLoopDriver(0)} uses brake port {Expansion.Out(DriversRig.ClosedLoopBoard, 0)} with voltage limited to 12.0 by PWM, brake delay 20ms";
-        await using Bench bench = await Bench.With(DriversRig.Config)
-                                             .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point7>(
-                message => message.C is null && message.V is null && message.S is null ? report : string.Empty)).StartAsync();
-        const byte board = DriversRig.ClosedLoopBoard;
-
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)} C\"{Expansion.Out(board, 0)}\" S20")).Trim(), Is.Empty,
-                    "the board took the binding");
-
-        (byte sentTo, CanMessageM569Point7 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point7>();
-        Assert.Multiple(() =>
-        {
-            Assert.That(sentTo, Is.EqualTo(board), "the port's board is where the message goes");
-            Assert.That(sent.C, Is.EqualTo("out0"), "and the name it carries is local to that board");
-            Assert.That(sent.S, Is.EqualTo(20), "S is the brake-off delay in milliseconds");
-        });
-
-        await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)} V12");
-        (_, CanMessageM569Point7 limited) = bench.CanMaster.LastCanMessage<CanMessageM569Point7>();
-        Assert.That(limited.V, Is.EqualTo(12.0f).Within(1e-3), "V limits the brake voltage by PWM");
-
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)}")).TrimEnd(), Is.EqualTo(report),
-                    "and a bare M569.7 P answers with the board's report");
-    }
-
-    /// <summary>
-    /// M569.7 C"nil" releases the port, which has to reach the board as the literal name
-    /// </summary>
-    /// <remarks>
-    /// <c>testcases/drivers/m569-7-motor-brake-port.yaml</c> teardown: a port left bound to a brake is
-    /// switched by every enable and disable after it, so releasing it has to work
-    /// </remarks>
-    [Test]
-    public async Task M569Point7NilReleasesTheBrakePort()
-    {
-        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
-
-        await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} C\"nil\"");
-
-        (_, CanMessageM569Point7 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point7>();
-        Assert.That(sent.C, Is.EqualTo("nil"), "\"nil\" is a name the board reads, not an empty port");
+        string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} D7");
+        Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569: {refusal}"));
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config.Mode),
+                    Is.EqualTo(DriverConfig.DefaultDriverMode), "the mode the driver had is still recorded");
     }
 }
