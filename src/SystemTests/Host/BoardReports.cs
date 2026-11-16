@@ -14,4 +14,12 @@ internal static class BoardReports
         return bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Heat.Heaters[heater]?.Current is float t && MathF.Abs(t - temperature) < 0.01f,
                                               what: $"heater {heater} reporting {temperature}C");
     }
+
+    /// <summary>Report that a board supports closed loop control, as an EXP1HCL's status reports say, and wait until <c>boards[].closedLoop</c> shows it</summary>
+    public static Task ReportClosedLoopAsync(this Bench bench, byte board)
+    {
+        bench.CanMaster.InjectBoardStatus(board, hasClosedLoop: true);
+        return bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.FindBoard(board)?.ClosedLoop is not null,
+                                              what: $"board {board} reporting closed loop support");
+    }
 }

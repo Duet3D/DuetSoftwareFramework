@@ -5,6 +5,10 @@
 /// </summary>
 public partial class LedStrip : ModelObject, IStaticModelObject
 {
+    /// <summary>Most LEDs a strip created by M950 E without U can address</summary>
+    /// <remarks>RepRapFirmware's <c>DefaultMaxLedsPerStrip</c></remarks>
+    public const uint DefaultMaxLeds = 60;
+
     /// <summary>
     /// Board address of the corresponding pin
     /// </summary>
@@ -24,6 +28,17 @@ public partial class LedStrip : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _colorOrder, value);
     }
     private LedStripColorOrder _colorOrder = LedStripColorOrder.BGR;
+
+    /// <summary>
+    /// Clock frequency the strip is driven at as given to M950 E Q (in Hz), or null for the board's default for the type
+    /// </summary>
+    /// <remarks>Sent to the board that drives the strip, so it is kept to recreate the strip after a restart</remarks>
+    public uint? Frequency
+    {
+        get => _frequency;
+        set => SetPropertyValue(ref _frequency, value);
+    }
+    private uint? _frequency;
 
     /// <summary>
     /// Maximum number of LEDs that can be addressed on this strip

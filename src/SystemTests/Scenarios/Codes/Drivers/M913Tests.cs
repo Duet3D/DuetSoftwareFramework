@@ -67,11 +67,8 @@ public class M913Tests : BenchFixture
         });
 
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PercentCurrent), Is.EqualTo(60),
-                    "move.extruders[0].percentCurrent records the percentage. RepRapFirmware's object "
-                    + "model reports axis 0's instead, because it passes the extruder number straight "
-                    + "to Move::GetMotorCurrent without ExtruderToLogicalDrive (Move.cpp:297) - which "
-                    + "m913-current-percentage-for-extruder.yaml records as a known bug rather than a "
-                    + "behaviour to reproduce");
+                    "move.extruders[0].percentCurrent records the percentage (RRF Move.cpp extruder "
+                    + "table, GetMotorCurrent(ExtruderToLogicalDrive(...), 913))");
     }
 
     /// <summary>A bare M913 reports the percentage of each drive</summary>
@@ -83,5 +80,140 @@ public class M913Tests : BenchFixture
 
         Assert.That((await bench.Host.ExecuteCodeAsync("M913")).TrimEnd(),
                     Is.EqualTo("Motor current % of normal - X:80, Y:80, Z:80, E:80"));
+    }
+
+    /// <summary>
+    /// A percentage above 100 runs the drive at its full current, and the object model reports 100
+    /// </summary>
+    /// <remarks>RRF Move2.cpp Move::SetMotorCurrent case 913 constrains the fraction to 0..1</remarks>
+    [Test]
+    public async Task M913ClampsAPercentageAbove100()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X150")).Trim(), Is.Empty);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
+                        Is.EqualTo(400.0f), "the configured current and no more");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.EqualTo(100));
+        });
+    }
+
+    /// <summary>
+    /// Zero is a valid percentage, which a power fail script uses to take the current off a drive
+    /// </summary>
+    /// <remarks>
+    /// RRF GCodes2.cpp case 906/913 reads the axes with GetNonNegativeFValue: "we must allow zero in
+    /// M913 power fail scripts"
+    /// </remarks>
+    [Test]
+    public async Task M913ZeroTakesTheCurrentOff()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X0")).Trim(), Is.Empty);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
+                        Is.EqualTo(0.0f));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.Zero);
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Current), Is.EqualTo(400),
+                        "the configured current is kept for when the percentage is restored");
+        });
+    }
+
+    /// <summary>
+    /// A negative percentage is refused, leaving the model as it was and telling no board
+    /// </summary>
+    /// <remarks>
+    /// RRF reads an axis with GetNonNegativeFValue, which refuses it, but reads E with GetFloatArray
+    /// and clamps it to 0 in Move::SetMotorCurrent. Refusing it for the extruders too is the minimum
+    /// limit rrf-differences.md section 6.1 records
+    /// </remarks>
+    [TestCase("M913 X-10")]
+    [TestCase("M913 E-10")]
+    public async Task M913RefusesANegativePercentage(string code)
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        string reply = await bench.Host.ExecuteCodeAsync(code);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>(), Is.Empty);
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.EqualTo(100));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PercentCurrent), Is.EqualTo(100));
+        });
+    }
+
+    /// <summary>
+    /// A current set with M906 while a percentage is in force goes to the driver scaled by it, and
+    /// restoring 100% sends the full current
+    /// </summary>
+    /// <remarks>
+    /// RRF Move2.cpp Move::SetMotorCurrent sends motorCurrents * motorCurrentFraction for both 906
+    /// and 913, which is how homing files reduce the current and put it back
+    /// </remarks>
+    [Test]
+    public async Task M913ScalesACurrentSetWhileItIsInForce()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M913 X50");
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M906 X800")).Trim(), Is.Empty);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
+                        Is.EqualTo(800.0f * (0.01f * 50)), "half of the new current");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Current), Is.EqualTo(800));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.EqualTo(50));
+        });
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X100")).Trim(), Is.Empty);
+        Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
+                    Is.EqualTo(800.0f), "and 100% is the whole of it again");
+    }
+
+    /// <summary>
+    /// A bare M913 on a machine with no extruders still names the extruders, with nothing after them
+    /// </summary>
+    /// <remarks>
+    /// <c>testcases/drivers/m913-motor-current-percentage.yaml</c> records
+    /// "Motor current % of normal - X:70, Y:70, Z:70, E" from a bench with no extruders
+    /// </remarks>
+    [Test]
+    public async Task M913ReportsAMachineWithNoExtruders()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M584 E", "M913 X70 Y70 Z70");
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M913")).TrimEnd(),
+                    Is.EqualTo("Motor current % of normal - X:70, Y:70, Z:70, E"));
+    }
+
+    /// <summary>
+    /// A fractional percentage scales the current as it was given, while the report and the object
+    /// model round it
+    /// </summary>
+    /// <remarks>
+    /// RRF Move2.cpp keeps motorCurrentFraction as a float (0.01 * 50.5) and sends the current
+    /// scaled by it; GetMotorCurrent rounds the percentage with lrintf for the object model
+    /// </remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task M913ScalesByAFractionalPercentageAsGiven()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X50.5")).Trim(), Is.Empty);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
+                        Is.EqualTo(400.0f * (0.01f * 50.5f)));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.EqualTo(50));
+        });
     }
 }

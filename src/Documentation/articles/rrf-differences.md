@@ -44,6 +44,7 @@ What it removes:
 | `M576` SPI communications parameters | The DSF/RRF SPI link is gone |
 | Local stall detection (`HAS_STALL_DETECT`) | Board 0 has no drivers |
 | Local heater, driver and filament faults | They arrive from the board as CAN events instead, which is the same event by a different door |
+| `M950 D` second SD card slot | The SBC owns the storage. RepRapFirmware refuses it in SBC mode too, `SD card attached to Duet is not supported in SBC mode` |
 
 **A port name has to name an expansion board.** Board 0 runs DuetCANMaster and owns no pins, so
 `io1.in` and `0.io1.in` — the same port named by omission and named explicitly — are both refused,
@@ -53,6 +54,8 @@ has no equivalent rule because its main board does have ports. One function,
 `TrySplitPort` is the policy on top of it, because two readers of one grammar diverge silently and
 did: a normally-closed endstop on an expansion board, which is how most machines are wired, was
 rejected outright.
+
+The same rule turns one RepRapFirmware refusal round. A spindle there is driven through main board pins only, and `M950 R` refuses a port on an expansion board with `Port must be on main board`. Here every port is on an expansion board, so each of a spindle's ports is created there as a general-purpose output, numbered down from the top of `state.gpOut[]` (`SpindleManager.PortNumberFor`), where those outputs also appear. As for a fan's tacho input, the board address in front of the first port applies to the ports after it.
 
 **`boards[0]` describes itself over the SPI link rather than being read out of the program that serves
 it.** In RepRapFirmware `boards[0]` is the board the object model lives on, so its name, firmware and
@@ -249,13 +252,24 @@ That adds fields RepRapFirmware does not keep, does not report, or both:
 | `sensors.probes[].port` and `.sensor` | RRF keeps the temperature-compensation sensor on the probe but neither reports nor saves it, so a machine using it could not be recreated |
 | `boards[].drivers[].config` — direction, mode, timings, thresholds | M569 forwarded everything over CAN and stored nothing. The object model already said this was wrong: `DriverConfig` is documented as "Configured (M569) settings of a driver" |
 | `boards[].drivers[].config.stallDetection` | M915 had no home at all |
-| `move.extruders[].pressAdv.K1` and `.D` | The CAN message carries only the first coefficient, so the second and its transition speed are held here alone — which is exactly what the rule is for |
 | `move.axes[].phaseStepKv` and `.phaseStepKa`, and the same on `move.extruders[]` | M970.1 and M970.2 send the phase stepping feedforward gains to the board that applies them. RepRapFirmware keeps its own copy in `DriveMovement` and answers a bare M970.1 from it; here the board is the only other place they exist, so without these a restart would lose them and the bare form would have nothing to report |
 | `move.axes[].rotational` and `.continuousRotation` | M584's R and S say what kind of axis is being created, which RepRapFirmware keeps in bitmaps of its own and prints as `(r)` and `(c)` in the M584 report without reporting anywhere a client can read |
 | `heat.coldExtrusionAllowed`, `heat.minExtrusionTemperature` and `heat.minRetractionTemperature` | M302 P is a flag RepRapFirmware keeps beside the minimums S and R set, and while it allows cold extrusion `heat.coldExtrudeTemperature` and `heat.coldRetractTemperature` report 0, which hides the minimums. These hold the flag and the minimums; the two RRF fields still report what RRF's do |
 | `sensors.analog[].type` of an expansion board's sensor | RepRapFirmware reports every expansion board's sensor as `remote` (`RemoteSensor::GetShortSensorType`, "TODO save the actual type"). Here it is the type `M308 Y` gave, such as `thermistor` or `linearanalog`, because a sensor cannot be recreated without it |
 | `sensors.analog[].offsetAdj` and `.slopeAdj` of an expansion board's sensor | `M308 U` and `V` go to the board, which applies them, and RepRapFirmware then clears its own copy (`ClearAdjustments`) and reports 0. Here they record what the board was sent |
 | `sensors.analog[].r25`, `.beta`, `.c`, `.rRef`, `.lowReading`, `.highReading`, `.adcLowOffset`, `.adcHighOffset`, `.filtered`, `.mainsFrequency`, `.wires`, `.thermocoupleType`, `.objectMix`, `.auxMix` and `.radiationExponent` of an expansion board's sensor | RepRapFirmware sends the rest of `M308` to the board and keeps none of it. Each field holds what its letter set for the sensor's type: `B` and `C` are a thermistor's `beta` and `c` but a linear analog sensor's `lowReading` and `highReading`, `L` and `H` are a thermistor's ADC corrections, and a thermopile sensor's `T`, `B` and `C` describe its environment thermistor while `F`, `W` and `R` are its `objectMix`, `auxMix` and `radiationExponent` |
+| `boards[].drivers[].config.chopperControl` | `M569 C` writes a driver's whole chopper control register, whose off time, blanking time and hysteresis fields `F`, `B` and `Y` also set one at a time. RepRapFirmware forwards both and keeps neither. Here the register is recorded, and each of `C` and the single fields updates the other, so the model never holds a register and fields that disagree and a board given them in one `M569` ends up as the codes left it |
+| `boards[].drivers[].config.closedLoop` | `M569.1` sends the encoder type and counts, the steps per revolution, the magnetic encoder type, the PID and feedforward constants, the warning and error thresholds, the torque constant and the deadband to the closed loop board, and RepRapFirmware keeps none of it. A null value has not been set, so the board uses its default, and a `deadband` of null is the automatic deadband that a negative `B` restores |
+| `boards[].drivers[].config.brake` | `M569.7` binds the brake port, its delay and its PWM voltage limit on the driver's board, which RepRapFirmware does not keep either. A `delay` of null is the board's default, which a port given without `S` restores |
+| `boards[].drivers[].config.waveformCorrection` | `M569.2 S`, `J` and `O` write a harmonic correction into the driver's sine table, one entry per harmonic, which RepRapFirmware does not keep. A register written with `M569.2 R` and `V` is not recorded: it is a debugging aid that later driver configuration overwrites |
+| `heat.heaters[].ambientSensor` | `M950 H B` names the sensor a heater takes as its ambient temperature. RepRapFirmware keeps it on the heater but does not report it |
+| `state.gpOut[].servo` | `M950 S` and `M950 P` create the same kind of port, which the board drives as a servo or as a PWM output. RepRapFirmware keeps the difference in the pin's access mode and does not report it |
+| `sensors.gpIn[].port` | The pin `M950 J` asked a board to watch, which RepRapFirmware keeps in the remote handle's board address and the board's pin table |
+| `ledStrips[].frequency` | `M950 E Q` is sent to the board that drives the strip and RepRapFirmware keeps nothing of it. Null means the board's default for the strip type |
+| `move.kinematics` of a rotary delta: `armLengths`, `rodLengths`, `bearingHeights`, `armAngleLimits`, `deltaRadius`, `printRadius`, `angleCorrections` and `endstopAdjustments` | RepRapFirmware reports only the name (and a placeholder `dummy`). These are what `M669` and `M666` configure |
+| `move.kinematics` of a five-bar SCARA: `xOrigins`, `yOrigins`, `proximalLengths`, `distalLengths`, `cantileverLengths`, `workMode`, `homingAngles`, `headAngleLimits`, `proximalDistalAngleLimits`, `actuatorAngleLimits` and `printArea` | The same: RepRapFirmware reports only the name and `dummy`, and these are what `M669` configures |
+| `move.kinematics.anchors` of a hangprinter has one entry per anchor | RepRapFirmware always reports eight, the unused ones zero, and does not report how many there are, which `M669 N` sets |
+| `move.kinematics.ttSpeedMax` and `.ttAccMax` of a polar machine are in degrees per second and per second squared | RepRapFirmware reports its internal per-step-clock values (0.0008 for 600 deg/s), where its own `M669` report and the documentation use degrees per second |
 
 **`HeaterMonitorCondition` enum value matches the `C` param values of `M143`.** This removes the need to have converters between the OM and gcode parameter and makes error messages more clear and consistent.
 
@@ -287,8 +301,13 @@ divergence between it and the object model refuses the move rather than being cl
 |---|---|
 | `M584` naming one driver on two drives | Checks only that the driver exists, then lets the two owners fight over its steps |
 | A driver claimed by an axis *and* an extruder | Same. Here the first claim wins — axes are walked before extruders — and any further claim is recorded and logged, because last-writer-wins was a real fault that corrupted the reverse map |
-| `M669 K6` with parameters | Hangprinter's anchors need array handling the other geometries do not, so it says so rather than accepting the parameters and behaving as something else |
+| `M666` with parameters on a hangprinter | Its line buildup and flex compensation, and the steps per mm they set, are not ported, so it says so rather than accepting the parameters and behaving as something else |
+| `M669 N` on a hangprinter outside 3 to 8 | Takes any number, and a number above eight overruns its anchor arrays |
+| A refused `M669` | Selects the geometry `K` names before the geometry's own parameters are checked, so a five-bar SCARA missing `D`, or given `L3`, is left selected and half configured. Here nothing of a refused code is applied |
 | Homing two axes whose coupling sets overlap | See §2.1 |
+| `M584` naming a driver that a board on the bus does not have | Reports `Driver 5.3 does not exist`, drops that driver from the list and applies the rest of the code. DSF refuses the whole code, as it does any array element it refuses (section 6.1) |
+| `M584 E` naming such a driver | Does not check the extruders' drivers at all. DSF checks them as it checks the axes' |
+| `M584` creating a 31st axis, or more axes and extruders together than the 32 drives | Ignores an axis letter past `MaxAxes` without saying so, and drops the last extruder when a new axis needs its drive. DSF refuses the code with `Too many axes`, as RRF refuses a list of more drivers than an axis can have, because a configuration it silently does not apply leaves the model and the motion engine disagreeing |
 
 And one thing DSF allows that RRF does not: **`M584 X` releases the drivers of X.** RRF never shrinks
 its axis count, so a drive refused a driver had no way to give one up. The axis stays in `move.axes[]`
@@ -357,7 +376,6 @@ the first move.
 | `G93` inverse time is carried as `RawMove.DurationSec` | Deliberately not a second meaning for `FeedRateMmPerSec`; the quantity is a duration, which is also why the speed factor divides rather than multiplies |
 | `inputs[].feedRate` holds the raw `F` value | The inch conversion depends on which axes the move mentions, which is not known when `F` is read — and this is what the field's documentation already said |
 | M906, M913 and M917 are one handler; M665, M666 and M669 are another | They differ only in which quantity they address, which is true in RRF too. Which parameters mean what is the geometry's business |
-| Rotary delta and five-bar SCARA are built with defaults | Nothing in the object model configures them yet, so the engines take RRF's and the M669 documentation's values rather than inventing a home for the settings |
 | Hangprinter uses the constant-spool-radius model | Line buildup and flex compensation need `move.kinematics` fields that do not exist; this is the branch RRF itself takes when the buildup factor is zero |
 | `config-override.g` (`M501`) and `dsf-config.g` keep the interpreter state they finish with, as `config.g` does | They configure the machine the same way `config.g` does, so an `M83` in them is the machine's setting afterwards. RRF keeps the state of `config.g` alone and restores its caller's state after `M501` |
 | `G10 L2` and `G10 L20` take a rotary axis's origin in degrees under `G20` | RRF converts every axis from inches, rotary ones included, while its moves leave a rotary axis in degrees. DSF follows the moves, as its `G10 P` tool offsets already do, so the same number means the same angle in a move and in a workplace |
@@ -422,6 +440,18 @@ When `M140`, `M141`, `M190` or `M191` switches on several heaters of a slot, eve
 A code that would push an eleventh level on its channel's stack, `M120` or any code that starts a macro, fails with `Push(): stack overflow on <channel>` as its own error reply. Every file on the channel is aborted, as in RepRapFirmware, which reports the overflow as a separate message and replies OK to the code.
 
 An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
+
+`M569.4` with several drivers sends each driver its own driver number. RepRapFirmware loops over the drivers but builds every message from `GCodeBuffer::GetDriverId`, which reads the first, so every board after the first is sent the first driver's number and a driver of that number on the wrong board is put into torque mode.
+
+`M569.1` waits for standstill before changing any setting. RepRapFirmware waits only when it sees `C`, `D`, `E`, `H`, `I`, `R`, `S`, `T` or `V`, which leaves out the later `A`, `B`, `Q` and `Y`, although they change what the closed loop controller does in the same way.
+
+A device `M950` creates exists only once its board has taken the port. RepRapFirmware's `GpOutputPort::Configure` records the board before it sends, so an output whose pin is refused (`Pin 1.out6 is not free`) is still reported in `state.gpOut[]`; here the slot stays empty, as it does for a refused heater, fan or LED strip in both.
+
+A fan whose board answers `M950 F` with a warning is created. RepRapFirmware keeps a new remote fan only when the board answers with plain success, where a heater, an output and an LED strip are kept on a warning too; DSF follows the heater and the others.
+
+`M950 H Q` with no `C` is clamped to 1000 Hz, `MaxHeaterPwmFrequency`, as it is when the heater is created. RepRapFirmware clamps only the frequency a heater is created with, so a frequency changed afterwards could exceed the limit that protects the heater's MOSFET.
+
+`M584` reports a phase stepping drive's step-mode reset that a board does not answer as an error, after applying the rest of the code. RepRapFirmware discards the result of that reset, so the timeout text comes back at OK severity, where every other CAN timeout it reports, including the steps per mm `M584` sends next, is an error.
 
 ## 6.2 G-code responses
 

@@ -57,7 +57,9 @@ Every node in the model derives from one of a small set of base types in
   (they are not camel-cased). Supports a "null removes the item" mode.
 - **`JsonModelDictionary`** - an untyped key/value store of raw JSON values, used for `Global`.
 
-Collections of numbered items are indexed by item number, with `null` where nothing has the number, as RepRapFirmware reports them: `tools[]`, `heat.heaters[]`, `fans[]`, `spindles[]`, `state.gpOut[]`, `sensors.analog[]`, `sensors.probes[]` and `sensors.endstops[]`. `tools[n]` is tool n, so `tools[]` reaches the highest-numbered tool and shrinks when that tool is deleted; a client looks a tool up by index rather than by searching for its `number`. DCS reads and writes these collections through `Model/IndexedCollection.cs`.
+Collections of numbered items are indexed by item number, with `null` where nothing has the number, as RepRapFirmware reports them: `tools[]`, `heat.heaters[]`, `fans[]`, `spindles[]`, `state.gpOut[]`, `ledStrips[]`, `sensors.analog[]`, `sensors.gpIn[]`, `sensors.probes[]` and `sensors.endstops[]`. `tools[n]` is tool n, so `tools[]` reaches the highest-numbered tool and shrinks when that tool is deleted; a client looks a tool up by index rather than by searching for its `number`. DCS reads and writes these collections through `Model/IndexedCollection.cs`.
+
+Some collections follow the axes rather than an item number. `sensors.endstops[]` has an entry for every axis, `null` until `M574` configures one, and `M584` adds one when it creates an axis. Each restore point's `coords[]` (`move.motionSystems[].restorePoints[]`) holds a coordinate for every visible axis, so `M584 P` shrinks and grows it, as RepRapFirmware's does.
 
 Two attributes annotate properties and drive query/merge behaviour:
 

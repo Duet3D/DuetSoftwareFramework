@@ -42,6 +42,20 @@ public partial class GpOutputPort : ModelObject, IStaticModelObject
     private string? _port;
 
     /// <summary>
+    /// Whether this port was created as a servo by M950 S rather than as an output by M950 P
+    /// </summary>
+    /// <remarks>
+    /// The board drives a servo pin differently from a plain PWM output, so the port cannot be
+    /// recreated without knowing which it is
+    /// </remarks>
+    public bool Servo
+    {
+        get => _servo;
+        set => SetPropertyValue(ref _servo, value);
+    }
+    private bool _servo;
+
+    /// <summary>
     /// PWM value of this port (0..1)
     /// </summary>
     public float Pwm
