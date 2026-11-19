@@ -5709,6 +5709,14 @@
             Information about an inductive sensor or null if not present
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.Interface">
+            <summary>
+            Number of the CAN interface this board is connected to as printed on the main board, or null if it is not known
+            </summary>
+            <remarks>
+            This is null as long as the board address is in use on more than one CAN bus
+            </remarks>
+        </member>
         <member name="P:DuetAPI.ObjectModel.ExpansionBoard.State">
             <summary>
             State of this board
