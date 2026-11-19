@@ -26,6 +26,19 @@ public partial class ExpansionBoard : Board
     private InductiveSensor? _inductiveSensor;
 
     /// <summary>
+    /// Number of the CAN interface this board is connected to as printed on the main board, or null if it is not known
+    /// </summary>
+    /// <remarks>
+    /// This is null as long as the board address is in use on more than one CAN bus
+    /// </remarks>
+    public int? Interface
+    {
+        get => _interface;
+        set => SetPropertyValue(ref _interface, value);
+    }
+    private int? _interface;
+
+    /// <summary>
     /// State of this board
     /// </summary>
     public BoardState State
