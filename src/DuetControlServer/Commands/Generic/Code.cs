@@ -118,19 +118,15 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
     public override async Task<Message?> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        // Assign a cancellation token when the execution starts.
+        // Assign a cancellation token when the execution starts unless the file running this code has assigned its own.
         // Prioritized codes use the application stopping token so they survive channel resets (e.g. emergency stop)
         if (cancellationToken != default)
         {
             CancellationToken = cancellationToken;
         }
-        else if (Flags.HasFlag(CodeFlags.IsPrioritized))
+        else if (CancellationToken == default)
         {
-            CancellationToken = _lifetime.ApplicationStopping;
-        }
-        else
-        {
-            CancellationToken = _codeProcessor.CancellationTokenSources[(int)Channel].Token;
+            CancellationToken = Flags.HasFlag(CodeFlags.IsPrioritized) ? _lifetime.ApplicationStopping : _codeProcessor.CancellationTokenSources[(int)Channel].Token;
         }
 
         // Send it to the code pipeline
@@ -341,6 +337,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     public override void Reset()
     {
         base.Reset();
+        CancellationToken = default;
         Connection = null;
         ReplyLogLevel = null;
         Stage = Codes.PipelineStage.Start;

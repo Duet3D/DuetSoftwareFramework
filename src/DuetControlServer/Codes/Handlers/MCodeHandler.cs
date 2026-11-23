@@ -738,16 +738,6 @@ public class MCodeHandler(
                 }
                 break;
 
-            // Send/receive data
-            case 260:
-            case 261:
-                // The firmware declares the result variable itself and rejects a name that still exists, so drop a leftover from a closed block first
-                if (code.File is not null && code.TryGetString('V', out string? varName))
-                {
-                    await code.File.DeleteStaleVariableAsync(varName, cancellationToken);
-                }
-                break;
-
             // Query object model
             case 409:
                 {
