@@ -997,6 +997,15 @@ namespace DuetControlServer.Codes.Handlers
                     }
                     throw new OperationCanceledException();
 
+                // Binary file uploads (the file data cannot follow a code sent via DSF)
+                case 559:
+                case 560:
+                    if (await Processor.FlushAsync(code))
+                    {
+                        return new Message(MessageType.Error, $"M{code.MajorNumber} is only supported on USB and serial inputs of the main board");
+                    }
+                    throw new OperationCanceledException();
+
                 // Synchronise motion systems
                 case 598:
                     // The file readers must rendezvous here like the firmware ones do, else read-ahead evaluates expressions and meta keywords out of order
