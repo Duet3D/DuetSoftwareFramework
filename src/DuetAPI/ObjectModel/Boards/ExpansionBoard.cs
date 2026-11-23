@@ -6,6 +6,19 @@ namespace DuetAPI.ObjectModel;
 public partial class ExpansionBoard : Board
 {
     /// <summary>
+    /// Version of the bootloader or empty if unknown
+    /// </summary>
+    /// <remarks>
+    /// Boards report this only from firmware 3.7.1 on, main boards in expansion mode never report it
+    /// </remarks>
+    public string BootloaderVersion
+    {
+        get => _bootloaderVersion;
+        set => SetPropertyValue(ref _bootloaderVersion, value);
+    }
+    private string _bootloaderVersion = string.Empty;
+
+    /// <summary>
     /// Closed loop data of this board or null if unknown
     /// </summary>
     public BoardClosedLoop? ClosedLoop
