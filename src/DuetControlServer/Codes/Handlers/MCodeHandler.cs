@@ -1050,6 +1050,15 @@ public class MCodeHandler(
                 }
                 throw new OperationCanceledException();
 
+            // Binary file uploads are taken by code streams before they get here, nothing else can carry the file data
+            case 559:
+            case 560:
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+                {
+                    return new Message(MessageType.Error, "file uploads via DSF need a code stream connection");
+                }
+                throw new OperationCanceledException();
+
             // Synchronise motion systems
             case 598:
                 // The file readers must rendezvous here like the firmware ones do, else read-ahead evaluates expressions and meta keywords out of order
