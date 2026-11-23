@@ -37,6 +37,11 @@ namespace DuetControlServer.Files
         public bool IsPausable { get; set; }
 
         /// <summary>
+        /// Macro files are never rewound, a pause either lets them finish or aborts them
+        /// </summary>
+        protected override bool IsRewindable => false;
+
+        /// <summary>
         /// Internal cancellation token source used for codes
         /// </summary>
         private readonly CancellationTokenSource _cts = CancellationTokenSource.CreateLinkedTokenSource(Program.CancellationToken);

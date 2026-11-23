@@ -77,10 +77,15 @@ namespace DuetControlServer.Files
 
         /// <summary>
         /// Blocks whose scope the read-ahead has left. The firmware may still be executing codes from inside them
-        /// and a pause can rewind into their scope, so their local variables must be kept until the file is closed
-        /// or until they are redeclared. Guarded by the lock on <see cref="_codeBlocks"/>
+        /// and a pause can rewind into their scope, so their local variables are kept in the firmware under hidden
+        /// names until the file is closed or the block is closed again. Guarded by the lock on <see cref="_codeBlocks"/>
         /// </summary>
         private readonly List<CodeBlock> _closedBlocks = [];
+
+        /// <summary>
+        /// Whether a pause can rewind this file into a block that the read-ahead has already left
+        /// </summary>
+        protected virtual bool IsRewindable => true;
 
         /// <summary>
         /// Last ended code block
@@ -114,9 +119,10 @@ namespace DuetControlServer.Files
         /// Seek to a new file position and restore the code block state the read-ahead had at that position.
         /// Blocks entered at or past it are dropped because their lines are read again after the seek, so blocks
         /// left on the stack would be pushed twice and while loops would restart with bogus iteration counts;
-        /// their local variables are deleted so that their re-declaration succeeds. Already closed blocks whose
-        /// scope contains the target position are pushed back onto the stack, their local variables are still
-        /// alive because closed blocks defer the deletion. The caller must hold the lock of this file
+        /// their local variables are deleted so that their re-declaration succeeds. The same goes for variables
+        /// that surviving blocks declared at or past it. Already closed blocks whose scope contains the target
+        /// position are pushed back onto the stack and their hidden local variables get their names back.
+        /// The caller must hold the lock of this file
         /// </summary>
         /// <param name="position">New file position</param>
         /// <returns>Asynchronous task</returns>
@@ -124,7 +130,8 @@ namespace DuetControlServer.Files
         {
             Position = position;
 
-            List<Task> varDeletionTasks = [];
+            // The firmware processes variable requests in the order they are queued here
+            List<Task> varTasks = [];
             lock (_codeBlocks)
             {
                 while (_codeBlocks.TryPeek(out CodeBlock? codeBlock) && codeBlock.FilePosition >= position)
@@ -132,19 +139,29 @@ namespace DuetControlServer.Files
                     _codeBlocks.Pop();
                     if (codeBlock.HasLocalVariables)
                     {
-                        varDeletionTasks.Add(DeleteLocalVariables(codeBlock));
+                        varTasks.Add(DeleteLocalVariables(codeBlock));
                     }
                     _logger.Debug("Dropped {0} block starting at byte {1} after seeking to byte {2}", codeBlock.Keyword, codeBlock.FilePosition, position);
+                }
+
+                foreach (CodeBlock codeBlock in _codeBlocks)
+                {
+                    codeBlock.LocalVariables.RemoveAll(variable =>
+                    {
+                        if (variable.Position >= position)
+                        {
+                            varTasks.Add(SPI.Interface.SetVariable(Channel, false, variable.Name, null));
+                            return true;
+                        }
+                        return false;
+                    });
                 }
 
                 _closedBlocks.RemoveAll(codeBlock =>
                 {
                     if (codeBlock.FilePosition >= position)
                     {
-                        if (codeBlock.HasLocalVariables)
-                        {
-                            varDeletionTasks.Add(DeleteLocalVariables(codeBlock));
-                        }
+                        DeleteHiddenVariables(codeBlock, varTasks);
                         _logger.Debug("Dropped closed {0} block starting at byte {1} after seeking to byte {2}", codeBlock.Keyword, codeBlock.FilePosition, position);
                         return true;
                     }
@@ -152,21 +169,17 @@ namespace DuetControlServer.Files
                 });
 
                 // Push closed blocks containing the target position back onto the stack, outermost first.
-                // They can only be nested inside each other and inside the surviving stack blocks
-                foreach (CodeBlock codeBlock in _closedBlocks.Where(codeBlock => codeBlock.EndPosition >= position).OrderBy(codeBlock => codeBlock.FilePosition).ToList())
+                // They can only be nested inside each other and inside the surviving stack blocks.
+                // A block that a loop has entered again in the meantime is still on the stack and stays as it is
+                foreach (CodeBlock codeBlock in _closedBlocks.Where(codeBlock => codeBlock.EndPosition >= position && !_codeBlocks.Any(openBlock => openBlock.FilePosition == codeBlock.FilePosition)).OrderBy(codeBlock => codeBlock.FilePosition).ToList())
                 {
                     _closedBlocks.Remove(codeBlock);
+                    RestoreLocalVariables(codeBlock, position, varTasks);
                     _codeBlocks.Push(codeBlock);
                     _logger.Debug("Restored {0} block starting at byte {1} after seeking to byte {2}", codeBlock.Keyword, codeBlock.FilePosition, position);
                 }
-
-                // Variable declarations at or past the target position are read and executed again
-                foreach (CodeBlock codeBlock in _codeBlocks)
-                {
-                    codeBlock.AllowVariableRedeclaration = true;
-                }
             }
-            await Task.WhenAll(varDeletionTasks);
+            await Task.WhenAll(varTasks);
         }
 
         /// <summary>
@@ -519,30 +532,23 @@ namespace DuetControlServer.Files
                             return code;
 
                         case KeywordType.Var:
-                            if (codeBlock is null || code.Indent > codeBlock.Indent)
-                            {
-                                codeBlock = new CodeBlock(code, true)
-                                {
-                                    HasLocalVariables = true
-                                };
-                                lock (_codeBlocks)
-                                {
-                                    _codeBlocks.Push(codeBlock);
-                                }
-                            }
-                            else
-                            {
-                                codeBlock.HasLocalVariables = true;
-                            }
+                            ExpectLocalVariable(code, codeBlock);
                             return code;
 
                         case KeywordType.Skip:
                             // No-op, the rest of the line is ignored
                             break;
 
+                        case KeywordType.None:
+                            // The firmware declares the result variable of these codes when it executes them, which may be after their block has been read to its end
+                            if (code is { Type: CodeType.MCode, MajorNumber: 260 or 261 } && code.HasParameter('V'))
+                            {
+                                ExpectLocalVariable(code, codeBlock);
+                            }
+                            return code;
+
                         case KeywordType.Echo:
                         case KeywordType.Global:
-                        case KeywordType.None:
                         case KeywordType.Set:
                             return code;
 
@@ -550,6 +556,26 @@ namespace DuetControlServer.Files
                             throw new CodeParserException($"Keyword {code.Keyword} is not supported", code);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Make sure the current code block waits for pending codes before it ends because the given code declares a local variable
+        /// </summary>
+        /// <param name="code">Code declaring the variable</param>
+        /// <param name="codeBlock">Current code block or null if there is none</param>
+        private void ExpectLocalVariable(Code code, CodeBlock? codeBlock)
+        {
+            if (codeBlock is null || code.Indent > codeBlock.Indent)
+            {
+                lock (_codeBlocks)
+                {
+                    _codeBlocks.Push(new CodeBlock(code, true, KeywordType.Var) { HasLocalVariables = true });
+                }
+            }
+            else
+            {
+                codeBlock.HasLocalVariables = true;
             }
         }
 
@@ -570,40 +596,70 @@ namespace DuetControlServer.Files
                     _codeBlocks.Push(codeBlock);
                 }
 
-                if (!codeBlock.LocalVariables.Contains(varName))
+                if (!codeBlock.LocalVariables.Exists(variable => variable.Name == varName))
                 {
-                    codeBlock.LocalVariables.Add(varName);
+                    codeBlock.LocalVariables.Add((varName, code.FilePosition ?? 0));
                 }
                 codeBlock.HasLocalVariables = true;
             }
         }
 
         /// <summary>
-        /// Delete a still existing local variable that is about to be redeclared. This happens when a closed block
-        /// deferred the deletion (a loop iteration or a sibling scope reuses the name) and when a rewind makes the
-        /// file read a declaration again that was already executed
+        /// Get the name under which the firmware keeps a local variable of a closed block.
+        /// Loop iterations close the same block again and reuse these names
         /// </summary>
-        /// <param name="varName">Name of the variable</param>
-        /// <returns>Asynchronous task</returns>
-        public async Task DeleteStaleVariableAsync(string varName)
-        {
-            Task? deletionTask = null;
-            lock (_codeBlocks)
-            {
-                foreach (CodeBlock codeBlock in _closedBlocks.Concat(_codeBlocks.Where(codeBlock => codeBlock.AllowVariableRedeclaration)))
-                {
-                    if (codeBlock.LocalVariables.Remove(varName))
-                    {
-                        codeBlock.HasLocalVariables = codeBlock.LocalVariables.Count > 0;
-                        deletionTask = SPI.Interface.SetVariable(Channel, false, varName, null);
-                        break;
-                    }
-                }
-            }
+        /// <param name="codeBlock">Closed code block</param>
+        /// <param name="index">Index of the local variable</param>
+        /// <returns>Variable name without prefix</returns>
+        private static string GetHiddenVariableName(CodeBlock codeBlock, int index) => $"dsfClosedBlock{codeBlock.FilePosition}x{index}";
 
-            if (deletionTask is not null)
+        /// <summary>
+        /// Move the local variables of a code block to hidden names so that codes following the block cannot access them
+        /// </summary>
+        /// <param name="codeBlock">Code block being closed</param>
+        /// <param name="varTasks">List of pending variable requests to add to</param>
+        private void HideLocalVariables(CodeBlock codeBlock, List<Task> varTasks)
+        {
+            for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
             {
-                await deletionTask;
+                // The firmware moves the variables of the File channel to File2 when the file reader is forked, so a variable may be gone
+                string name = codeBlock.LocalVariables[i].Name;
+                varTasks.Add(SPI.Interface.SetVariable(Channel, true, "var." + GetHiddenVariableName(codeBlock, i), $"exists(var.{name}) ? var.{name} : null"));
+                varTasks.Add(SPI.Interface.SetVariable(Channel, false, name, null));
+            }
+        }
+
+        /// <summary>
+        /// Give the hidden local variables of a closed code block their names back.
+        /// Variables declared at or past the given file position are dropped because their declarations are executed again
+        /// </summary>
+        /// <param name="codeBlock">Closed code block being opened again</param>
+        /// <param name="position">File position being rewound to</param>
+        /// <param name="varTasks">List of pending variable requests to add to</param>
+        private void RestoreLocalVariables(CodeBlock codeBlock, long position, List<Task> varTasks)
+        {
+            for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
+            {
+                string hiddenName = GetHiddenVariableName(codeBlock, i);
+                if (codeBlock.LocalVariables[i].Position < position)
+                {
+                    varTasks.Add(SPI.Interface.SetVariable(Channel, true, "var." + codeBlock.LocalVariables[i].Name, "var." + hiddenName));
+                }
+                varTasks.Add(SPI.Interface.SetVariable(Channel, false, hiddenName, null));
+            }
+            codeBlock.LocalVariables.RemoveAll(variable => variable.Position >= position);
+        }
+
+        /// <summary>
+        /// Delete the hidden local variables of a closed code block
+        /// </summary>
+        /// <param name="codeBlock">Closed code block</param>
+        /// <param name="varTasks">List of pending variable requests to add to</param>
+        private void DeleteHiddenVariables(CodeBlock codeBlock, List<Task> varTasks)
+        {
+            for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
+            {
+                varTasks.Add(SPI.Interface.SetVariable(Channel, false, GetHiddenVariableName(codeBlock, i), null));
             }
         }
 
@@ -617,7 +673,7 @@ namespace DuetControlServer.Files
             Task[] deletionTasks = new Task[codeBlock.LocalVariables.Count];
             for (int i = 0; i < codeBlock.LocalVariables.Count; i++)
             {
-                deletionTasks[i] = SPI.Interface.SetVariable(Channel, false, codeBlock.LocalVariables[i], null);
+                deletionTasks[i] = SPI.Interface.SetVariable(Channel, false, codeBlock.LocalVariables[i].Name, null);
             }
             await Task.WhenAll(deletionTasks);
             codeBlock.LocalVariables.Clear();
@@ -631,6 +687,8 @@ namespace DuetControlServer.Files
         /// <returns>Asynchronous task</returns>
         private async Task EndCodeBlock(long endPosition)
         {
+            List<Task> varTasks = [];
+
             using (await LockAsync())
             {
                 CodeBlock? codeBlock;
@@ -654,21 +712,46 @@ namespace DuetControlServer.Files
                         _logger.Debug("End of generic block");
                     }
 
-                    // Keep the block and its local variables instead of deleting them right away. The firmware may
-                    // still be executing codes from inside it and a pause can rewind into its scope, in which case
-                    // the variables must still exist. They are deleted when they are redeclared, and RRF cleans up
-                    // the remaining ones automatically when the file is closed. Loop iterations re-close the same
-                    // blocks, so only the latest instance per start position is kept
-                    codeBlock.EndPosition = endPosition;
-                    lock (_codeBlocks)
+                    if (IsRewindable)
                     {
-                        _closedBlocks.RemoveAll(closedBlock => closedBlock.FilePosition == codeBlock.FilePosition);
-                        _closedBlocks.Add(codeBlock);
+                        // Keep the block and hide its local variables instead of deleting them. The firmware may still
+                        // be executing codes from inside it and a pause can rewind into its scope, in which case the
+                        // variables must exist again. RRF cleans up the hidden ones automatically when the file is
+                        // closed. Loop iterations re-close the same blocks, so only the latest instance per start
+                        // position is kept
+                        codeBlock.EndPosition = endPosition;
+                        lock (_codeBlocks)
+                        {
+                            _closedBlocks.RemoveAll(closedBlock =>
+                            {
+                                if (closedBlock.FilePosition == codeBlock.FilePosition)
+                                {
+                                    DeleteHiddenVariables(closedBlock, varTasks);
+                                    return true;
+                                }
+                                return false;
+                            });
+                            HideLocalVariables(codeBlock, varTasks);
+                            _closedBlocks.Add(codeBlock);
+                        }
+                    }
+                    else if (codeBlock.HasLocalVariables)
+                    {
+                        varTasks.Add(DeleteLocalVariables(codeBlock));
                     }
 
                     // End
                     _lastCodeBlock = codeBlock;
                 }
+            }
+
+            try
+            {
+                await Task.WhenAll(varTasks);  // wait outside the code lock to avoid deadlocks
+            }
+            catch (Exception) when (IsClosed)
+            {
+                // RRF discards the variables of an aborted file, so requests that were still pending fail
             }
         }
     }
