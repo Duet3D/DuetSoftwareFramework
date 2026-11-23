@@ -5699,6 +5699,14 @@
             Information about an expansion board connected over CAN
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.BootloaderVersion">
+            <summary>
+            Version of the bootloader or empty if unknown
+            </summary>
+            <remarks>
+            Boards report this only from firmware 3.7.1 on, main boards in expansion mode never report it
+            </remarks>
+        </member>
         <member name="P:DuetAPI.ObjectModel.ExpansionBoard.ClosedLoop">
             <summary>
             Closed loop data of this board or null if unknown
