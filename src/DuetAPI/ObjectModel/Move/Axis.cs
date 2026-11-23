@@ -215,6 +215,17 @@ public partial class Axis : ModelObject, IStaticModelObject
     private float _speed = 100F;
 
     /// <summary>
+    /// State of the drivers of this axis
+    /// </summary>
+    [Live]
+    public DriverState State
+    {
+        get => _state;
+        set => SetPropertyValue(ref _state, value);
+    }
+    private DriverState _state;
+
+    /// <summary>
     /// Number of microsteps per mm
     /// </summary>
     public float StepsPerMm
