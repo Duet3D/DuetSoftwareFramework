@@ -8501,6 +8501,11 @@
             Maximum speed (in mm/min)
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.Axis.State">
+            <summary>
+            State of the drivers of this axis
+            </summary>
+        </member>
         <member name="P:DuetAPI.ObjectModel.Axis.StepsPerMm">
             <summary>
             Number of microsteps per mm
@@ -8687,6 +8692,26 @@
             <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
             <remarks>This method is auto-generated</remarks>
         </member>
+        <member name="T:DuetAPI.ObjectModel.DriverState">
+            <summary>
+            Enumeration of possible states of the drivers of an axis or extruder
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.DriverState.Disabled">
+            <summary>
+            Drivers are disabled
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.DriverState.Idle">
+            <summary>
+            Drivers are enabled at idle current
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.DriverState.Enabled">
+            <summary>
+            Drivers are enabled
+            </summary>
+        </member>
         <member name="T:DuetAPI.ObjectModel.Extruder">
             <summary>
             Information about an extruder drive
@@ -8782,6 +8807,11 @@
         <member name="P:DuetAPI.ObjectModel.Extruder.Speed">
             <summary>
             Maximum speed (in mm/min)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Extruder.State">
+            <summary>
+            State of the drivers of this extruder
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.StepsPerMm">
@@ -12141,6 +12171,11 @@
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.NullableDriverMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.DriverState">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
