@@ -141,20 +141,20 @@ public sealed class CodeStream : IProcessor, IDisposable
     /// <returns>Asynchronous task</returns>
     public async Task ProcessAsync(CancellationToken cancellationToken)
     {
+        // Prepare some code instances as a buffer
+        int numCodes = Math.Max(_bufferSize, 1);
+        AsyncMonitor codeLock = new();
+        Queue<Code> codes = new();
+        for (int i = 0; i < numCodes; i++)
+        {
+            codes.Enqueue(_codeFactory.Create());
+        }
+
         try
         {
             CodeParserBuffer parserBuffer = new(_settings.FileBufferSize, false);
             // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
             parserBuffer.MayRepeatCode = _model.CurrentMachineMode is MachineMode.CNC or MachineMode.Laser;
-
-            // Prepare some code instances as a buffer
-            int numCodes = Math.Max(_bufferSize, 1);
-            AsyncMonitor codeLock = new();
-            Queue<Code> codes = new();
-            for (int i = 0; i < numCodes; i++)
-            {
-                codes.Enqueue(_codeFactory.Create());
-            }
 
             do
             {
@@ -341,7 +341,56 @@ public sealed class CodeStream : IProcessor, IDisposable
             {
                 _streams.Remove(this);
             }
+
+            // The pending codes may still be lines of a file being written, so they must finish before that file is abandoned
+            using (await codeLock.EnterAsync(cancellationToken))
+            {
+                while (codes.Count < numCodes)
+                {
+                    await codeLock.WaitAsync(cancellationToken);
+                }
+            }
+            await AbortTextFileUploadAsync();
         }
+    }
+
+    /// <summary>
+    /// Abandon the text file upload that this connection has started with M28 and not finished with M29, and delete the partial file.
+    /// Otherwise the codes of the next connection on this channel would be written to the file.
+    /// RepRapFirmware does the same when the host of a serial input disconnects.
+    /// </summary>
+    /// <returns>Asynchronous task</returns>
+    private async Task AbortTextFileUploadAsync()
+    {
+        string physicalFile;
+        using (await _codeProcessor.FileLocks[(int)_channel].LockAsync())
+        {
+            StreamWriter? writer = _codeProcessor.FilesBeingWritten[(int)_channel];
+            if (writer is null || _codeProcessor.FileWriterConnections[(int)_channel] != Connection.Id)
+            {
+                return;
+            }
+
+            _codeProcessor.FilesBeingWritten[(int)_channel] = null;
+            physicalFile = ((FileStream)writer.BaseStream).Name;
+            try
+            {
+                File.Delete(physicalFile);
+            }
+            catch (Exception e)
+            {
+                _logger.LogDebug(e, "IPC#{Id}: Failed to delete partial file", Connection.Id);
+            }
+            try
+            {
+                await writer.DisposeAsync();
+            }
+            catch (Exception e)
+            {
+                _logger.LogDebug(e, "IPC#{Id}: Failed to close partial file", Connection.Id);
+            }
+        }
+        await _eventLogger.LogOutputAsync(MessageType.Error, $"Upload of {await _filePathResolver.ToVirtualAsync(physicalFile)} aborted because the client disconnected, partial file deleted");
     }
 
     /// <summary>

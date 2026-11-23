@@ -399,6 +399,7 @@ public class MCodeHandler(
                             FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, settings.Value.FileBufferSize);
                             StreamWriter writer = new(fileStream, new UTF8Encoding(false), settings.Value.FileBufferSize);
                             codeProcessor.FilesBeingWritten[numChannel] = writer;
+                            codeProcessor.FileWriterConnections[numChannel] = code.SourceConnection;
                             return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
                         }
                         catch (Exception e)

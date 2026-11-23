@@ -40,6 +40,11 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public readonly StreamWriter?[] FilesBeingWritten = new StreamWriter[Inputs.Total];
 
     /// <summary>
+    /// IDs of the connections that started the files being written to, so that a code stream can abandon its file when it is closed
+    /// </summary>
+    public readonly int[] FileWriterConnections = new int[Inputs.Total];
+
+    /// <summary>
     /// Processors per code channel
     /// </summary>
     public readonly Lazy<ChannelProcessor[]> Processors = new(() => [.. Enum.GetValues<CodeChannel>().Select(channel => ActivatorUtilities.CreateInstance<ChannelProcessor>(serviceProvider, channel)) ]);
