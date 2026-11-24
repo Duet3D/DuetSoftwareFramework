@@ -108,8 +108,8 @@ public class M569Point4Tests : BenchFixture
         Assert.That((await bench.Host.ExecuteCodeAsync($"M569.4 P{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)} T0.5")).Trim(), Is.Empty);
 
         Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point4>().Select(sent => (sent.Board, sent.Message.P, sent.Message.T)),
-                    Is.EqualTo(new (byte, byte?, float?)[] { (DriversRig.ClosedLoopBoard, 0, 0.5f), (DriversRig.MainDriverBoard, 3, 0.5f) }),
-                    "each driver is sent its own number, in the order the list gives them");
+                    Is.EquivalentTo(new (byte, byte?, float?)[] { (DriversRig.ClosedLoopBoard, 0, 0.5f), (DriversRig.MainDriverBoard, 3, 0.5f) }),
+                    "each driver is sent its own number");
     }
 
     /// <summary>

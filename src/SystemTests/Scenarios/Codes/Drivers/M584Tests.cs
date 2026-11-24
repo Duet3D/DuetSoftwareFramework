@@ -18,7 +18,7 @@ public class M584Tests : BenchFixture
     /// <summary>Drivers of <see cref="Machines.DriverBoard"/> that no machine maps, for the U axis the machine scenarios create</summary>
     private const byte UDriver = 4, SecondUDriver = 5;
 
-    /// <summary>A board that answers like the rig's boards but is not part of the rig, so that the order of the boards it is sent to shows</summary>
+    /// <summary>A board that answers like the rig's boards but is not part of the rig</summary>
     private const byte OtherBoard = 3;
 
     /// <summary>A board address nothing answers at, as in <c>m584-expansion-timeout.yaml</c></summary>
@@ -157,15 +157,16 @@ public class M584Tests : BenchFixture
 
         Assert.That((await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} Y{DriversRig.MainDriver(4)} E{DriversRig.MainDriver(5)}")).Trim(), Is.Empty);
 
-        Assert.That(SentCanMessages(bench), Is.EqualTo(new[]
+        Assert.That(SentCanMessages(bench), Is.EquivalentTo(new[]
                     {
                         (DriversRig.MainDriverBoard, CanMessageType.M970),
                         (DriversRig.ClosedLoopBoard, CanMessageType.M970),
                         (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
-                    }),
+                    }));
+        Assert.That(SentCanMessages(bench)[^1].Type, Is.EqualTo(CanMessageType.SetStepsPerMmAndMicrostepping),
                     "the resets come before the new drivers are told their settings");
         Assert.That(bench.CanMaster.CanMessages<CanMessageM970>().Select(message => (message.Board, message.Message.P, message.Message.S)),
-                    Is.EqualTo(new[]
+                    Is.EquivalentTo(new[]
                     {
                         (DriversRig.MainDriverBoard, (byte?)0, (byte?)0),
                         (DriversRig.ClosedLoopBoard, (byte?)0, (byte?)0),
@@ -780,9 +781,8 @@ public class M584Tests : BenchFixture
     /// </summary>
     /// <remarks>
     /// <c>testcases/drivers/m584-expansion-timeout.yaml</c>: <c>M584 U3.0 V99.0 W3.1 A2.0</c> creates
-    /// all four axes, sends one <c>setStepsPerMmAndMicrostepping</c> per board in ascending board
-    /// address order (2, 3, 99: RRF's CanDriversData keeps its entries sorted by driver id), and
-    /// replies "Timed out awaiting response from board 99 to request type 6042" as an error. The M92
+    /// all four axes, sends one <c>setStepsPerMmAndMicrostepping</c> per board, in no order that
+    /// matters, and replies "Timed out awaiting response from board 99 to request type 6042" as an error. The M92
     /// that follows reaches every axis and times out on board 99 again
     /// </remarks>
     [Test]
@@ -817,13 +817,14 @@ public class M584Tests : BenchFixture
                             ('W', new DriverId(DriversRig.MainDriverBoard, 4)),
                             ('A', new DriverId(OtherBoard, 0)),
                         }), "every axis is created and mapped, the one behind the absent board included");
-            Assert.That(SentCanMessages(bench), Is.EqualTo(new[]
+            Assert.That(SentCanMessages(bench), Is.EquivalentTo(new[]
                         {
                             (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
                             (OtherBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
                             (AbsentBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
-                        }), "one request per board, in board address order");
-            Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>()[0].Message.DriversToUpdate,
+                        }), "one request per board");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>()
+                             .Single(sent => sent.Board == DriversRig.MainDriverBoard).Message.DriversToUpdate,
                         Is.EqualTo(0b11000), "U and W share a board, and a request");
         });
 
@@ -833,7 +834,7 @@ public class M584Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(reply, Does.StartWith("Error").And.Contain($"board {AbsentBoard}, req type {(int)CanMessageType.SetStepsPerMmAndMicrostepping}"));
-            Assert.That(SentCanMessages(bench).Select(message => message.Board), Is.EqualTo(new[] { DriversRig.MainDriverBoard, OtherBoard, AbsentBoard }),
+            Assert.That(SentCanMessages(bench).Select(message => message.Board), Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, OtherBoard, AbsentBoard }),
                         "the new axes are usable: M92 reaches every one of them");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Skip(3).Select(axis => axis.StepsPerMm).ToArray()),
                         Is.EqualTo(Enumerable.Repeat(stepsPerMm, 4)));

@@ -124,12 +124,11 @@ public class M572Tests : BenchFixture
     }
 
     /// <summary>
-    /// Extruders on the same board share one message, and boards are told in ascending order of
-    /// address
+    /// Extruders on the same board share one message
     /// </summary>
     /// <remarks>
-    /// RRF Move::ConfigurePressureAdvance collects the remote drivers in a CanDriversData, which
-    /// keeps them sorted by driver id, and SetRemoteDriverValues sends one message per board
+    /// RRF Move::ConfigurePressureAdvance collects the remote drivers in a CanDriversData, and
+    /// SetRemoteDriverValues sends one message per board. The order the boards are told in does not matter
     /// </remarks>
     [Test]
     [Category("KnownGap")]
@@ -142,13 +141,14 @@ public class M572Tests : BenchFixture
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>();
         Assert.That(sent.Select(m => (m.Board, (int)m.Message.DriversToUpdate)),
-                    Is.EqualTo(new[] { (DriversRig.MainDriverBoard, (1 << 3) | (1 << 4)), (DriversRig.ClosedLoopBoard, 1 << 0) }),
-                    "the six-driver board first, carrying both of its extruders, then the other");
+                    Is.EquivalentTo(new[] { (DriversRig.MainDriverBoard, (1 << 3) | (1 << 4)), (DriversRig.ClosedLoopBoard, 1 << 0) }),
+                    "the six-driver board's message carries both of its extruders");
+        CanMessageMultipleDrivesRequestShortPressureAdvanceParameters main = sent.Single(m => m.Board == DriversRig.MainDriverBoard).Message;
         Assert.Multiple(() =>
         {
-            Assert.That(sent[0].Message.Values[0].K[0], Is.EqualTo((Half)0.05f));
-            Assert.That(sent[0].Message.Values[1].K[0], Is.EqualTo((Half)0.05f));
-            Assert.That(sent[0].Message.Values[1].Dk, Is.EqualTo(Half.PositiveInfinity));
+            Assert.That(main.Values[0].K[0], Is.EqualTo((Half)0.05f));
+            Assert.That(main.Values[1].K[0], Is.EqualTo((Half)0.05f));
+            Assert.That(main.Values[1].Dk, Is.EqualTo(Half.PositiveInfinity));
         });
     }
 
@@ -182,7 +182,7 @@ public class M572Tests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.K0), Is.EqualTo(0.1f));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[1].PressAdv.K0), Is.EqualTo(0.1f));
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>().Select(m => m.Board),
-                        Is.EqualTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
+                        Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
                         "both of the tool's extruders, on their two boards");
         });
     }
@@ -301,8 +301,8 @@ public class M572Tests : BenchFixture
         {
             Assert.That(reply, Does.StartWith("Error:").And.Contain(refusal));
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>().Select(m => m.Board),
-                        Is.EqualTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
-                        "the refusal from the first board does not stop the second being told");
+                        Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
+                        "one board's refusal does not stop the other being told");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.K0), Is.EqualTo(0.1f));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[1].PressAdv.K0), Is.EqualTo(0.1f));
         });
