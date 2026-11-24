@@ -24,7 +24,6 @@ public class G60Tests : BenchFixture
     /// originalFeedRate and the current tool number; RestorePoint.cpp reports them as coords,
     /// feedRate and toolNumber
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task G60SavesRestorePoint()
     {

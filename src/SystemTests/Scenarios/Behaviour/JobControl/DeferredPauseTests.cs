@@ -21,10 +21,10 @@ public class DeferredPauseTests : BenchFixture
     private const string SquareMacro = """
         set global.macroRuns = global.macroRuns + 1
         G90
-        G1 X150 Y50 F3000
-        G1 X150 Y150 F3000
-        G1 X50 Y150 F3000
+        G1 X50 Y20 F3000
         G1 X50 Y50 F3000
+        G1 X20 Y50 F3000
+        G1 X20 Y20 F3000
         """;
 
     /// <summary>
@@ -34,39 +34,34 @@ public class DeferredPauseTests : BenchFixture
     /// queued move is the case that names no purge boundary, and the pause must still settle rather
     /// than wait on codes whose anchors will never retire
     /// </summary>
-    /// <remarks>
-    /// This test is intermitent and it is undetermined if it is the test or program at fault
-    /// </remarks>
     [Test]
-    [Category("KnownGap")]
     [Category("LongRunning")]
     public async Task PauseTwiceAroundDeferredCodes()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, $"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 3)}\" Q500", Machines.Segmented, Machines.Xye.Homed)
                                              .WithSd(sd => sd.WriteGCode("job.gcode", """
                 G91
-                G1 X100 F6000
-                G1 X100
+                G1 X60 F6000
+                G1 X60
                 M106 S1
                 M106 S0.5
                 M106 S0.2
-                G1 X-100
-                G1 X-100
+                G1 X-60
+                G1 X-60
                 M107
                 G90
                 G60 S3
                 """)).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(TimeSpan.FromSeconds(1));
+        await bench.RunToPositionAsync(axis: 0, position: 30);
 
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Processing);
-        await Task.Delay(TimeSpan.FromSeconds(1));
+        await bench.RunToPositionAsync(axis: 0, position: 90);
 
         // The second stop is the one that hangs: it comes to rest with nothing left to purge, so
         // there is no boundary to cancel the owed codes against
@@ -100,7 +95,7 @@ public class DeferredPauseTests : BenchFixture
                 sd.WriteMacro("plain-moves.g", SquareMacro);
                 sd.WriteGCode("job.gcode", """
                     G90
-                    G1 X50 Y50 F6000
+                    G1 X20 Y20 F6000
                     M98 P"0:/macros/plain-moves.g"
                     set global.afterMacro = 1
                     G1 X10 Y10 F6000
@@ -109,8 +104,7 @@ public class DeferredPauseTests : BenchFixture
             }).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(TimeSpan.FromSeconds(1.5));
+        await bench.RunToPositionAsync(axis: 0, position: 30);
 
         // The pause is accepted but pending; a second one is told so
         await bench.Host.ExecuteCodeAsync("M25");
@@ -121,7 +115,7 @@ public class DeferredPauseTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(1), "the macro completed once");
-            Assert.That(await bench.Host.RestorePointAsync(1), Is.EqualTo((50.0, 50.0)),
+            Assert.That(await bench.Host.RestorePointAsync(1), Is.EqualTo((20.0, 20.0)),
                         "the deferred pause fired after the macro's last move: nothing was purged mid-macro");
             Assert.That(await bench.Host.GlobalAsync("afterMacro"), Is.Zero,
                         "and before the code after the M98 line");
@@ -143,7 +137,6 @@ public class DeferredPauseTests : BenchFixture
     /// A pause during an M98 R1 macro feedholds immediately, and the resume reruns the whole
     /// macro from its first line: one M98 call, two executions
     /// </summary>
-    /// TODO this might be an intermitant failure
     [Test]
     [Category("LongRunning")]
     public async Task PauseDuringPausableMacroRerunsIt()
@@ -154,7 +147,7 @@ public class DeferredPauseTests : BenchFixture
             sd.WriteMacro("pausable-moves.g", "M98 R1\n" + SquareMacro);
             sd.WriteGCode("job.gcode", """
                 G90
-                G1 X50 Y50 F6000
+                G1 X20 Y20 F6000
                 M98 P"0:/macros/pausable-moves.g"
                 G1 X10 Y10 F6000
                 G60 S3
@@ -162,8 +155,7 @@ public class DeferredPauseTests : BenchFixture
         }).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(TimeSpan.FromSeconds(1.5));
+        await bench.RunToPositionAsync(axis: 0, position: 30);
 
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
@@ -202,9 +194,9 @@ public class DeferredPauseTests : BenchFixture
                 global tpostRan = 0
                 """, "\nT0", Machines.Xye.Homed).WithSd(sd =>
             {
-                sd.WriteSys("tfree0.g", "set global.tfreeRan = global.tfreeRan + 1\nG91\nG1 X100 F3000\nM400\n");
-                sd.WriteSys("tpre0.g", "set global.tpreRan = global.tpreRan + 1\nG91\nG1 X100 F6000\nM400\n");
-                sd.WriteSys("tpost0.g", "set global.tpostRan = global.tpostRan + 1\nG91\nG1 X100 F6000\nM400\n");
+                sd.WriteSys("tfree0.g", "set global.tfreeRan = global.tfreeRan + 1\nG91\nG1 X30 F1500\nM400\n");
+                sd.WriteSys("tpre0.g", "set global.tpreRan = global.tpreRan + 1\nG91\nG1 X30 F6000\nM400\n");
+                sd.WriteSys("tpost0.g", "set global.tpostRan = global.tpostRan + 1\nG91\nG1 X30 F6000\nM400\n");
                 sd.WriteGCode("job.gcode", """
                     G90
                     G1 X10 Y10 F6000
@@ -226,10 +218,9 @@ public class DeferredPauseTests : BenchFixture
         });
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(TimeSpan.FromSeconds(1));
+        await bench.Host.WaitForGlobalAsync("tfreeRan", 1);
 
-        // Land the pause while the tool change macros' slow moves are being made
+        // Land the pause while tfree0.g's slow move is being made
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.Multiple(async () =>

@@ -21,8 +21,7 @@ public class G20G21Tests : BenchFixture
     /// </summary>
     /// <remarks>
     /// RRF GCodes2.cpp case 20/21 calls gb.UseInches, GCodeBuffer.cpp GetDistanceUnits reports
-    /// "in"/"mm" for inputs[].distanceUnit, and Move.cpp reports userPosition in millimetres.
-    /// The raw feedRate is per rrf-differences.md section 5
+    /// "in"/"mm" for inputs[].distanceUnit, and Move.cpp reports userPosition in millimetres
     /// </remarks>
     [Test]
     public async Task G20AndG21SwitchDistanceUnit()
@@ -48,7 +47,7 @@ public class G20G21Tests : BenchFixture
             Assert.That(axis.UserPosition, Is.EqualTo(25.4).Within(1e-3),
                         "a relative G1 X1 under G20 moves one inch and move.axes[0].userPosition reports millimetres (RRF Move.cpp userPosition)");
             Assert.That(httpChannel?.FeedRate, Is.EqualTo(60.0).Within(1e-3),
-                        "inputs[].feedRate keeps the raw F value under G20 (RRF GCodes.cpp LoadFeedrateFromGCode, rrf-differences.md section 5)");
+                        "inputs[].feedRate keeps the raw F value under G20 (RRF GCodes.cpp LoadFeedrateFromGCode)");
         });
 
         await bench.Host.ExecuteCodeAsync("G21");

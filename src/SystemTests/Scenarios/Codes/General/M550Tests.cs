@@ -15,27 +15,40 @@ namespace SystemTests.Scenarios.Codes.General;
 [GCode("M550")]
 public class M550Tests : BenchFixture
 {
-    /// <summary>
-    /// M550 sets the machine name, which the object model reports as network.name, and reports it
-    /// in RepRapFirmware's wording.
-    /// </summary>
-    /// <remarks>
-    /// RRF GCodes2.cpp case 550: P sets the name via reprap.SetName, no P replies
-    /// "RepRap name: %s". The name is reported as network.name (Network.cpp objectModelTable,
-    /// reprap.GetName()); RRF has no state.machineName
-    /// </remarks>
-    [Category("KnownGap")]
+    /// <summary>M550 without P reports network.name</summary>
+    /// <remarks>RRF GCodes2.cpp case 550 replies "RepRap name: %s" with the name network.name reports</remarks>
     [Test]
-    public async Task M550SetsTheMachineName()
+    public async Task M550ReportsTheMachineName()
     {
         await using Bench bench = await Bench.StartAsync();
-        string omName = await bench.Host.ReadModelAsync(model => model.Network.Name);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M550")).Trim(), Is.EqualTo($"RepRap name: {omName}"),
-                    "M550 without P reports network.name (RRF GCodes2.cpp case 550)");
 
-        string reply = await bench.Host.ExecuteCodeAsync("M550 P\"Bench550\"");
-        Assert.That(reply, Does.Not.Contain("Error"), "M550 P accepts a new machine name (RRF reprap.SetName)");
-        Assert.That(await bench.Host.ReadModelAsync(model => model.Network.Name), Is.EqualTo("Bench550"),
-                    "M550 P sets network.name (RRF Network.cpp name entry)");
+        string name = await bench.Host.ReadModelAsync(model => model.Network.Name);
+        Assert.That((await bench.Host.ExecuteCodeAsync("M550")).Trim(), Is.EqualTo($"RepRap name: {name}"));
+    }
+
+    /// <summary>
+    /// Without DuetPiManagementPlugin, which changes the hostname, M550 P takes a name that spells the hostname and
+    /// refuses any other
+    /// </summary>
+    /// <remarks>RRF takes any name (reprap.SetName); rrf-differences.md section 1</remarks>
+    [Test]
+    public async Task M550TakesANameThatSpellsTheHostname()
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        string spaced = Environment.MachineName.Insert(1, " ");
+        string accepted = await bench.Host.ExecuteCodeAsync($"M550 P\"{spaced}\"");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(accepted.Trim(), Is.Empty, "only letters and digits are compared");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Network.Name), Is.EqualTo(spaced), "network.name is the name as given");
+        });
+
+        string refused = await bench.Host.ExecuteCodeAsync($"M550 P\"{Environment.MachineName}2\"");
+        Assert.Multiple(async () =>
+        {
+            Assert.That(refused, Does.StartWith("Error:").And.Contain("hostname"));
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Network.Name), Is.EqualTo(spaced), "a refused name changes nothing");
+        });
     }
 }

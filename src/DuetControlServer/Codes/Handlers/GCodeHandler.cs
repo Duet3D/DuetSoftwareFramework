@@ -200,12 +200,12 @@ internal sealed partial class GCodeHandler(
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            float feedRateMmPerSec = MoveInterpreter.ModalFeedRateMmPerSec(model.Inputs[code.Channel]);
+            float feedRate = model.Inputs[code.Channel]?.FeedRate ?? 0.0f;
 
             using (planner.Lock())
             {
                 planner.State.SavePosition(restorePointNumber, planner.Parameters.SharedAxisCount(model.Move),
-                                           feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
+                                           feedRate, model.State.CurrentTool, filePosition: null);
                 planner.PublishRestorePoints();
             }
         }
@@ -424,7 +424,7 @@ internal sealed partial class GCodeHandler(
                                     FilePosition = code.FilePosition,
                                     CodeLength = code.Length ?? 0,
                                     GCommandNumber = code.MajorNumber ?? -1,
-                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                                    FeedRate = raw.OriginalFeedRate,
                                     AxesRelative = input.AxesRelative,
                                     DrivesRelative = input.DrivesRelative,
                                     FractionAtStart = fractionAtStart,
@@ -441,7 +441,7 @@ internal sealed partial class GCodeHandler(
                                     FilePosition = invocation.FilePosition,
                                     CodeLength = invocation.CodeLength,
                                     GCommandNumber = -1,
-                                    FeedRateMmPerSec = raw.OriginalFeedRateMmPerSec,
+                                    FeedRate = raw.OriginalFeedRate,
                                     AxesRelative = input.AxesRelative,
                                     DrivesRelative = input.DrivesRelative,
                                     SegmentCount = segments.Count,

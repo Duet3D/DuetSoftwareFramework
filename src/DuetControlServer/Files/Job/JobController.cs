@@ -122,18 +122,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private JobCommand? _sequenceRequest;
     private int _sequenceId;
 
-    /// <summary>
-    /// Commands that start a sequence of their own, held because one was already in flight
-    /// </summary>
-    /// <remarks>
-    /// An operator stop from Idle holds the sequence slot while <c>stop.g</c> runs without any
-    /// phase saying so, and the commands that would start the next job wait their turn here rather
-    /// than replace it: a replaced sequence would keep running with nothing to answer its caller.
-    /// <see cref="OnSequenceCompletedAsync"/> re-dispatches them, so each is decided against the
-    /// phase as it stands then
-    /// </remarks>
-    private readonly Queue<JobCommand> _deferredCommands = new();
-
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -159,10 +147,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         finally
         {
             _commands.Writer.TryComplete();
-            while (_deferredCommands.TryDequeue(out JobCommand? deferred))
-            {
-                deferred.Completion.TrySetCanceled(CancellationToken.None);
-            }
         }
     }
 
@@ -222,7 +206,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         => PostAsync(new JobCommand.Pause(request), cancellationToken);
 
     /// <summary>
-    /// Stop the job, or put the machine down when there is none
+    /// Stop the job, which has to be paused unless the stop is from the job file
     /// </summary>
     /// <param name="channel">Channel the stop was commanded from, which the macro runs on</param>
     /// <param name="cancellationToken">Cancellation token</param>
@@ -441,12 +425,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         switch (state.Phase)
         {
             case JobPhase.Selected:
-                if (_sequence is not null)
-                {
-                    // An operator stop is still running its macro from Idle; the start waits for it
-                    _deferredCommands.Enqueue(command);
-                    return ValueTask.CompletedTask;
-                }
                 Publish(state with { Phase = JobPhase.Starting, StopReason = null });
                 _runTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
                 StartSequence(command, token => _sequences.StartAsync(_state, token));
@@ -588,24 +566,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                     await CloseStreamsAsync(_state);
                     return await _sequences.StopAsync(command.Channel, PrintStoppedReason.UserCancelled, token);
                 });
-                return;
-
-            case JobPhase.Idle:
-                // TODO RRF refuses this with "Pause the print before attempting to cancel it" and runs no macro
-                // (GCodes2.cpp case 0, regression case m0-m1-m2-cancel-guard); see M0M1AndM2OutsideAJobAreRefused
-                // A stop that arrives while another is running its macro waits for it
-                if (_sequence is not null)
-                {
-                    _deferredCommands.Enqueue(command);
-                    return;
-                }
-                StartSequence(command, token => _sequences.StopAsync(command.Channel, PrintStoppedReason.NormalCompletion, token));
-                return;
-
-            case JobPhase.Cancelling:
-            case JobPhase.Finishing:
-            case JobPhase.Aborting:
-                command.Reply(new Message());
                 return;
 
             default:
@@ -798,21 +758,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         _sequenceTokenSource = null;
 
         await SettleSequenceAsync(request, command.Outcome);
-
-        // The settle may have freed the slot the held commands were waiting for. One that starts a
-        // sequence of its own puts the rest back on hold until that one settles in turn
-        while (_sequence is null && _deferredCommands.TryDequeue(out JobCommand? deferred))
-        {
-            try
-            {
-                await PerformAsync(deferred);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e, "Failed to perform deferred job command {Command}", deferred.GetType().Name);
-                deferred.Completion.TrySetException(e);
-            }
-        }
     }
 
     /// <summary>
@@ -1035,7 +980,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         {
             // Enforced rather than assumed: a sequence that was silently replaced would keep
             // running with nothing to answer its caller. Whoever starts one either waited for the
-            // settle, cancelled the predecessor, or deferred through _deferredCommands
+            // settle or cancelled the predecessor
             throw new InvalidOperationException("A sequence is already in flight");
         }
 

@@ -269,7 +269,7 @@ Variables (`var`, `set`, `global`, `param`) are also DCS's own, in `Codes/Meta/V
 `VariableStore.cs`: one set per file, per channel for codes without one, with RepRapFirmware's
 semantics - `var` and `global` create and refuse to overwrite, `set` assigns and refuses to create,
 parameters are read-only. One thing they deliberately cannot do is hold an object model reference; see
-[Differences from RepRapFirmware](rrf-differences.md#6-meta-g-code-and-expressions).
+[Differences from RepRapFirmware](rrf-differences.md#63-meta-g-code).
 
 ### Flow control
 

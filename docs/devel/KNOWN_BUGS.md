@@ -8,6 +8,9 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 - [ ] Nothing maintains `job.layer`, so `JobMonitor.UpdateLayers` never records `job.layers[]` statistics and DWC's layer chart stays empty. RepRapFirmware's PrintMonitor derives the current layer from the Z height and the layer height reported by the file info.
 
 
+### A pause inside a while loop loses the rest of the loop
+- [ ] The resume seeks to the interrupted code, and the code blocks that were open there are not put back, so the rest of the body runs once and the job carries on after the loop: the remaining iterations are silently skipped. RepRapFirmware's `GCodeBuffer::RestartFrom` only seeks, and its block state survives. The rewind point has to carry the open blocks and their iteration counts. `JobEdgeCaseTests.PauseInsideWhileLoop`. `pause-and-resume.md` and `file-management.md` say the loop is counted again from the start, and have to change with the fix.
+
 ### A deferred code stalls the moves behind it
 - [ ] Found on hardware as a stutter whenever a deferred command is sent, with `Underruns [0, 96]` on the ring to go with it. A deferred code's handler runs on its channel's `ProcessInternally` stage, and the channel submits no further moves while it runs, so the ring drains. The `Movement delay` in the same report is the scheduling horizon and is constant; it is not this.
 
@@ -18,13 +21,19 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 
 ### Kinematics
 - [ ] Delta kinematics can't set `NumTowers` using gcode
+- [ ] A hangprinter takes no `M669` parameters beyond `K`, and `M666` is refused: the spool buildup and flex compensation, and the steps per mm RepRapFirmware works out from them, are not ported. `M669Tests.M669HangprinterSetsTheLineMotorsStepsPerMm`.
+
+### Babystepping
+- [ ] `M290` takes effect on the next move built; RepRapFirmware also pushes it into the moves already queued (`DDARing::PushBabyStepping`).
+
+### Expansion boards that reset
+- [ ] Nothing re-creates the input monitors of a board that has reset, and nothing fails if `expansion-reconnect.g` does not. RepRapFirmware's homing fails loudly, because it asks the board to prime each switch.
 
 ### Probing and the move transforms
 - [ ] `G30` without P first moves Z to the dive height above the axis minimum (`ProbeStartHeight`) and dives from there; RepRapFirmware dives from where the head is (`ExecuteG30` goes straight to `probingAtPoint2a`). On the regression bench, where Z's minimum is −100, that is a 99 mm move down before the dive. KnownGap scenario `GeneratedMoveTransformTests.G30WithoutPDivesFromWhereTheHeadIs`.
 - [ ] `G29`'s travel height and dive target are measured from Z's minimum (`ZMin + dive + trigger`, `ZMin − dive + trigger`); RepRapFirmware's grid probing measures both from Z0 (`gridProbing1`, `gridProbing3`). The two agree only when `M208` puts Z's minimum at 0.
 - [ ] The lift after a tap goes to the second dive height above where the probe stopped (`stopped + DiveHeights[1]`, in `TapAsync`, for `G30` and `G29`), and there is no lift after the tap whose reading agrees with the one before. RepRapFirmware lifts after every tap, to `ZProbe::GetStartingHeight(acceptReading, g30zHeightError)` (`probingAtPoint4a`, `gridProbing4a`), measured from Z0: the first dive height plus the trigger height once the reading is accepted, and before another tap the second dive height plus the last height error plus the trigger height if the second dive height is the lower, otherwise the first.
 - [ ] Loading a height map does not bring the interpreter into step, so Z keeps reading the uncorrected height; RepRapFirmware's `LoadHeightMap` ends with `ActivateHeightmap` (`GCodes.cpp:5576-5588`), which re-reads the position and brings the user position into step with `ToolOffsetInverseTransform`, and `g30-dive-with-mesh` reads Z −0.07 before its dive. KnownGap scenario `GeneratedMoveTransformTests.LoadingAHeightMapReportsZWithTheCorrectionTakenOff`.
-- [ ] The move back on resume sets the interpreter's position before queueing and does not put it back when the ring is full, so the retry finds nothing left to restore and the head is not moved back.
 - [ ] The generated moves keep the `RawMove` flags each site has always set, which differ from what RepRapFirmware's `MovementState::SetDefaults` (from `SetMoveBufferDefaults`) gives a special move: it clears `isCoordinated`, `usingStandardFeedrate`, `applyM220M221` and `usePressureAdvance`, where DSF's probing moves keep `IsCoordinated` and `UsingStandardFeedrate` at their default of true and the move back on resume sets `IsCoordinated`. `ApplyM220M221` and `UsePressureAdvance` default to false, as RepRapFirmware's do. None of them changes the packets of these moves in the scenarios that cover them.
 - [ ] After a probing move is stopped, the engine's commanded motor positions (`DuetRT_MotionGetMotorPositions`, which `MovePlanner.ResyncFromEngine` reads) can put a drive the stopped move did not turn one microstep from where the move before left it: X reads 1599 after a travel to 1600, and 1601 after a travel back down to 1600. The builder is resynced to what is read, so the next move is planned a step off: if the read is wrong the motor is moved a step it should not be, and the scenario cannot tell that from the read being right and the next move making up a step the motor missed. The resync path is the one every stopped move takes, not one specific to probing. A likely cause, not yet confirmed, is `MotionSystem::GetMotorPositions` (`src/DuetRealtimeCore/src/Motion/MotionSystem.cpp`) reporting each drive's tracker position as of its last retired segment. Seen in `GeneratedMoveTransformTests.GridProbingWithADuplicatingToolLeavesTheToolsOtherCarriageAlone`, which allows X that step.
 - [ ] `G30` does not refuse with "Insufficient axes homed for bed probing" when the kinematics' `AxesToHomeBeforeProbing` are not homed (`GCodes2.cpp` case 30). `G30Tests.G30RefusesUntilXAndYAreHomed`.
@@ -62,14 +71,13 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 
 ### Probe grid and bed compensation (M557, M561)
 - [ ] `M557` caps the grid at 441 points; RepRapFirmware on the MB6HC allows 961. `M557Tests.M557AcceptsTheMb6hcGridPointLimit`.
-- [ ] `M557` accepts a radius between 0 and 1 and a second point count below 2; both should be refused. `M557Tests.M557RefusesARadiusUnderOne`, `M557RefusesASecondPointCountUnderTwo`.
+- [ ] `M557` accepts a radius between 0 and 1, which should be refused. `M557Tests.M557RefusesARadiusUnderOne`.
 - [ ] `move.compensation.probeGrid.radius` starts at 0; RepRapFirmware's `GridDefinition()` starts it at −1. `M557Tests.ProbeGridStartsUndefined`.
 - [ ] `M561` does not recompute the user position (`GCodes::ClearBedMapping`), so Z keeps reading the corrected height after the map is cleared. `M561Tests.M561KeepsTheHeadWhereItIs`, `M561RemovesTheMapFromTheUserPosition`.
 
 ### Stall detection (M915)
 - [ ] `M915 P` takes a single driver; RepRapFirmware takes a list across boards. `M915Tests.M915PTakesADriverListAcrossBoards`.
 - [ ] `M915` forwards or clamps S outside −128..127, T ≥ 65536 and R ≥ 4 instead of refusing them before anything is sent. `M915Tests.M915RefusesAValueOutOfRange`.
-- [ ] `M915` asks the boards in the order the drivers were named; RepRapFirmware goes in ascending CAN address, so its reports are ordered by board. `M915Tests.M915AsksTheBoardsInAddressOrder`.
 - [ ] `M915` naming no driver is an error; RepRapFirmware replies OK and sends nothing. `M915Tests.M915NamingNoDriverIsNotAnError`.
 - [ ] `M915` records its settings for drivers whose board refused them, and adds a `boards[].drivers[]` entry for a driver past the end of the board. `M915Tests.M915DoesNotRecordWhatABoardRefused`, `M915OnADriverPastTheEndOfABoardIsIgnoredByTheBoard`.
 

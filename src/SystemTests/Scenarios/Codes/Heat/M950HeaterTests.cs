@@ -402,7 +402,6 @@ public class M950HeaterTests : BenchFixture
     /// </summary>
     /// <remarks>Heat::ConfigureHeater: <c>GetLimitedUIValue('H', MaxHeaters)</c></remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M950RefusesAHeaterNumberPastTheLimit()
     {
         await using Bench bench = await Bench.StartAsync(Sensors);

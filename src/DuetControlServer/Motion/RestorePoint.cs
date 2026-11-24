@@ -61,7 +61,7 @@ internal sealed class RestorePoint
     public float[] Coords { get; } = new float[MotionLimits.MaxAxes];
 
     /// <summary>
-    /// Feed rate of the move being executed, in mm/s
+    /// Feed rate of the move being executed, as <c>inputs[].feedRate</c> held it
     /// </summary>
     public float FeedRate { get; set; }
 

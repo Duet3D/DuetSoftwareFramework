@@ -213,8 +213,7 @@ public class M569Point5Tests : BenchFixture
     /// <remarks>
     /// RepRapFirmware reads both with <c>TryGetLimitedUIValue</c> (ClosedLoop.cpp:112 and :150).
     /// Casting instead would make S70000 collect 4464 samples and S-1 collect 65535, neither of them
-    /// what was asked for and neither of them reported. The column is quoted rather than stated,
-    /// because it is where the value stands in a line the case builds
+    /// what was asked for and neither of them reported
     /// </remarks>
     [TestCase("S70000")]
     [TestCase("S-1")]

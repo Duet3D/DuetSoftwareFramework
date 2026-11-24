@@ -26,11 +26,11 @@ public class M0M1M2Tests : BenchFixture
     /// that is missing, stop.g; and with no paused print they answer
     /// "Pause the print before attempting to cancel it" as an error, running neither macro
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M0M1AndM2OutsideAJobAreRefused()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
 
         Assert.Multiple(async () =>
         {
@@ -64,11 +64,7 @@ public class M0M1M2Tests : BenchFixture
     /// <c>StopPrint(StopPrintReason::normalCompletion)</c>, which runs stop.g and moves the file
     /// name into <c>job.lastFileName</c> (PrintMonitor.cpp)
     /// </remarks>
-    /// <remarks>
-    /// This test is intermitent and it is undetermined if it is the test or program at fault
-    /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M2InsideTheJobFileEndsTheJob()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)

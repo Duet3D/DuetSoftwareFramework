@@ -230,7 +230,7 @@ public class M950LedStripTests : BenchFixture
         });
     }
 
-    /// <summary>Lines M950 E refuses, and what it says</summary>
+    /// <summary>Lines M950 E refuses</summary>
     private static readonly object[] BadParameters =
     [
         new object[] { $"E{CanLimits.MaxLedStrips} C\"{StripPort}\"" },  // parameter 'E' too high

@@ -301,8 +301,8 @@ public class TTests : BenchFixture
         await host.ExecuteCodeAsync("T0");
         Assert.Multiple(async () =>
         {
-            Assert.That(await ReadRestorePoint2Async(), Is.EqualTo((10.0f, 20.0f, 5.0f, 1200.0f / 60.0f, -1, 0.5f, -1)),
-                        "T0 saved X Y Z, the feed rate in mm/s, no tool and the virtual fan speed (RRF toolChange0)");
+            Assert.That(await ReadRestorePoint2Async(), Is.EqualTo((10.0f, 20.0f, 5.0f, 1200.0f, -1, 0.5f, -1)),
+                        "T0 saved X Y Z, the feed rate as F gave it, no tool and the virtual fan speed (RRF toolChange0)");
             Assert.That(await host.ReadInputAsync(input => input.FeedRate), Is.EqualTo(feedRateBefore),
                         "the feed rate tpost0.g set does not outlast the tool change (RRF toolChangeComplete)");
         });
@@ -310,7 +310,7 @@ public class TTests : BenchFixture
         await host.ExecuteCodeAsync("G1 X30 F600");
         await host.ExecuteCodeAsync("M106 S0.25");
         await host.ExecuteCodeAsync("T1 P0");
-        Assert.That(await ReadRestorePoint2Async(), Is.EqualTo((30.0f, 20.0f, 5.0f, 600.0f / 60.0f, 0, 0.25f, 0)),
+        Assert.That(await ReadRestorePoint2Async(), Is.EqualTo((30.0f, 20.0f, 5.0f, 600.0f, 0, 0.25f, 0)),
                     "T1 P0 still saves restore point 2, now with tool 0 (RRF toolChange0 ignores toolChangeParam)");
     }
 

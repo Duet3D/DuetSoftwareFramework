@@ -466,17 +466,22 @@ internal partial class MCodeHandler(
                 return new Message();
             }
 
-            // Stopping the job cancels the read-ahead this code is part of, so from here it runs
-            // under the shutdown token alone and its own reply survives
             if (code.IsFromFileChannel)
             {
+                // The job is not over until its last move has been made, and a pause may land until it is
+                if (!await codeProcessor.WaitForStandstillAsync(code.Channel, cancellationToken))
+                {
+                    throw new OperationCanceledException();
+                }
+
+                // Stopping the job cancels the read-ahead this code is part of, so from here it runs
+                // under the shutdown token alone and its own reply survives
                 cancellationToken = code.DetachFromChannelCancellation();
             }
 
             // How the job ended decides which macro runs, and the transition table decides which of
-            // them this is: a stop from inside the job file is the job reaching its end, a stop from
-            // anywhere else is the operator cancelling one that has already been paused, and a stop
-            // with no job at all is the machine being put down for the night
+            // them this is: a stop from inside the job file is the job reaching its end, and a stop
+            // from anywhere else is the operator cancelling one that has already been paused
             return await jobController.StopAsync(code.Channel, cancellationToken);
         }
         throw new OperationCanceledException();
@@ -1035,14 +1040,13 @@ internal partial class MCodeHandler(
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             InputChannel? input = model.Inputs[code.Channel];
-            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? 25.4f : 1.0f;
-            float feedRateMmPerSec = (input?.FeedRate ?? 0.0f) * unitScale / 60.0f;
+            float feedRate = input?.FeedRate ?? 0.0f;
 
             using (planner.Lock())
             {
                 planner.State.SavePosition(Motion.RestorePoint.SimulationNumber,
                                            planner.Parameters.SharedAxisCount(model.Move),
-                                           feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
+                                           feedRate, model.State.CurrentTool, filePosition: null);
             }
         }
     }

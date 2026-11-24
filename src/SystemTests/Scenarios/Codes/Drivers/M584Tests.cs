@@ -644,7 +644,7 @@ public class M584Tests : BenchFixture
     /// <remarks>
     /// RRF GCodeBuffer GetDriverIdArray throws once the list is longer than MaxDriversPerAxis (8) or
     /// MaxExtruders (20). RRF has applied the axis letters before the one that throws; DSF reads the
-    /// whole code first, as for any array parameter it refuses (rrf-differences.md section 6.1)
+    /// whole code first (rrf-differences.md section 3.1)
     /// </remarks>
     [TestCase('U', 9)]
     [TestCase('E', 21)]
@@ -749,8 +749,7 @@ public class M584Tests : BenchFixture
     /// <remarks>
     /// RRF GCodes3.cpp DoDriveMapping replies "Driver 5.3 does not exist" for a driver at or past the
     /// board's driver count, drops it from the list and applies the rest. DSF refuses the whole code,
-    /// as for any array element it refuses, and checks the extruders' drivers as it does the axes',
-    /// which RRF does not (rrf-differences.md section 3.1)
+    /// and checks the extruders' drivers as it does the axes', which RRF does not (rrf-differences.md section 3.1)
     /// </remarks>
     [TestCase("U{0}")]
     [TestCase("U{1}:{0}")]

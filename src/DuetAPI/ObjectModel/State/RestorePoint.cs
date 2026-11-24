@@ -34,7 +34,7 @@ public partial class RestorePoint : ModelObject, IStaticModelObject
 
 
     /// <summary>
-    /// Requested feedrate (in mm/s)
+    /// Requested feedrate (in the units of the F parameter, per minute)
     /// </summary>
     public float FeedRate
     {

@@ -364,7 +364,6 @@ public class M950PortTests : BenchFixture
     /// <remarks>Platform::ConfigurePort: <c>GetLimitedUIValue('P', MaxGpOutPorts)</c>, and the same for S</remarks>
     [TestCase('P')]
     [TestCase('S')]
-    [Category("KnownGap")]
     public async Task M950RefusesAnOutputNumberPastTheLimit(char letter)
     {
         await using Bench bench = await Bench.StartAsync();

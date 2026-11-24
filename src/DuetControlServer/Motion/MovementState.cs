@@ -251,7 +251,7 @@ internal sealed class MovementState
     /// </summary>
     /// <param name="restorePointNumber">Which point to write</param>
     /// <param name="numAxes">How many axes are visible</param>
-    /// <param name="feedRate">Feed rate of the channel that asked, in mm/s</param>
+    /// <param name="feedRate">Feed rate of the channel that asked, as <c>inputs[].feedRate</c> holds it</param>
     /// <param name="toolNumber">Tool that is active, or -1 if none</param>
     /// <param name="filePosition">Position in the job file to resume from, if there is one</param>
     /// <remarks>

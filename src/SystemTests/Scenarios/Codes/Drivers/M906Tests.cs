@@ -212,7 +212,7 @@ public class M906Tests : BenchFixture
     /// RRF GCodes2.cpp case 906 reads an axis with GetNonNegativeFValue and I with
     /// GetLimitedFValue('I', 0.0, 100.0). It reads E with GetFloatArray and does not check it, so it
     /// would store and send a negative extruder current; refusing it as the axes do is the minimum
-    /// limit rrf-differences.md section 6.1 records
+    /// limit rrf-differences.md section 3.1 records
     /// </remarks>
     [TestCase("M906 X-100")]
     [TestCase("M906 E-100")]

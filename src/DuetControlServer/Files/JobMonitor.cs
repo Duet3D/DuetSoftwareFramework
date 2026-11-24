@@ -247,6 +247,12 @@ internal sealed class JobMonitor(
 
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
+            if (!_running)
+            {
+                // The job ended while this waited for the lock, and FinishAsync has cleared these
+                return;
+            }
+
             model.Job.Duration = (int)MathF.Round(duration);
             model.Job.WarmUpDuration = (int)MathF.Round(warmUp);
             model.Job.PauseDuration = (int)MathF.Round(pauseDuration);

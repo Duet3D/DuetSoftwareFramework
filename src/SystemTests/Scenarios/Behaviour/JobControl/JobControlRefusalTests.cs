@@ -37,8 +37,9 @@ public class JobControlRefusalTests : BenchFixture
             Assert.That(await bench.Host.ExecuteCodeAsync("M24"),
                         Does.Contain("Cannot print, because no file is selected!"),
                         "M24 with no file selected");
-            Assert.That((await bench.Host.ExecuteCodeAsync("M0")).Trim(), Is.Empty,
-                        "M0 with no job at all is accepted");
+            Assert.That(await bench.Host.ExecuteCodeAsync("M0"),
+                        Does.Contain("Pause the print before attempting to cancel it"),
+                        "M0 with no job at all");
             Assert.That(await bench.Host.ExecuteCodeAsync("M26"),
                         Does.Contain("Not printing a file"),
                         "M26 with no file selected");
@@ -59,13 +60,12 @@ public class JobControlRefusalTests : BenchFixture
     /// job, and pausing twice
     /// </summary>
     [Test]
-    [Category("LongRunning")]
     public async Task RefusalsAroundARunningJob()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
                                              .WithSd(sd =>
         {
-            sd.WriteGCode("job.gcode", "G90\nG1 X190 F1200\nG1 X10 F1200\nG1 X190 F1200\nG1 X10 F1200\n");
+            sd.WriteGCode("job.gcode", "G90\nG1 X40 F1200\nG1 X10 F1200\nG1 X40 F1200\nG1 X10 F1200\n");
             sd.WriteGCode("other.gcode", "G91\nG1 X1 F6000\n");
         }).StartAsync();
 
@@ -107,15 +107,14 @@ public class JobControlRefusalTests : BenchFixture
                                              .WithSd(sd =>
             sd.WriteGCode("job.gcode", """
                 G90
-                G1 X190 Y190 F3000
+                G1 X60 Y60 F3000
                 G1 X10 Y10 F3000
-                G1 X190 Y190 F3000
+                G1 X60 Y60 F3000
                 G1 X10 Y10 F3000
                 """)).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(TimeSpan.FromSeconds(1));
+        await bench.RunToPositionAsync(axis: 0, position: 10);
 
         // While the machine is pausing (pause.g's park is still on its way to X0 Y0)...
         Task<string> pausing = bench.Host.ExecuteCodeAsync("M25");

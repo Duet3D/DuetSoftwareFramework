@@ -285,7 +285,7 @@ public class M350Tests : BenchFixture
 
 
     /// <summary>A negative E entry refuses the code, and no extruder is changed or told</summary>
-    /// <remarks>RRF GCodes2.cpp case 350 skips the extruder instead; see rrf-differences.md, Error handling</remarks>
+    /// <remarks>RRF GCodes2.cpp case 350 skips the extruder instead; see rrf-differences.md section 3.1</remarks>
     [Test]
     public async Task M350RefusesANegativeExtruderValue()
     {

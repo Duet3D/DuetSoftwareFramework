@@ -220,8 +220,8 @@ public class M557Tests : BenchFixture
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: X0.0:300.0, Y0.0:300.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 961 points"));
         
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P41:1")).Trim(), Is.Empty, "max points in axis0 is accepted");
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P1:41")).Trim(), Is.Empty, "max points in axis1 is accepted");
+        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P41:2")).Trim(), Is.Empty, "max points in axis0 is accepted");
+        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P2:41")).Trim(), Is.Empty, "max points in axis1 is accepted");
     }
 
     /// <summary>
@@ -453,7 +453,10 @@ public class M557Tests : BenchFixture
         new object[] { "M557 X0:200 Y0:10 S4", "51 points along the first axis" },
         new object[] { "M557 X0:200 Y0:200 S5", "41 x 41 points" },
         new object[] { $"M557 X0:{BaselineMax} Y0:{BaselineMax} P0", "no points" },
-        new object[] { $"M557 X0:{BaselineMax} Y0:{BaselineMax} P1", "one point, where RRF divides by zero" }
+        new object[] { $"M557 X0:{BaselineMax} Y0:{BaselineMax} P1", "one point" },
+        new object[] { $"M557 X0:{BaselineMax} Y0:{BaselineMax} P1:3", "one point along the first axis" },
+        new object[] { $"M557 X0:{BaselineMax} Y0:{BaselineMax} P3:1", "one point along the second axis" },
+        new object[] { "M557 R50 P3:1", "one point along the second axis of a circle" }
     ];
 
     /// <summary>
@@ -480,8 +483,8 @@ public class M557Tests : BenchFixture
     /// (GridDefinition::PrintError: "Spacing too small", "X range too small", "Too many grid
     /// points"), so after the refusal RRF's object model shows the refused values and a bare M557
     /// says no grid is defined. Every other refusal of M557, and of configuration codes generally,
-    /// leaves what was there, so DSF does the same here. P1 is refused for the same reason as P0:
-    /// RRF divides the range by P - 1 and accepts an infinite spacing
+    /// leaves what was there, so DSF does the same here. One point along an axis is refused where RRF
+    /// divides the range by P - 1 and accepts an infinite spacing (rrf-differences.md section 6.1)
     /// </remarks>
     [TestCaseSource(nameof(RefusedByTheGridCheck))]
     public async Task M557RefusedByTheGridCheckLeavesItIntact(string code, string why)
