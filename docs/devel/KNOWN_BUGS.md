@@ -8,6 +8,9 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 - [ ] Nothing maintains `job.layer`, so `JobMonitor.UpdateLayers` never records `job.layers[]` statistics and DWC's layer chart stays empty. RepRapFirmware's PrintMonitor derives the current layer from the Z height and the layer height reported by the file info.
 
 
+### A pause inside a while loop loses the rest of the loop
+- [ ] The resume seeks to the interrupted code, and the code blocks that were open there are not put back, so the rest of the body runs once and the job carries on after the loop: the remaining iterations are silently skipped. RepRapFirmware's `GCodeBuffer::RestartFrom` only seeks, and its block state survives. The rewind point has to carry the open blocks and their iteration counts. `JobEdgeCaseTests.PauseInsideWhileLoop`. `pause-and-resume.md` and `file-management.md` say the loop is counted again from the start, and have to change with the fix.
+
 ### A deferred code stalls the moves behind it
 - [ ] Found on hardware as a stutter whenever a deferred command is sent, with `Underruns [0, 96]` on the ring to go with it. A deferred code's handler runs on its channel's `ProcessInternally` stage, and the channel submits no further moves while it runs, so the ring drains. The `Movement delay` in the same report is the scheduling horizon and is constant; it is not this.
 

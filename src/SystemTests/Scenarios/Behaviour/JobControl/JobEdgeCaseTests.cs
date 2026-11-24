@@ -69,44 +69,43 @@ public class JobEdgeCaseTests : BenchFixture
         });
     }
 
-    /// <summary>
-    /// Pausing inside an open while block: block state does not survive the seek, the job re-parses
-    /// from the recorded position and the loop counts again, so the job runs more bodies in total
-    /// than an unpaused run and nothing errors when the seek lands inside the block
-    /// </summary>
+    /// <summary>A job paused inside a while loop makes the iterations that were left when it resumes</summary>
+    /// <remarks>GCodeBuffer::RestartFrom seeks the file and leaves the block state alone, so the loop carries on</remarks>
     [Test]
     [Category("LongRunning")]
     [Category("KnownGap")]
     public async Task PauseInsideWhileLoop()
     {
-        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "global loopCount = 0\n", Machines.Xye.Homed)
+        const int lastX = 80;
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
                                              .WithSd(sd => sd.WriteGCode("job.gcode", """
                 G90
-                G1 X20 Y20 F6000
+                G1 X10 Y10 F6000
                 while iterations < 4
-                    G1 X{40 + iterations * 40} Y100 F6000
-                    G1 X20 Y20 F6000
-                    set global.loopCount = global.loopCount + 1
+                    G1 X{20 + iterations * 20} Y30 F6000
+                    G1 X10 Y10 F6000
                 G60 S3
                 """)).StartAsync();
 
+        // Only the second iteration and those after it pass X25
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(TimeSpan.FromSeconds(3));
-
+        await bench.RunToPositionAsync(axis: 0, position: 25);
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
-        Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "the feedhold pause settled");
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        int x = 0, furthestX = 0;
+        foreach (ScheduledMove move in bench.CanMaster.ScheduledMoves())
+        {
+            x += move.DriverFor(Machines.DriverBoard, Machines.XDriver)?.Steps ?? 0;
+            furthestX = Math.Max(furthestX, x);
+        }
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1),
-                        "the seek into the block did not error and the job finished");
-            Assert.That(await bench.Host.GlobalAsync("loopCount"), Is.GreaterThan(4),
-                        "the re-parsed while began counting again, so more than 4 bodies ran");
-            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((20.0, 20.0)), "final position");
+            Assert.That(furthestX, Is.EqualTo(lastX * Machines.XyStepsPerMm), "the last iteration was made");
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)), "final position");
         });
     }
 
