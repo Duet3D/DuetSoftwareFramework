@@ -466,10 +466,16 @@ internal partial class MCodeHandler(
                 return new Message();
             }
 
-            // Stopping the job cancels the read-ahead this code is part of, so from here it runs
-            // under the shutdown token alone and its own reply survives
             if (code.IsFromFileChannel)
             {
+                // The job is not over until its last move has been made, and a pause may land until it is
+                if (!await codeProcessor.WaitForStandstillAsync(code.Channel, cancellationToken))
+                {
+                    throw new OperationCanceledException();
+                }
+
+                // Stopping the job cancels the read-ahead this code is part of, so from here it runs
+                // under the shutdown token alone and its own reply survives
                 cancellationToken = code.DetachFromChannelCancellation();
             }
 

@@ -19,19 +19,25 @@ public class JobEdgeCaseTests : BenchFixture
     /// its move is queued, so a job file of a few long moves is read to the end in milliseconds -
     /// and if that ended the job, the machine would report itself idle with the head still moving,
     /// <c>stop.g</c> would run against a machine that had not finished, and every pause commanded
-    /// from that point on would be refused for want of a job to pause
+    /// from that point on would be refused for want of a job to pause. The same holds for a job that
+    /// ends itself
     /// </summary>
-    [Test]
+    /// <param name="ending">What the file ends with</param>
+    /// <remarks>RRF waits for standstill before StopPrint at the end of the file (GCodes.cpp DoFilePrint) and in GCodes2.cpp cases 0, 1 and 2</remarks>
+    [TestCase("")]
+    [TestCase("M0")]
+    [TestCase("M2")]
     [Category("LongRunning")]
-    public async Task JobLastsAsLongAsItsMotion()
+    public async Task JobLastsAsLongAsItsMotion(string ending)
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
                                              .WithSd(sd =>
-            sd.WriteGCode("job.gcode", """
+            sd.WriteGCode("job.gcode", $"""
                 G90
                 G1 X80 F3000
                 G1 X80 Y30 F6000
                 G60 S3
+                {ending}
                 """)).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");

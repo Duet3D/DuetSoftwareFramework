@@ -64,11 +64,7 @@ public class M0M1M2Tests : BenchFixture
     /// <c>StopPrint(StopPrintReason::normalCompletion)</c>, which runs stop.g and moves the file
     /// name into <c>job.lastFileName</c> (PrintMonitor.cpp)
     /// </remarks>
-    /// <remarks>
-    /// This test is intermitent and it is undetermined if it is the test or program at fault
-    /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M2InsideTheJobFileEndsTheJob()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
