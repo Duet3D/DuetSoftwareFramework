@@ -896,6 +896,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     {
         using (AccessReadWrite())
         {
+            if (IsDisconnected)
+            {
+                // A reset seen after the link dropped is the same outage, and clearing the model
+                // again would lose the globals controller-disconnect.g has set since
+                return;
+            }
+
             Boards.Clear();
 
             // The expansion boards go with the link that reached them; the controller stays, because

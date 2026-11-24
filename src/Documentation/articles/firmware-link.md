@@ -95,7 +95,9 @@ reacts in a fixed order:
 
 1. `Invalidate()` - cancel pending CAN requests, discard queued moves, drop what was staged for a
    controller that may since have rebooted. Staged data is **not** replayed: a rebooted controller has
-   no state to receive it, and one that merely stalled is about to be reconfigured anyway.
+   no state to receive it, and one that merely stalled is about to be reconfigured anyway. `boards`
+   and the global variables are cleared once per outage, so what `controller-disconnect.g` sets in a
+   global is still there for `controller-reconnect.g`.
 2. Raise `controller_disconnect`, which runs `sys/controller-disconnect.g` if the machine has one.
    Once per outage, whether the outage was seen as a timeout or as a reset.
 3. On recovery, raise `controller_reconnect`. Its default action is to run `config.g`, because a

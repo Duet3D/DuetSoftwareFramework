@@ -125,6 +125,11 @@ public class ConnectionTests : BenchFixture
         Assert.That(fake.Accepts, Is.EqualTo(accepts), "the link never dropped");
     }
 
+    /// <summary>
+    /// controller-reconnect.g replaces config.g as the recovery, and still has the globals
+    /// controller-disconnect.g set: a controller seen to have reset after the link dropped is the same
+    /// outage, so the model is cleared once for both
+    /// </summary>
     [Test]
     public async Task ReconnectMacroReplacesTheDefaultRecovery()
     {
@@ -136,7 +141,12 @@ public class ConnectionTests : BenchFixture
         DcsTestHost host = bench.Host;
         ScriptedCanMaster fake = bench.CanMaster;
 
+        // Away for long enough that the disconnect macro has run before the reset can be seen
+        fake.PauseArming();
         fake.SimulateReboot();
+        await host.WaitForModelAsync(model => Recorded(model, "wentAway"), recorded => recorded is not null,
+                                     "controller-disconnect.g running");
+        fake.ResumeArming();
 
         JsonElement? recovered = await host.WaitForModelAsync(model => Recorded(model, "cameBack"),
                                                               recorded => recorded is not null,
