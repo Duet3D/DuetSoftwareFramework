@@ -480,9 +480,8 @@ internal partial class MCodeHandler(
             }
 
             // How the job ended decides which macro runs, and the transition table decides which of
-            // them this is: a stop from inside the job file is the job reaching its end, a stop from
-            // anywhere else is the operator cancelling one that has already been paused, and a stop
-            // with no job at all is the machine being put down for the night
+            // them this is: a stop from inside the job file is the job reaching its end, and a stop
+            // from anywhere else is the operator cancelling one that has already been paused
             return await jobController.StopAsync(code.Channel, cancellationToken);
         }
         throw new OperationCanceledException();

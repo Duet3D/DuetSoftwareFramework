@@ -37,8 +37,9 @@ public class JobControlRefusalTests : BenchFixture
             Assert.That(await bench.Host.ExecuteCodeAsync("M24"),
                         Does.Contain("Cannot print, because no file is selected!"),
                         "M24 with no file selected");
-            Assert.That((await bench.Host.ExecuteCodeAsync("M0")).Trim(), Is.Empty,
-                        "M0 with no job at all is accepted");
+            Assert.That(await bench.Host.ExecuteCodeAsync("M0"),
+                        Does.Contain("Pause the print before attempting to cancel it"),
+                        "M0 with no job at all");
             Assert.That(await bench.Host.ExecuteCodeAsync("M26"),
                         Does.Contain("Not printing a file"),
                         "M26 with no file selected");
