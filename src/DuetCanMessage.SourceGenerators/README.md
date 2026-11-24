@@ -83,7 +83,7 @@ That computed layout is then asserted in both languages by generated harnesses:
   allowed to add `const` and `constexpr` where CANlib omits them, since those only widen what callers may
   do; anything else must match.
 * **`CanMessageLayout.g.cs`** asserts the same expectations against the generated C# structs as an NUnit
-  fixture, so `dotnet test` catches any C#-side drift.
+  fixture, so `scripts/test.py unit` catches any C#-side drift.
 
 Both harnesses currently make 489 checks over 80 structs and 216 bitfields. The generic message parameter
 tables are checked the same way, by `CanMessageGenericTablesProbe.cpp` and `CanGenericTableLayout.g.cs`:

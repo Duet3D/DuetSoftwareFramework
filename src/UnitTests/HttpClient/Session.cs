@@ -16,7 +16,7 @@ namespace UnitTests.HttpClient;
 /// Integration tests against a real machine. These require physical hardware, so they are skipped
 /// unless the DSF_TEST_MACHINE_URL environment variable points to a Duet (standalone mode) or to a
 /// SBC running DSF (SBC mode), for example:
-/// <code>DSF_TEST_MACHINE_URL=http://192.168.1.42 dotnet test UnitTests.csproj --filter HttpClient</code>
+/// <code>DSF_TEST_MACHINE_URL=http://192.168.1.42 scripts/test.py unit --filter HttpClient</code>
 /// </summary>
 [TestFixture, Category("RequiresMachine")]
 public class Session

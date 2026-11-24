@@ -283,17 +283,11 @@ scripts/test.py scripts
 pyright
 ```
 
-Running the system test project directly works, but the progress needs the console logger asked for by name,
-because at its default verbosity it prints nothing until the run is over:
+Run the tests only with `scripts/test.py`, never with `dotnet test`. Arguments after `--` are passed on to `dotnet test`:
 
 ```bash
-dotnet test src/SystemTests/SystemTests.csproj -tl:off \
-    --logger 'console;verbosity=normal' --filter 'TestCategory!=KnownGap'
+scripts/test.py system --filter 'Name~PauseStopsMidMove' -- -p:Profiling=true
 ```
-
-`-tl:off` turns off MSBuild's terminal logger, which otherwise echoes the test output on top of that
-logger and prints every line twice. It turns itself on only when the output is a terminal, so
-without it the same command behaves differently piped and interactively.
 
 ## Deploy to a Remote DuetPi/SBC
 
@@ -568,7 +562,7 @@ v0.13.1: Tracy's protocol carries a version and the server refuses a connection 
 ### Profiling the system tests
 
 ```bash
-dotnet test src/SystemTests/SystemTests.csproj --filter Name~PauseStopsMidMove -p:Profiling=true
+scripts/test.py system --filter 'Name~PauseStopsMidMove' -- -p:Profiling=true
 ```
 
 ### Profiling a Pi

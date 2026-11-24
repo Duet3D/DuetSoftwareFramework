@@ -43,7 +43,7 @@ This project can talk to RepRapFirmware directly when a board is operating in st
 
 ```sh
 dotnet build DuetHttpClient.csproj
-dotnet test ../UnitTests/UnitTests.csproj --filter HttpClient
+../../scripts/test.py unit --filter HttpClient
 ```
 
 ## Related Docs

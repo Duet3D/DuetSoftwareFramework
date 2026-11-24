@@ -33,13 +33,13 @@ The tests do not speak to live firmware, but many of them validate assumptions t
 ## Build And Verify
 
 ```sh
-dotnet test UnitTests.csproj
+../../scripts/test.py unit
 ```
 
 Use targeted filters when iterating on a specific subsystem, for example:
 
 ```sh
-dotnet test UnitTests.csproj --filter SPI
+../../scripts/test.py unit --filter SPI
 ```
 
 ### Tests That Need Physical Hardware
@@ -49,14 +49,10 @@ read the object model from a live machine. They are tagged `Category("RequiresMa
 themselves unless `DSF_TEST_MACHINE_URL` points at a Duet in standalone mode or an SBC running DSF:
 
 ```sh
-DSF_TEST_MACHINE_URL=http://192.168.1.42 dotnet test UnitTests.csproj --filter HttpClient
+DSF_TEST_MACHINE_URL=http://192.168.1.42 ../../scripts/test.py unit --filter HttpClient
 ```
 
-CI excludes the category outright:
-
-```sh
-dotnet test UnitTests.csproj --filter "TestCategory!=RequiresMachine"
-```
+`scripts/test.py unit` leaves the category out unless it is given a filter.
 
 Note that these tests write to `0:/sys` on the target machine (`unitTest.txt`, `unitTest2.txt` and a
 `unitTest` directory), so point them at a test machine rather than one mid-print.

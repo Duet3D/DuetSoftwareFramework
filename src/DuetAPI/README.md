@@ -58,7 +58,7 @@ If the firmware-side model changes, this project is usually one of the first pla
 
 ```sh
 dotnet build DuetAPI.csproj
-dotnet test ../UnitTests/UnitTests.csproj
+../../scripts/test.py unit
 ```
 
 When changing the object model or command contracts, regenerate and review the documentation pipeline as well because `DocGen` and `DocFX` consume this assembly.
