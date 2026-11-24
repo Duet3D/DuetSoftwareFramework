@@ -158,8 +158,7 @@ public class MovementLockTests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M140 S60");
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 0, HeaterMode.Heating, currentTemperature: 25.0f);
-        await bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Heat.Heaters[0] is { Current: > 20.0f and < 30.0f },
-                                             what: "the heater report reaching the model");
+        await bench.Host.WaitForNumberAsync(model => model.Heat.Heaters[0]?.Current, 25.0, "heater 0's temperature");
 
         Task<string> wait = bench.Host.ExecuteCodeAsync(code);
         await bench.CanMaster.WaitUntilAsync(() => heat.IsWaitingForTemperatures, what: $"{code} blocking on the cold bed");
@@ -191,8 +190,7 @@ public class MovementLockTests : BenchFixture
         HeatManager heat = bench.Host.Services.GetRequiredService<HeatManager>();
 
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 0, HeaterMode.Heating, currentTemperature: 25.0f);
-        await bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Heat.Heaters[0] is { Current: > 20.0f and < 30.0f },
-                                             what: "the heater report reaching the model");
+        await bench.Host.WaitForNumberAsync(model => model.Heat.Heaters[0]?.Current, 25.0, "heater 0's temperature");
 
         Task<string> toolChange = bench.Host.ExecuteCodeAsync("T0");
         await bench.CanMaster.WaitUntilAsync(() => heat.IsWaitingForTemperatures, what: "tpost0.g's M190 blocking on the cold bed");

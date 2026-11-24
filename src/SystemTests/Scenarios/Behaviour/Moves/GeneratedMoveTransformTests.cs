@@ -341,7 +341,7 @@ public class GeneratedMoveTransformTests : BenchFixture
                         "and so is X, which the tool maps onto U");
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.UserPosition), Is.EqualTo(-1.0f).Within(1e-3f));
         });
-        await bench.Host.WaitForModelAsync(model => model.Move.Axes[3].MachinePosition, (float?)15.0f, "U's machine position");
+        await bench.WaitForMachinePositionAsync(3, 15.0);
     }
 
     /// <summary>

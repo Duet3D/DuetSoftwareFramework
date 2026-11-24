@@ -1,12 +1,7 @@
-using System;
 using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using DuetAPI;
-using DuetAPI.ObjectModel;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.Files;
@@ -53,58 +48,6 @@ internal static class FileSetup
         }
         return (long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture),
                 long.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture));
-    }
-
-    /// <summary>
-    /// An object model field as a number, or NaN where the model leaves it null. Reading it as NaN
-    /// fails the assertion that wanted a number rather than the test that asked for the field
-    /// </summary>
-    internal static Task<double> NumberAsync(DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, double?> read)
-        => host.ReadModelAsync(model => read(model) ?? double.NaN);
-
-    /// <summary>
-    /// The same reading, once the job monitor has published it. The job counters are recomputed on
-    /// an interval rather than by the code that feeds them, so a reading taken in the same
-    /// millisecond as the reply describes the moment before it
-    /// </summary>
-    internal static async Task<double> SettledNumberAsync(DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, double?> read, int timeoutMs = 5_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        double value;
-        do
-        {
-            value = await NumberAsync(host, read);
-            if (!double.IsNaN(value))
-            {
-                return value;
-            }
-            await Task.Delay(50);
-        }
-        while (DateTime.UtcNow < deadline);
-        return value;
-    }
-
-    /// <summary>
-    /// An expression's text once it reads as expected, or its last reading when it never does. The
-    /// fields a finished job leaves behind are written by the job monitor rather than by the code
-    /// that stopped the job, so they settle shortly after the reply
-    /// </summary>
-    internal static async Task<T> SettledValueAsync<T>(DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, T> read, T expected,
-                                                      int timeoutMs = 5_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        T value;
-        do
-        {
-            value = await host.ReadModelAsync(read);
-            if (Equals(value, expected))
-            {
-                return value;
-            }
-            await Task.Delay(50);
-        }
-        while (DateTime.UtcNow < deadline);
-        return value;
     }
 
     /// <summary>

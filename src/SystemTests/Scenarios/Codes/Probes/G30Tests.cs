@@ -173,32 +173,12 @@ public class G30Tests : BenchFixture
     }
 
     /// <summary>
-    /// Poll an object model value until it reaches the wanted value and return what it last read. A
-    /// position published as a move winds down settles shortly after the code replies
+    /// Z's user and machine positions once they have settled at the expected value. A position
+    /// published as a move winds down settles shortly after the code replies
     /// </summary>
-    /// TODO generalise this
-    private static async Task<double> SettledValueAsync(DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, double?> read,
-                                                        double expected, double tolerance = 1e-3, int timeoutMs = 2_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        double value;
-        do
-        {
-            value = await host.ReadModelAsync(read) ?? double.NaN;
-            if (Math.Abs(value - expected) <= tolerance)
-            {
-                return value;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        return value;
-    }
-
-    /// <summary>Z's user and machine positions once they have settled at the expected value</summary>
     private static async Task<(double User, double Machine)> SettledZAsync(Bench bench, double expected)
-        => (await SettledValueAsync(bench.Host, model => model.Move.Axes[2].UserPosition, expected),
-            await SettledValueAsync(bench.Host, model => model.Move.Axes[2].MachinePosition, expected));
+        => (await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].UserPosition, expected),
+            await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].MachinePosition, expected));
 
     // ---- G30 without P: setting Z ----------------------------------------------------------------
 
@@ -238,8 +218,8 @@ public class G30Tests : BenchFixture
         Assert.That(reply.Trim(), Is.Empty, "G30 completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[2].Homed);
         const double diveHeight = 5.0, triggerHeight = 1.5;
-        double zPosition = await SettledValueAsync(bench.Host, model => model.Move.Axes[2].MachinePosition,
-                                                   diveHeight + triggerHeight, 0.01);
+        double zPosition = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].MachinePosition,
+                                                               diveHeight + triggerHeight, 0.01);
         float lastStopHeight = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight);
         Assert.Multiple(() =>
         {
@@ -329,8 +309,8 @@ public class G30Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M400");
 
         ScheduledMove[] moves = MovesSince(bench, before);
-        double machine = await SettledValueAsync(bench.Host, model => model.Move.Axes[2].MachinePosition, StartHeight);
-        double user = await SettledValueAsync(bench.Host, model => model.Move.Axes[2].UserPosition, StartHeight + toolZOffset);
+        double machine = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].MachinePosition, StartHeight);
+        double user = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].UserPosition, StartHeight + toolZOffset);
         Assert.Multiple(() =>
         {
             Assert.That(reply, Is.Empty);
@@ -987,7 +967,7 @@ public class G30Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M400");
 
         ScheduledMove[] moves = MovesSince(bench, before);
-        double machine = await SettledValueAsync(bench.Host, model => model.Move.Axes[2].MachinePosition, Bed);
+        double machine = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].MachinePosition, Bed);
         Assert.Multiple(() =>
         {
             Assert.That(reply, Does.Not.StartWith("Error"));

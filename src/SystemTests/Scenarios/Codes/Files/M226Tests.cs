@@ -46,14 +46,14 @@ public class M226Tests : BenchFixture
         long modelPosition = 0;
         await Assert.MultipleAsync(async () =>
         {
-            modelPosition = (long)await NumberAsync(bench.Host, model => model.Job.FilePosition);
+            modelPosition = (long)await bench.Host.ReadNumberAsync(model => model.Job.FilePosition);
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.Status), Is.EqualTo(MachineStatus.Paused),
                         "M226 pauses the job (RepRap.cpp GetStatusIndex)");
             Assert.That(modelPosition, Is.GreaterThan(0).And.LessThanOrEqualTo(size),
                         "job.filePosition is where the file paused (PrintMonitor.cpp filePosition)");
-            Assert.That(await NumberAsync(bench.Host, model => model.Job.PauseDuration), Is.GreaterThanOrEqualTo(0),
+            Assert.That(await bench.Host.ReadNumberAsync(model => model.Job.PauseDuration), Is.GreaterThanOrEqualTo(0),
                         "job.pauseDuration counts the pause in seconds (PrintMonitor.cpp pauseDuration)");
-            Assert.That(await NumberAsync(bench.Host, model => model.Job.Duration), Is.GreaterThanOrEqualTo(0),
+            Assert.That(await bench.Host.ReadNumberAsync(model => model.Job.Duration), Is.GreaterThanOrEqualTo(0),
                         "job.duration keeps running while the job is paused (PrintMonitor.cpp duration)");
         });
 
@@ -65,7 +65,7 @@ public class M226Tests : BenchFixture
         (long position, long length) = ParsePrintStatus(printStatus);
         Assert.Multiple(async () =>
         {
-            Assert.That(await SettledValueAsync(bench.Host, model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
+            Assert.That(await bench.Host.SettledValueAsync(model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
                         "the resumed job ran to its end (PrintMonitor.cpp lastFileName)");
             Assert.That(length, Is.EqualTo(size), "M27 still reports the length of the file being printed");
             Assert.That(position, Is.EqualTo(modelPosition),

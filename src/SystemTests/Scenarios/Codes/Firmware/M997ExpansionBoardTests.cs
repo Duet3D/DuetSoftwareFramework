@@ -309,7 +309,7 @@ public class M997ExpansionBoardTests : BenchFixture
 
         const int marker = 12345;
         bench.CanMaster.InjectBoardStatus(Board, neverUsedRam: marker);
-        await bench.Host.WaitForModelAsync(model => model.FindBoard(Board)?.FreeRam, marker, "the status report being applied");
+        await bench.Host.WaitForModelAsync(model => model.FindBoard(Board)?.FreeRam, marker, $"free RAM of board {Board}");
 
         Assert.That(await bench.Host.ReadModelAsync(model => model.FindBoard(Board)?.State), Is.EqualTo(BoardState.Flashing));
     }

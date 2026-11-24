@@ -6,7 +6,6 @@ using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Tools.ToolSetup;
 
 namespace SystemTests.Scenarios.Codes.Tools;
 
@@ -199,7 +198,7 @@ public class TTests : BenchFixture
         Assert.Multiple(async () =>
         {
 #pragma warning disable CS0618
-            Assert.That(await EvaluateNumberAsync(host, model => model.State.RestorePoints[1].ToolNumber), Is.EqualTo(-1),
+            Assert.That(await host.ReadNumberAsync(model => model.State.RestorePoints[1].ToolNumber), Is.EqualTo(-1),
                         "no pause has recorded a tool (RRF RestorePoint::Init)");
 #pragma warning restore
             Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1),

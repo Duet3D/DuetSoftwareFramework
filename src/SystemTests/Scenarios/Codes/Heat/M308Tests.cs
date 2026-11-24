@@ -74,10 +74,7 @@ public class M308Tests : BenchFixture
         });
 
         bench.CanMaster.InjectSensorReport(srcAddress: Machines.DriverBoard, sensorNumber: 3, temperature: 23.5f);
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.Model.Sensors.Analog.Count > 3
-                  && bench.Host.Model.Sensors.Analog[3]?.LastReading is > 23.0f and < 24.0f,
-            what: "the sensor report reaching sensors.analog[3].lastReading");
+        await bench.Host.WaitForNumberAsync(model => SensorAt(model, 3)?.LastReading, 23.5, "sensors.analog[3].lastReading", tolerance: 0.01);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Analog[3]?.LastReading), Is.EqualTo(23.5).Within(0.01),
                     "sensors.analog[3].lastReading follows the board's report (RRF TemperatureSensor.cpp lastTemperature)");
     }
@@ -945,9 +942,8 @@ public class M308Tests : BenchFixture
 
         bench.CanMaster.InjectSensorReport(Machines.DriverBoard, SensorNumber, temperature: 2000.0f, TemperatureError.OpenCircuit);
 
-        await bench.Host.WaitForModelAsync(model => SensorAt(model, SensorNumber)?.State,
-                                           state => state == TemperatureError.OpenCircuit,
-                                           "sensors.analog[2].state becoming openCircuit", timeoutMs: 5_000);
+        await bench.Host.WaitForModelAsync(model => SensorAt(model, SensorNumber)?.State, TemperatureError.OpenCircuit,
+                                           "sensors.analog[2].state", timeoutMs: 5_000);
     }
 
     /// <summary>
@@ -1008,9 +1004,8 @@ public class M308Tests : BenchFixture
                                            value => value is > reading - 0.1f and < reading + 0.1f,
                                            "the first report arriving", timeoutMs: 5_000);
 
-        await bench.Host.WaitForModelAsync(model => SensorAt(model, SensorNumber)?.State,
-                                           state => state == TemperatureError.Timeout,
-                                           "sensors.analog[2].state timing out without reports", timeoutMs: 6_000);
+        await bench.Host.WaitForModelAsync(model => SensorAt(model, SensorNumber)?.State, TemperatureError.Timeout,
+                                           "sensors.analog[2].state without reports", timeoutMs: 6_000);
         Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)?.LastReading), Is.EqualTo(2000.0f).Within(0.01),
                     "a timed-out sensor reads BadErrorTemperature");
     }

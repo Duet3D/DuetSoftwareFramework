@@ -51,12 +51,12 @@ public class M24M27Tests : BenchFixture
         long modelPosition = 0;
         await Assert.MultipleAsync(async () =>
         {
-            modelPosition = (long)await NumberAsync(bench.Host, model => model.Job.FilePosition);
+            modelPosition = (long)await bench.Host.ReadNumberAsync(model => model.Job.FilePosition);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Job.File.Size), Is.EqualTo(size),
                         "job.file.size is the length of the file being printed (PrintMonitor.cpp fileSize)");
             Assert.That(modelPosition, Is.GreaterThan(0).And.LessThanOrEqualTo(size),
                         "job.filePosition lies within the file being printed (PrintMonitor.cpp filePosition)");
-            Assert.That(await NumberAsync(bench.Host, model => model.Job.Duration), Is.GreaterThanOrEqualTo(0),
+            Assert.That(await bench.Host.ReadNumberAsync(model => model.Job.Duration), Is.GreaterThanOrEqualTo(0),
                         "job.duration counts the job in seconds while it is printing (PrintMonitor.cpp duration)");
             Assert.IsNull(await bench.Host.ReadModelAsync(model => model.Job.LastFileName),
                         "job.lastFileName stays null while the file is printing (PrintMonitor.cpp lastFileName)");
@@ -76,13 +76,13 @@ public class M24M27Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await SettledValueAsync(bench.Host, model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
+            Assert.That(await bench.Host.SettledValueAsync(model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
                         "the stopped job's file becomes job.lastFileName (PrintMonitor.cpp lastFileName)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileSimulated), Is.False,
                         "a printed job is not a simulated one (job.lastFileSimulated)");
             Assert.IsNull(await bench.Host.ReadModelAsync(model => model.Job.Duration),
                         "job.duration is reported only while printing (PrintMonitor.cpp duration)");
-            Assert.That(await SettledNumberAsync(bench.Host, model => model.Job.LastDuration), Is.GreaterThanOrEqualTo(0),
+            Assert.That(await bench.Host.SettledNumberAsync(model => model.Job.LastDuration), Is.GreaterThanOrEqualTo(0),
                         "job.lastDuration holds what the finished job took, in seconds (PrintMonitor.cpp lastDuration)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M27", timeoutMs: ReportTimeoutMs),
                         Does.Contain("Not SD printing."),

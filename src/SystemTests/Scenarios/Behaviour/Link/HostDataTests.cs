@@ -177,8 +177,7 @@ public class HostDataTests : BenchFixture
 
         await using Bench bench = await StartAsync();
         DcsTestHost host = bench.Host;
-        await host.WaitForModelAsync(model => model.Network.Interfaces.Count, count => count == expected,
-                                     $"network.interfaces lists the machine's {expected} interface(s)");
+        await host.WaitForModelAsync(model => model.Network.Interfaces.Count, expected, "the number of network.interfaces");
 
         List<NetworkInterface> interfaces = await host.ReadModelAsync(model => model.Network.Interfaces.ToList());
         Assert.Multiple(() =>
@@ -264,8 +263,7 @@ public class HostDataTests : BenchFixture
 
         host.Services.GetRequiredService<PeriodicUpdateService>().HostnameSource = () => "renamed-machine";
 
-        await host.WaitForModelAsync(model => model.Network.Hostname, hostname => hostname == "renamed-machine",
-                                     "network.hostname follows the Linux hostname");
+        await host.WaitForModelAsync(model => model.Network.Hostname, "renamed-machine", "network.hostname");
         Assert.That(await host.ReadModelAsync(model => model.Network.Name), Is.EqualTo("renamed-machine"),
                     "network.name follows the hostname, as M550 would only accept a name matching it");
     }
@@ -321,7 +319,7 @@ public class HostDataTests : BenchFixture
             host.Model.Volumes.Add(new Volume { Path = "/nowhere" });
         }
 
-        await host.WaitForModelAsync(model => model.Volumes.Count, count => count == volumes,
-                                     "the volume walk runs again and drops the entry the host does not have");
+        await host.WaitForModelAsync(model => model.Volumes.Count, volumes,
+                                     "the number of volumes, once the volume walk drops the entry the host does not have,");
     }
 }

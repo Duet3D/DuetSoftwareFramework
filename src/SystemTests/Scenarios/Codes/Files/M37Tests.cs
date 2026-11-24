@@ -50,11 +50,11 @@ public class M37Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await SettledValueAsync(bench.Host, model => model.Job.LastFileSimulated, true), Is.True,
+            Assert.That(await bench.Host.SettledValueAsync(model => model.Job.LastFileSimulated, true), Is.True,
                         "the finished job was a simulation (job.lastFileSimulated)");
-            Assert.That(await SettledValueAsync(bench.Host, model => model.Job.LastFileName, "0:/gcodes/sim.gcode"), Is.EqualTo("0:/gcodes/sim.gcode"),
+            Assert.That(await bench.Host.SettledValueAsync(model => model.Job.LastFileName, "0:/gcodes/sim.gcode"), Is.EqualTo("0:/gcodes/sim.gcode"),
                         "the simulated file becomes job.lastFileName (PrintMonitor.cpp lastFileName)");
-            Assert.That(await SettledNumberAsync(bench.Host, model => model.Job.LastDuration), Is.GreaterThanOrEqualTo(0),
+            Assert.That(await bench.Host.SettledNumberAsync(model => model.Job.LastDuration), Is.GreaterThanOrEqualTo(0),
                         "job.lastDuration holds the simulated duration (GCodes.cpp StopPrint, lastDuration)");
         });
     }
@@ -86,7 +86,7 @@ public class M37Tests : BenchFixture
                     "the simulated time is appended to the file (MassStorage::RecordSimulationTime)");
 
         await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/sim.gcode\"");
-        Assert.That(await SettledNumberAsync(bench.Host, model => model.Job.File.SimulatedTime), Is.GreaterThanOrEqualTo(0),
+        Assert.That(await bench.Host.SettledNumberAsync(model => model.Job.File.SimulatedTime), Is.GreaterThanOrEqualTo(0),
                     "the recorded time is read back as job.file.simulatedTime (PrintMonitor.cpp simulatedTime)");
     }
 

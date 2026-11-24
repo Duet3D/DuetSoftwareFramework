@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Files.FileSetup;
 
 namespace SystemTests.Scenarios.Codes.Files;
 
@@ -85,7 +84,7 @@ public class M0M1M2Tests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1),
                         "M2 in the file ends the job through stop.g (GCodes.cpp StopPrint)");
-            Assert.That(await SettledValueAsync(bench.Host, model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
+            Assert.That(await bench.Host.SettledValueAsync(model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
                         "the ended job's file becomes job.lastFileName (PrintMonitor.cpp lastFileName)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileAborted), Is.False,
                         "ending a job with M2 is a normal completion (job.lastFileAborted)");

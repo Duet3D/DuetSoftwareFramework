@@ -154,7 +154,7 @@ public class G31Tests : BenchFixture
         await using Bench bench = await StartBenchAsync($"{ProbeLine}\nG31 K0 P500 X-20.5 Y10.25 Z2.75");
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, RemoteProbes.HandleFor(0), active: true);
         await bench.Host.WaitForModelAsync(model => model.Sensors.Probes[0]!.Value.FirstOrDefault(),
-                                           value => value == RemoteProbes.MaxReading, "the probe reading triggered");
+                                           RemoteProbes.MaxReading, "probe 0's reading");
 
         Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0"),
                     Does.Contain("Z probe 0: current reading 1000, threshold 500, trigger height 2.750, offsets X-20.5 Y10.2"),
@@ -216,7 +216,7 @@ public class G31Tests : BenchFixture
         await bench.Host.WaitForModelAsync(model => CompensationSensor < model.Sensors.Analog.Count
                                                     ? model.Sensors.Analog[CompensationSensor]?.LastReading
                                                     : null,
-                                           reading => reading == current, "the sensor reading");
+                                           current, "the sensor reading");
 
         Assert.That((await bench.Host.ExecuteCodeAsync($"G31 K0 H{CompensationSensor} T0.02")).Trim(), Is.Empty, "G31 was accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.CalibrationTemperature),

@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using DuetControlServer.Link.Protocol.Shared;
 
@@ -11,7 +10,7 @@ internal static class BoardReports
     public static Task ReportHeaterAsync(this Bench bench, int heater, HeaterMode mode, float temperature)
     {
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: heater, mode, currentTemperature: temperature);
-        return bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Heat.Heaters[heater]?.Current is float t && MathF.Abs(t - temperature) < 0.01f,
-                                              what: $"heater {heater} reporting {temperature}C");
+        return bench.Host.WaitForNumberAsync(model => model.Heat.Heaters[heater]?.Current, temperature,
+                                             $"heater {heater}'s temperature", tolerance: 0.01);
     }
 }

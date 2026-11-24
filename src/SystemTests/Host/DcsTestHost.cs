@@ -134,48 +134,9 @@ internal sealed class DcsTestHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// The line a test config.g ends with so <see cref="WaitForConfigDoneAsync"/> can see it finish
+    /// The line a test config.g ends with so <see cref="ModelWaits.WaitForConfigDoneAsync"/> can see it finish
     /// </summary>
     public const string ConfigDoneMarker = "\nglobal configDone = 1\n";
-
-    /// <summary>Wait until config.g has run to its <see cref="ConfigDoneMarker"/> last line</summary>
-    public async Task WaitForConfigDoneAsync(int timeoutMs = 30_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        do
-        {
-            // Whether the marker is there, rather than what it says: it has not run yet for most of
-            // this poll, and reading it through the interpreter would log a channel error per ask
-            if (await ReadModelAsync(model => model.Global.ContainsKey("configDone")))
-            {
-                return;
-            }
-            await Task.Delay(50);
-        }
-        while (DateTime.UtcNow < deadline);
-        throw new TimeoutException("config.g did not finish; its done marker was never set");
-    }
-
-    /// <summary>Wait until the machine reports the given status</summary>
-    public async Task WaitForStatusAsync(DuetAPI.ObjectModel.MachineStatus status, int timeoutMs = 20_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        DuetAPI.ObjectModel.MachineStatus current;
-        do
-        {
-            using (await Model.AccessReadOnlyAsync(CancellationToken.None))
-            {
-                current = Model.State.Status;
-            }
-            if (current == status)
-            {
-                return;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        throw new TimeoutException($"Machine status stayed {current}, expected {status}");
-    }
 
     /// <summary>Read part of the object model under its lock</summary>
     public async Task<T> ReadModelAsync<T>(Func<DuetControlServer.Model.ObjectModel, T> read)
@@ -184,35 +145,6 @@ internal sealed class DcsTestHost : IAsyncDisposable
         {
             return read(Model);
         }
-    }
-
-    /// <summary>Wait until part of the object model satisfies a condition, and return it</summary>
-    /// <typeparam name="T">What is being read</typeparam>
-    /// <param name="read">Reads the part of the model in question</param>
-    /// <param name="isReady">Says whether what was read is what the test is waiting for</param>
-    /// <param name="what">What is being waited for, for the timeout message</param>
-    /// <param name="timeoutMs">How long to wait</param>
-    /// <returns>The value once the condition holds</returns>
-    /// <remarks>
-    /// Anything a board reports reaches the model through a queue and a background task, so a
-    /// scenario that injects a report and reads the model in the next statement is reading the model
-    /// as it was before the report. This is the wait that closes that gap
-    /// </remarks>
-    public async Task<T> WaitForModelAsync<T>(Func<DuetControlServer.Model.ObjectModel, T> read,
-                                              Func<T, bool> isReady, string what, int timeoutMs = 20_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        do
-        {
-            T value = await ReadModelAsync(read);
-            if (isReady(value))
-            {
-                return value;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        throw new TimeoutException($"The object model never reached the expected state: {what}");
     }
 
     /// <summary>Run G-code as if entered on the given input, returning the reply text</summary>
