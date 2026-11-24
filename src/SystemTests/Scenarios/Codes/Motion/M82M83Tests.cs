@@ -52,7 +52,7 @@ public class M82M83Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G1 E1 F300");
         await bench.Host.ExecuteCodeAsync("G1 E1 F300");
         await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(bench.CanMaster.ScheduledSteps(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm),
+        Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm).Within(1e-2f),
                     "M83 makes G1 E1 a 1 mm extrusion each time (RRF GCodes2.cpp case 83)");
 
         await bench.Host.ExecuteCodeAsync("M82");
@@ -64,7 +64,7 @@ public class M82M83Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G1 E2 F300");
         await bench.Host.ExecuteCodeAsync("G1 E2 F300");
         await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(bench.CanMaster.ScheduledSteps(Machines.EDriver), Is.EqualTo(4 * Machines.EStepsPerMm),
+        Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(4 * Machines.EStepsPerMm).Within(1e-2f),
                     "M82 makes G1 E2 an absolute target, so repeating it extrudes nothing more (RRF GCodes2.cpp case 82)");
     }
 }

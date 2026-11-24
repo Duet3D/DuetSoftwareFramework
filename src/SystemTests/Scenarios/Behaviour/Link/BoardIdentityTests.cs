@@ -384,8 +384,8 @@ public class BoardIdentityTests : BenchFixture
         await using Bench bench = await Bench.With().WithController(controller =>
             controller.InjectControllerBoardInfo(
                 name: "Duet 3 MB6HC", shortName: "MB6HC",
-                firmwareName: "RepRapFirmware for Duet 3 MB6HC", firmwareVersion: "4.0.0-alpha.1",
-                firmwareDate: "2026-09-18", firmwareFileName: "Duet3Firmware_MB6HC.bin",
+                firmwareName: "DuetCANMaster for Duet 3 MB6HC", firmwareVersion: "4.0.0-alpha.1",
+                firmwareDate: "2026-09-18", firmwareFileName: "DuetCANMaster_MB6HC.bin",
                 iapFileNameSbc: "Duet3_SBCiap32_MB6HC.bin", iapFileNameSd: "Duet3_SDiap32_MB6HC.bin",
                 uniqueId: UniqueId)).StartAsync();
 
@@ -396,10 +396,10 @@ public class BoardIdentityTests : BenchFixture
         {
             Assert.That(board.Name, Is.EqualTo("Duet 3 MB6HC"));
             Assert.That(board.ShortName, Is.EqualTo("MB6HC"));
-            Assert.That(board.FirmwareName, Is.EqualTo("RepRapFirmware for Duet 3 MB6HC"));
+            Assert.That(board.FirmwareName, Is.EqualTo("DuetCANMaster for Duet 3 MB6HC"));
             Assert.That(board.FirmwareVersion, Is.EqualTo("4.0.0-alpha.1"));
             Assert.That(board.FirmwareDate, Is.EqualTo("2026-09-18"));
-            Assert.That(board.FirmwareFileName, Is.EqualTo("Duet3Firmware_MB6HC.bin"));
+            Assert.That(board.FirmwareFileName, Is.EqualTo("DuetCANMaster_MB6HC.bin"));
             Assert.That(board.IapFileNameSBC, Is.EqualTo("Duet3_SBCiap32_MB6HC.bin"));
             Assert.That(board.IapFileNameSD, Is.EqualTo("Duet3_SDiap32_MB6HC.bin"));
             Assert.That(board.UniqueId, Is.EqualTo("6949f358594d32532020204638420eff"));

@@ -37,7 +37,7 @@ public class M665Tests : BenchFixture
         double towerCount = await host.ReadModelAsync(model => ((DeltaKinematics)model.Move.Kinematics).Towers.Count);
         Assert.Multiple(() =>
         {
-            Assert.That(name, Is.EqualTo("delta"), "M665 L switches move.kinematics.name to delta (RRF GCodes2.cpp case 665)");
+            Assert.That(name, Is.EqualTo(KinematicsName.LinearDelta), "M665 L switches to a linear delta (RRF GCodes2.cpp case 665)");
             Assert.That(towerCount, Is.EqualTo(3), "a single L value gives three towers (RRF numTowers)");
         });
 
