@@ -16,22 +16,17 @@ namespace SystemTests.Scenarios.Codes.General;
 public class M552Tests : BenchFixture
 {
     /// <summary>
-    /// M552 without parameters reports the network state.
+    /// M552 says it needs DuetPiManagementPlugin, which answers it when it is running and is not here
     /// </summary>
     /// <remarks>
-    /// RRF GCodes2.cpp case 552 with no S or P calls Network::GetNetworkState, which replies
-    /// "Network is %s, configured IP address: %s, actual IP address: %s" for an ethernet
-    /// interface (for example W5500Interface::GetNetworkState). The interfaces themselves are
-    /// network.interfaces[] (Network.cpp objectModelTable); rrf-differences.md documents no
-    /// deviation for M552
+    /// RRF GCodes2.cpp case 552 configures and reports its own network interfaces; the SBC's belong to the plugin
+    /// (rrf-differences.md section 1)
     /// </remarks>
-    [Category("KnownGap")]
-    [Test]
-    public async Task M552ReportsTheNetworkState()
+    [TestCase("M552")]
+    [TestCase("M552 S1")]
+    public async Task M552IsLeftToTheManagementPlugin(string code)
     {
         await using Bench bench = await Bench.StartAsync();
-        string reply = await bench.Host.ExecuteCodeAsync("M552");
-        Assert.That(reply, Does.Match("Network is (enabled|disabled)"),
-                    "M552 without parameters reports the network state (RRF Network::GetNetworkState)");
+        Assert.That((await bench.Host.ExecuteCodeAsync(code)).Trim(), Is.EqualTo("Warning: M552: reserved - requires DuetPiManagementPlugin"));
     }
 }

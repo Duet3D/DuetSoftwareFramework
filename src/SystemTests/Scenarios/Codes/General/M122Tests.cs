@@ -43,23 +43,21 @@ public class M122Tests : BenchFixture
     }
 
     /// <summary>
-    /// M122 prints the diagnostics report, opening with RepRapFirmware's header and containing the
-    /// motion section.
+    /// M122 reports DSF's own diagnostics, the motion engine's among them
     /// </summary>
-    /// <remarks>
-    /// RRF RepRap::Diagnostics (RepRap.cpp) opens with "=== Diagnostics ===";
-    /// Move::Diagnostics contributes the "=== Move ===" section
-    /// </remarks>
     [Category("KnownGap")]
-    [Test]
-    public async Task M122ReportsDiagnostics()
+    [TestCase("M122")]
+    [TestCase("M122 B0")]
+    public async Task M122ReportsDiagnostics(string code)
     {
         await using Bench bench = await Bench.StartAsync();
-        string reply = await bench.Host.ExecuteCodeAsync("M122");
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain("=== Diagnostics ==="), "M122 opens with the diagnostics header (RRF RepRap::Diagnostics)");
+            Assert.That(reply, Does.StartWith("=== Diagnostics ==="));
+            Assert.That(reply, Does.Contain("=== Duet Control Server ==="));
             Assert.That(reply, Does.Contain("=== Move ==="), "M122 contains the Move section (RRF Move::Diagnostics)");
+            Assert.That(bench.CanMaster.CanMessages<CanMessageReturnInfo>(), Is.Empty, "board 0 is answered here, not asked for over CAN");
         });
     }
 }
