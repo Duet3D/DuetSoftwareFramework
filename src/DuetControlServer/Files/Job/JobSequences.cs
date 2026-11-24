@@ -534,6 +534,8 @@ internal sealed class JobSequences(
                     raw.IsCoordinated = true;
                     raw.FeedRateMmPerSec = ResumeFeedRateMmPerSec;
 
+                    float[] positionBeforeMove = [.. planner.State.CurrentUserPosition];
+
                     bool anythingToDo = false;
                     for (int axis = 0; axis < numAxes; axis++)
                     {
@@ -573,6 +575,11 @@ internal sealed class JobSequences(
                     if (result.IsSettled())
                     {
                         planner.PublishCommittedPosition();
+                    }
+                    else
+                    {
+                        // The retry finds the axes to restore by comparing this with the restore point
+                        positionBeforeMove.CopyTo(planner.State.CurrentUserPosition, 0);
                     }
                     return result;
                 }
