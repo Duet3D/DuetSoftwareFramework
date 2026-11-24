@@ -224,7 +224,6 @@ public class M950SpindleTests : BenchFixture
     /// error-missing-parameters-spindle-laser records <c>Error: M950: parameter 'R' too high</c>
     /// </remarks>
     [Test]
-    [Category("KnownGap")]
     public async Task M950RefusesASpindleNumberPastTheLimit()
     {
         await using Bench bench = await Bench.StartAsync();
