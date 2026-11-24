@@ -25,6 +25,14 @@ internal static class JobDriving
     }
 
     /// <summary>
+    /// Wait for a job running in real time to take an axis to the given position, so that what follows lands
+    /// part-way through a move the test chose
+    /// </summary>
+    public static Task RunToPositionAsync(this Bench bench, int axis, double position)
+        => bench.Host.WaitForModelAsync(model => axis < model.Move.Axes.Count ? model.Move.Axes[axis].MachinePosition ?? 0.0 : 0.0,
+                                        reached => reached >= position, $"axis {axis} reaching {position}");
+
+    /// <summary>
     /// Run the machine until an axis reaches the given position, and stop the timeline there. This is
     /// what a pause scenario names instead of a delay: the stop then lands at a position the test
     /// chose rather than wherever the host happened to be when a timer expired

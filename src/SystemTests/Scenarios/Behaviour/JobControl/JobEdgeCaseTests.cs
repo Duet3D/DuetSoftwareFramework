@@ -29,23 +29,21 @@ public class JobEdgeCaseTests : BenchFixture
                                              .WithSd(sd =>
             sd.WriteGCode("job.gcode", """
                 G90
-                G1 X190 F3000
-                G1 X190 Y100 F6000
+                G1 X80 F3000
+                G1 X80 Y30 F6000
                 G60 S3
                 """)).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
 
-        // 190 mm at 50 mm/s and 100 mm at 100 mm/s is close to five seconds of motion; one second
-        // in, every code has been read and none of the motion has been made
-        await Task.Delay(TimeSpan.FromSeconds(1));
+        // Every code was read in the first few milliseconds, and most of the motion is still to be made
+        await bench.RunToPositionAsync(axis: 0, position: 20);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.Status), Is.EqualTo(MachineStatus.Processing),
                         "the job is still running while the machine works through what it queued");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.Zero, "so stop.g has not run yet");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.LessThan(189.0),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition), Is.LessThan(79.0),
                         "and the head has not reached the end of the first move");
         });
 
@@ -60,7 +58,7 @@ public class JobEdgeCaseTests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1),
                         "the job ended once, after the machine had stopped");
-            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((190.0, 100.0)),
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((80.0, 30.0)),
                         "having made all of its motion");
         });
     }
@@ -162,22 +160,19 @@ public class JobEdgeCaseTests : BenchFixture
             sd.WriteGCode("job.gcode", """
                 G90
                 G1 X10 Y10 F6000
-                G1 X10 Y150 F6000
-                G1 X200 Y150 F3000
+                G1 X10 Y40 F6000
+                G1 X90 Y40 F3000
                 """)).StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-
-        // The two leading moves take about 1.6 s; land the pause inside the 190 mm final move
-        await Task.Delay(TimeSpan.FromSeconds(2.5));
+        await bench.RunToPositionAsync(axis: 0, position: 30);
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
         Assert.Multiple(() =>
         {
-            Assert.That(pausedX, Is.InRange(10.5, 199.5), "the pause landed inside the final move");
-            Assert.That(pausedY, Is.EqualTo(150.0), "on its line");
+            Assert.That(pausedX, Is.InRange(10.5, 89.5), "the pause landed inside the final move");
+            Assert.That(pausedY, Is.EqualTo(40.0), "on its line");
         });
 
         await bench.Host.ExecuteCodeAsync("M24");
@@ -189,9 +184,9 @@ public class JobEdgeCaseTests : BenchFixture
                         "as the last file printed");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileCancelled), Is.False,
                         "not cancelled");
-            Assert.That(bench.CanMaster.ScheduledSteps(Machines.XDriver), Is.EqualTo(200 * Machines.XyStepsPerMm),
+            Assert.That(bench.CanMaster.ScheduledSteps(Machines.XDriver), Is.EqualTo(90 * Machines.XyStepsPerMm),
                         "the final move completed in full");
-            Assert.That(bench.CanMaster.ScheduledSteps(Machines.YDriver), Is.EqualTo(150 * Machines.XyStepsPerMm));
+            Assert.That(bench.CanMaster.ScheduledSteps(Machines.YDriver), Is.EqualTo(40 * Machines.XyStepsPerMm));
         });
     }
 

@@ -19,14 +19,12 @@ namespace SystemTests.Scenarios.Behaviour.JobControl;
 public class AsyncPauseTests : BenchFixture
 {
     /// <summary>
-    /// Start the given job and pause it from the console mid-flight: after the first scheduled
-    /// move appears, wait out <paramref name="intoJob"/> of execution time and send M25
+    /// Start the given job and pause it from the console once an axis has passed the given position
     /// </summary>
-    private static async Task PauseMidJobAsync(Bench bench, string jobFile, TimeSpan intoJob)
+    private static async Task PauseMidJobAsync(Bench bench, string jobFile, int axis, double position)
     {
         await bench.Host.ExecuteCodeAsync($"M32 \"{jobFile}\"");
-        await bench.CanMaster.WaitForSbcPacketAsync(SbcRequest.ScheduleMove);
-        await Task.Delay(intoJob);
+        await bench.RunToPositionAsync(axis, position);
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
     }
@@ -46,19 +44,18 @@ public class AsyncPauseTests : BenchFixture
                                              .WithSd(sd =>
             sd.WriteGCode("job.gcode", $"""
                 G90
-                G1 X190 F{feedrate * 60}
-                G1 X190 Y100 F{2 * feedrate * 50}
-                G1 X10 Y100 F{2 * feedrate * 50}
+                G1 X80 F{feedrate * 60}
+                G1 X80 Y30 F{2 * feedrate * 50}
+                G1 X10 Y30 F{2 * feedrate * 50}
                 G60 S3
                 """)).StartAsync();
 
-        // 190 mm at 50 mm/s: one second in, the first move is mid-flight
-        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(1));
+        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 0, position: 20);
 
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
         Assert.Multiple(async () =>
         {
-            Assert.That(pausedX, Is.InRange(1.0, 189.0), "the head stopped mid-move, not at either end");
+            Assert.That(pausedX, Is.InRange(1.0, 79.0), "the head stopped mid-move, not at either end");
             Assert.That(pausedY, Is.Zero, "still on the first move's line");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].GCommandNumber), Is.EqualTo(1),
                         "the interrupted code is a G1");
@@ -73,11 +70,11 @@ public class AsyncPauseTests : BenchFixture
         {
             Assert.That(await bench.Host.GlobalAsync("resumeRan"), Is.EqualTo(1), "resume.g ran once");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job finished normally");
-            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 100.0)),
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 30.0)),
                         "the interrupted move and the purged moves all completed");
             Assert.That(bench.CanMaster.ScheduledSteps(Machines.XDriver), Is.EqualTo(10 * Machines.XyStepsPerMm),
                         "the scheduled X steps net out at the final position");
-            Assert.That(bench.CanMaster.ScheduledSteps(Machines.YDriver), Is.EqualTo(100 * Machines.XyStepsPerMm),
+            Assert.That(bench.CanMaster.ScheduledSteps(Machines.YDriver), Is.EqualTo(30 * Machines.XyStepsPerMm),
                         "and the Y steps");
         });
     }
@@ -195,7 +192,6 @@ public class AsyncPauseTests : BenchFixture
     /// </summary>
     [Test]
     [Category("LongRunning")]
-    [Category("KnownGap")]
     public async Task ResumeFractionScalesRelativeMoves()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.OneTool, Machines.Segmented, Machines.Xye.Homed)
@@ -205,18 +201,17 @@ public class AsyncPauseTests : BenchFixture
                 G1 X10 Y10 F6000
                 M83
                 G91
-                G1 X180 E10 F3000
-                G1 Y180 E10 F6000
-                G1 X-180 E10 F6000
-                G1 Y-180 E10 F6000
+                G1 X60 E10 F3000
+                G1 Y60 E10 F6000
+                G1 X-60 E10 F6000
+                G1 Y-60 E10 F6000
                 G90
                 G60 S3
                 """)).StartAsync();
 
-        // Mid the first relative edge (180 mm at 50 mm/s)
-        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(1.5));
+        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 0, position: 20);
         (double pausedX, _) = await bench.Host.RestorePointAsync(1);
-        Assert.That(pausedX, Is.InRange(10.5, 189.5), "the pause landed inside the first relative edge");
+        Assert.That(pausedX, Is.InRange(10.5, 69.5), "the pause landed inside the first relative edge");
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
@@ -237,8 +232,6 @@ public class AsyncPauseTests : BenchFixture
     /// either re-extrudes the whole line or skips the remainder
     /// </summary>
     [Test]
-    [Category("LongRunning")]
-    [Category("KnownGap")]
     public async Task ResumeFractionScalesAbsoluteExtrusion()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.OneTool, Machines.Segmented, Machines.Xye.Homed)
@@ -248,22 +241,21 @@ public class AsyncPauseTests : BenchFixture
                 G1 X10 F6000
                 M82
                 G92 E0
-                G1 X190 E40 F3000
+                G1 X90 E20 F3000
                 G60 S3
                 """)).StartAsync();
 
-        // Mid the long combined X+E move (180 mm at 50 mm/s)
-        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(1.5));
+        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 0, position: 30);
         (double pausedX, _) = await bench.Host.RestorePointAsync(1);
-        Assert.That(pausedX, Is.InRange(10.5, 189.5), "the pause landed inside the extruding move");
+        Assert.That(pausedX, Is.InRange(10.5, 89.5), "the pause landed inside the extruding move");
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.RestorePointAsync(3)).X, Is.EqualTo(190.0), "the move completed");
-            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(40 * Machines.EStepsPerMm).Within(1e-2f),
-                        "total extrusion is exactly the absolute 40 mm: no blob, no gap");
+            Assert.That((await bench.Host.RestorePointAsync(3)).X, Is.EqualTo(90.0), "the move completed");
+            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(20 * Machines.EStepsPerMm).Within(1e-2f),
+                        "total extrusion is exactly the absolute 20 mm: no blob, no gap");
         });
     }
 
@@ -281,15 +273,15 @@ public class AsyncPauseTests : BenchFixture
             sd.WriteGCode("job.gcode", """
                 G90
                 G1 X10 Y10 F6000
-                G1 X190 Y10 F6000
-                X190 Y190
-                X10 Y190
+                G1 X60 Y10 F6000
+                X60 Y60
+                X10 Y60
                 X10 Y10
                 G60 S3
                 """)).StartAsync();
 
-        // Past the explicit G1 edge (3 s at 100 mm/s), into the bare lines
-        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(3.5));
+        // Past the explicit G1 edge, into the bare lines
+        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 1, position: 20);
 
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
         Assert.Multiple(async () =>
@@ -328,14 +320,13 @@ public class AsyncPauseTests : BenchFixture
                 G90
                 G1 X10 Y10 F6000
                 M220 S50
-                G1 X190 Y10 F3000
+                G1 X60 Y10 F3000
                 G1 X10 Y10 F3000
                 M220 S100
                 G60 S3
                 """)).StartAsync();
 
-        // The long edge runs at the scaled 25 mm/s, so 1.5 s in it is mid-flight
-        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(1.5));
+        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 0, position: 20);
 
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(50.0).Within(0.01),
                     "the recorded rate is the file's F3000, not the M220-scaled one");
@@ -359,22 +350,21 @@ public class AsyncPauseTests : BenchFixture
                                              .WithSd(sd =>
             sd.WriteGCode("job.gcode", """
                 G90
-                G1 X5 Y100 F6000
+                G1 X5 Y20 F6000
                 M83
-                G1 X195 E20 F1500
+                G1 X85 E8 F1500
                 G60 S3
                 """)).StartAsync();
 
-        // The long line runs 190 mm at 25 mm/s; the first stop lands in its first half
-        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", TimeSpan.FromSeconds(2));
+        await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 0, position: 20);
         (double firstStop, _) = await bench.Host.RestorePointAsync(1);
-        Assert.That(firstStop, Is.InRange(5.5, 194.5), "the first pause landed inside the line");
+        Assert.That(firstStop, Is.InRange(5.5, 84.5), "the first pause landed inside the line");
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Processing);
 
         // And the second in what remains of the same line
-        await Task.Delay(TimeSpan.FromSeconds(2));
+        await bench.RunToPositionAsync(axis: 0, firstStop + 15);
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         (double secondStop, _) = await bench.Host.RestorePointAsync(1);
@@ -384,10 +374,10 @@ public class AsyncPauseTests : BenchFixture
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((195.0, 100.0)),
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((85.0, 20.0)),
                         "the line still finished exactly at its target");
-            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(20 * Machines.EStepsPerMm).Within(1e-2f),
-                        "the extrusion over the whole line totals 20 mm regardless of the two stops");
+            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(8 * Machines.EStepsPerMm).Within(1e-2f),
+                        "the extrusion over the whole line totals 8 mm regardless of the two stops");
         });
     }
 }

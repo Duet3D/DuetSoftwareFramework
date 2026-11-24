@@ -56,7 +56,7 @@ public class M581Tests : BenchFixture
         Assert.That(reply, Does.Not.Contain("Error"), "M581.1 accepts an expression trigger (RRF TriggerItem::Configure fraction 1)");
 
         await bench.Host.ExecuteCodeAsync("set global.fireTrigger = true");
-        await bench.Host.WaitForGlobalAsync("trigRan", 1);
+        await bench.Host.WaitForGlobalAsync("trigRan", 1, timeoutMs: 5_000);
         Assert.That(await bench.Host.GlobalAsync("trigRan"), Is.EqualTo(1),
                     "the expression's false-to-true transition ran trigger2.g once (RRF GCodes::CheckTriggers)");
     }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -219,10 +220,12 @@ public class BoardIdentityTests : BenchFixture
     /// <c>running</c> it would say the controller is there while the link is down
     /// </remarks>
     [Test]
-    [Category("LongRunning")]
     public async Task TheControllerStateFollowsTheLink()
     {
-        await using Bench bench = await Bench.StartAsync();
+        await using Bench bench = await Bench.With().WithSettings(new Dictionary<string, string?>
+        {
+            [nameof(DuetControlServer.Settings.SbcConnectionTimeout)] = "500"
+        }).StartAsync();
 
         Assert.That(await bench.Host.ReadModelAsync(model => model.FindBoard(0)!.State),
                     Is.EqualTo(BoardState.Running), "the link is up");
