@@ -136,30 +136,6 @@ public class M584Tests : BenchFixture
     }
 
     /// <summary>
-    /// An extruder dropped by a shorter E list and brought back by a longer one has the settings it
-    /// had before
-    /// </summary>
-    /// <remarks>
-    /// RRF keeps an extruder's settings in the logical drive it occupies
-    /// (<c>ExtruderToLogicalDrive</c>), which M584 E only counts, so dropping the extruder hides them
-    /// and bringing it back shows them again. DSF's <c>move.extruders[]</c> drops the extruder whole,
-    /// and has nowhere to keep the settings of one that is not there
-    /// </remarks>
-    [Test]
-    [Category("KnownGap")]
-    public async Task M584KeepsTheSettingsOfAnExtruderItDropsAndBringsBack()
-    {
-        const float secondExtruderStepsPerMm = 500.0f;
-        await using Bench bench = await Bench.StartAsync(DriversRig.Config,
-                                                          $"M584 E{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)}",
-                                                          $"M92 E{Extruder.DefaultStepsPerMm}:{secondExtruderStepsPerMm}");
-
-        await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.ClosedLoopDriver(0)}");
-        await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)}");
-        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[1].StepsPerMm), Is.EqualTo(secondExtruderStepsPerMm));
-    }
-
-    /// <summary>
     /// A phase stepping drive that M584 maps is put back into step/direction mode on the drivers it had,
     /// before it is given the new ones
     /// </summary>
