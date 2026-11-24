@@ -27,7 +27,7 @@ public class JobResumePointTests
             FilePosition = 100,
             CodeLength = 20,
             GCommandNumber = 1,
-            FeedRateMmPerSec = 50.0f,
+            FeedRate = 3000.0f,
             FractionAtStart = fractionAtStart,
             SegmentCount = segmentCount
         };
@@ -43,7 +43,7 @@ public class JobResumePointTests
             Assert.That(point!.Value.FilePosition, Is.EqualTo(100L), "the code is read again from its start");
             Assert.That(point!.Value.ProportionDone, Is.EqualTo(0.4f).Within(1e-4f));
             Assert.That(point!.Value.GCommandNumber, Is.EqualTo(1));
-            Assert.That(point!.Value.FeedRateMmPerSec, Is.EqualTo(50.0f));
+            Assert.That(point!.Value.FeedRate, Is.EqualTo(3000.0f));
         });
     }
 

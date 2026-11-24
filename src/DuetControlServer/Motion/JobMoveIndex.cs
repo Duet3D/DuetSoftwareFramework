@@ -34,7 +34,7 @@ internal sealed class JobMoveOrigin
     public int GCommandNumber { get; init; }
 
     /// <summary>
-    /// Feed rate in effect when the move was built, in mm/s
+    /// Feed rate in effect when the move was built, as <c>inputs[].feedRate</c> held it
     /// </summary>
     /// <remarks>
     /// The modal feed rate the code was read with, not the speed the move was planned at:
@@ -42,7 +42,7 @@ internal sealed class JobMoveOrigin
     /// The two differ by M220, and restoring the scaled one would fold the speed factor into the
     /// file's own feed rate every time the job was paused
     /// </remarks>
-    public float FeedRateMmPerSec { get; init; }
+    public float FeedRate { get; init; }
 
     /// <summary>
     /// Whether axis words meant distances rather than targets when the code was read (G91)
@@ -117,7 +117,7 @@ internal sealed class JobMoveOrigin
         if (IsMacroInvocation)
         {
             // The invocation runs again whole; nothing of it has been made that the job could skip
-            return new JobResumePoint(filePosition, 0.0f, GCommandNumber, FeedRateMmPerSec,
+            return new JobResumePoint(filePosition, 0.0f, GCommandNumber, FeedRate,
                                       AxesRelative, DrivesRelative);
         }
 
@@ -126,10 +126,10 @@ internal sealed class JobMoveOrigin
         // segment when the code is read again
         if (SegmentCount > 0 && segmentsMade >= SegmentCount)
         {
-            return new JobResumePoint(filePosition + CodeLength, 0.0f, GCommandNumber, FeedRateMmPerSec,
+            return new JobResumePoint(filePosition + CodeLength, 0.0f, GCommandNumber, FeedRate,
                                       AxesRelative, DrivesRelative);
         }
-        return new JobResumePoint(filePosition, ProportionAt(segmentsMade), GCommandNumber, FeedRateMmPerSec,
+        return new JobResumePoint(filePosition, ProportionAt(segmentsMade), GCommandNumber, FeedRate,
                                   AxesRelative, DrivesRelative);
     }
 
@@ -217,7 +217,7 @@ internal readonly record struct JobMacroInvocation(long FilePosition, long CodeL
 /// <param name="FilePosition">Where in the job file to read from again</param>
 /// <param name="ProportionDone">How much of the code at that position is already made, 0..1</param>
 /// <param name="GCommandNumber">The modal G command that code was read under, or -1</param>
-/// <param name="FeedRateMmPerSec">The feed rate it was read with, unscaled by M220</param>
+/// <param name="FeedRate">The feed rate it was read with, unscaled by M220</param>
 /// <param name="AxesRelative">Whether axis words were distances when it was read (G91)</param>
 /// <param name="DrivesRelative">Whether extrusion was relative when it was read (M83)</param>
 /// <remarks>
@@ -226,7 +226,7 @@ internal readonly record struct JobMacroInvocation(long FilePosition, long CodeL
 /// modal state the resume puts back
 /// </remarks>
 internal readonly record struct JobResumePoint(long FilePosition, float ProportionDone, int GCommandNumber,
-                                               float FeedRateMmPerSec, bool AxesRelative, bool DrivesRelative);
+                                               float FeedRate, bool AxesRelative, bool DrivesRelative);
 
 /// <summary>
 /// Remembers which job code each queued move came from, so a stop can say where to resume

@@ -509,10 +509,10 @@ internal sealed class MoveInterpreter(
         bool isRapid = !raw.IsCoordinated && model.State.MachineMode != MachineMode.FFF;
         raw.UsingStandardFeedrate = !isRapid;
 
-        // What the channel would use if the move named no F, kept unscaled and in mm/sec. Recorded
+        // What the channel would use if the move named no F, as the file gave it. Recorded
         // before anything below decides what this move actually travels at, because it is the file's
         // feed rate rather than this move's that a resume has to put back
-        raw.OriginalFeedRateMmPerSec = ModalFeedRateMmPerSec(input);
+        raw.OriginalFeedRate = input.FeedRate;
 
         if (isRapid)
         {
@@ -545,7 +545,7 @@ internal sealed class MoveInterpreter(
         {
             // Kept raw, which is also what inputs[].feedRate reports
             input.FeedRate = feedRate;
-            raw.OriginalFeedRateMmPerSec = ModalFeedRateMmPerSec(input);
+            raw.OriginalFeedRate = input.FeedRate;
         }
 
         // A move that names only rotational axes is measured in degrees, so G20 does not scale its
@@ -556,29 +556,6 @@ internal sealed class MoveInterpreter(
 
         raw.FeedRateMmPerSec = raw.ApplyM220M221 ? converted * model.Move.SpeedFactor : converted;
     }
-
-    /// <summary>
-    /// The feed rate a channel is set to, in mm/sec
-    /// </summary>
-    /// <param name="input">The channel, or null for one that does not exist</param>
-    /// <returns>The rate</returns>
-    /// <remarks>
-    /// One rule and one place: <c>inputs[].feedRate</c> is what the operator typed, per minute and
-    /// in whatever unit G20 or G21 left the channel in, and every move and every restore point wants
-    /// it per second in millimetres. <see cref="ModalFeedRateFromMmPerSec"/> is the inverse, so what
-    /// a pause saves and what a resume puts back are the same quantity in both directions
-    /// </remarks>
-    public static float ModalFeedRateMmPerSec(InputChannel? input)
-        => (input?.FeedRate ?? 0.0f) * UnitScale(input) / SecondsPerMinute;
-
-    /// <summary>
-    /// A rate in mm/sec as the channel would report it
-    /// </summary>
-    /// <param name="input">The channel</param>
-    /// <param name="feedRateMmPerSec">The rate</param>
-    /// <returns>The rate in the channel's own units, per minute</returns>
-    public static float ModalFeedRateFromMmPerSec(InputChannel input, float feedRateMmPerSec)
-        => feedRateMmPerSec * SecondsPerMinute / UnitScale(input);
 
     /// <summary>
     /// What one of a channel's distance units is in millimetres

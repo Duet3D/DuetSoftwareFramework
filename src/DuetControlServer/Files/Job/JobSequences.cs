@@ -313,7 +313,7 @@ internal sealed class JobSequences(
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
-            float feedRateMmPerSec = MoveInterpreter.ModalFeedRateMmPerSec(model.Inputs[CodeChannel.File]);
+            float feedRate = model.Inputs[CodeChannel.File]?.FeedRate ?? 0.0f;
 
             using (planner.Lock())
             {
@@ -328,7 +328,7 @@ internal sealed class JobSequences(
 
                 planner.State.SavePosition(RestorePoint.PauseNumber,
                                            planner.Parameters.SharedAxisCount(model.Move),
-                                           feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
+                                           feedRate, model.State.CurrentTool, filePosition: null);
 
                 // What the file position alone cannot say, from the same value that supplied it: the
                 // fraction of the code the machine has already made, the modal G command that code
@@ -340,7 +340,7 @@ internal sealed class JobSequences(
                     RestorePoint rp = planner.State.RestorePoints[RestorePoint.PauseNumber];
                     rp.ProportionDone = point.ProportionDone;
                     rp.GCommandNumber = point.GCommandNumber;
-                    rp.FeedRate = point.FeedRateMmPerSec;
+                    rp.FeedRate = point.FeedRate;
                     rp.AxesRelative = point.AxesRelative;
                     rp.DrivesRelative = point.DrivesRelative;
                 }
@@ -611,12 +611,12 @@ internal sealed class JobSequences(
         {
             if (model.Inputs[CodeChannel.File] is InputChannel input)
             {
-                float feedRateMmPerSec;
+                float feedRate;
                 bool? axesRelative, drivesRelative;
                 using (planner.Lock())
                 {
                     RestorePoint rp = planner.State.RestorePoints[RestorePoint.PauseNumber];
-                    feedRateMmPerSec = rp.FeedRate;
+                    feedRate = rp.FeedRate;
                     axesRelative = rp.AxesRelative;
                     drivesRelative = rp.DrivesRelative;
                 }
@@ -630,7 +630,7 @@ internal sealed class JobSequences(
                     input.DrivesRelative = drivesWereRelative;
                 }
 
-                input.FeedRate = MoveInterpreter.ModalFeedRateFromMmPerSec(input, feedRateMmPerSec);
+                input.FeedRate = feedRate;
             }
         }
     }

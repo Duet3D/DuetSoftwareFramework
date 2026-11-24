@@ -60,8 +60,8 @@ public class AsyncPauseTests : BenchFixture
             Assert.That(pausedY, Is.Zero, "still on the first move's line");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].GCommandNumber), Is.EqualTo(1),
                         "the interrupted code is a G1");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(feedrate).Within(0.01),
-                        "the interrupted move's feed rate in mm/s");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(feedrate * 60).Within(0.01),
+                        "the interrupted move's feed rate as F gave it");
             Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1), "ran pause.g");
         });
 
@@ -349,7 +349,7 @@ public class AsyncPauseTests : BenchFixture
             Assert.That(pausedY, Is.GreaterThan(10.5), "the pause landed on one of the bare modal lines");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].GCommandNumber), Is.EqualTo(1),
                         "the modal G command was recorded");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(100.0).Within(0.01),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(6000.0).Within(0.01),
                         "with the feed rate the line was read with");
         });
 
@@ -388,7 +388,7 @@ public class AsyncPauseTests : BenchFixture
 
         await PauseMidJobAsync(bench, "0:/gcodes/job.gcode", axis: 0, position: 20);
 
-        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(50.0).Within(0.01),
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[1].FeedRate), Is.EqualTo(3000.0).Within(0.01),
                     "the recorded rate is the file's F3000, not the M220-scaled one");
 
         await bench.Host.ExecuteCodeAsync("M24");

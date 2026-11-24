@@ -1040,14 +1040,13 @@ internal partial class MCodeHandler(
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             InputChannel? input = model.Inputs[code.Channel];
-            float unitScale = input?.DistanceUnit == DistanceUnit.Inch ? 25.4f : 1.0f;
-            float feedRateMmPerSec = (input?.FeedRate ?? 0.0f) * unitScale / 60.0f;
+            float feedRate = input?.FeedRate ?? 0.0f;
 
             using (planner.Lock())
             {
                 planner.State.SavePosition(Motion.RestorePoint.SimulationNumber,
                                            planner.Parameters.SharedAxisCount(model.Move),
-                                           feedRateMmPerSec, model.State.CurrentTool, filePosition: null);
+                                           feedRate, model.State.CurrentTool, filePosition: null);
             }
         }
     }

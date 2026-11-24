@@ -141,8 +141,8 @@ public class JobEdgeCaseTests : BenchFixture
             Assert.That(await bench.Host.RestorePointAsync(1), Is.EqualTo((100.0, 120.0)),
                         "the pause wrote slot 1");
 #pragma warning disable CS0618
-            Assert.That(await bench.Host.ReadModelAsync(model => model.State.RestorePoints[1].FeedRate), Is.EqualTo(100.0).Within(0.01),
-                        "with the job's feed rate in mm/s");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.RestorePoints[1].FeedRate), Is.EqualTo(6000.0).Within(0.01),
+                        "with the job's feed rate as F gave it");
 #pragma warning restore
         });
 

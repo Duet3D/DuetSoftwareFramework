@@ -69,7 +69,7 @@ internal sealed class RawMove
     public float FeedRateMmPerSec { get; set; } = 50.0f;
 
     /// <summary>
-    /// The channel's modal feed rate when the move was built, in mm/sec
+    /// The channel's modal feed rate when the move was built, as <c>inputs[].feedRate</c> holds it
     /// </summary>
     /// <remarks>
     /// RepRapFirmware's <c>raw.originalFeedRate</c>, and it exists for the one thing that field is
@@ -78,7 +78,7 @@ internal sealed class RawMove
     /// <em>as the file gave it</em> - <see cref="FeedRateMmPerSec"/> has the speed factor applied and
     /// a rapid ignores F altogether, so neither can be restored without changing what the file said
     /// </remarks>
-    public float OriginalFeedRateMmPerSec { get; set; }
+    public float OriginalFeedRate { get; set; }
 
     /// <summary>
     /// How long the whole move should take, in seconds; only used when <see cref="InverseTimeMode"/>

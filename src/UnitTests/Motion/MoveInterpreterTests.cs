@@ -475,7 +475,7 @@ public class MoveInterpreterTests
         Assert.Multiple(() =>
         {
             Assert.That(printing.FeedRateMmPerSec, Is.EqualTo(100.0f).Within(1e-4f));
-            Assert.That(printing.OriginalFeedRateMmPerSec, Is.EqualTo(50.0f).Within(1e-4f));
+            Assert.That(printing.OriginalFeedRate, Is.EqualTo(3000.0f).Within(1e-4f));
         });
     }
 
