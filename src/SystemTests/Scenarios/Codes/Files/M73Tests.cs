@@ -25,7 +25,6 @@ public class M73Tests : BenchFixture
     /// entry <c>timesLeft.slicer</c> is <c>EstimateTimeLeft(slicerBased)</c>, which reports the
     /// stored value less the time since it was stored, and null when no file is being printed
     /// </remarks>
-    /// TODO this test is intermitant
     [Test]
     public async Task M73SetsTheSlicerTimeEstimate()
     {
