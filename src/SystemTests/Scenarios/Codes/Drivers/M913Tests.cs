@@ -131,7 +131,7 @@ public class M913Tests : BenchFixture
     /// <remarks>
     /// RRF reads an axis with GetNonNegativeFValue, which refuses it, but reads E with GetFloatArray
     /// and clamps it to 0 in Move::SetMotorCurrent. Refusing it for the extruders too is the minimum
-    /// limit rrf-differences.md section 6.1 records
+    /// limit rrf-differences.md section 3.1 records
     /// </remarks>
     [TestCase("M913 X-10")]
     [TestCase("M913 E-10")]

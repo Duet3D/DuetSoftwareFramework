@@ -196,7 +196,7 @@ public class M572Tests : BenchFixture
     /// <c>error-missing-parameters-tools.yaml</c> records for <c>M572 S0.9:0.1</c>) read with
     /// GetNonNegativeFValue, and S holds at most two values. An extruder number past the last is
     /// "Invalid extruder number"; RRF applies the extruders listed before it first, where this side
-    /// refuses the whole list (rrf-differences.md, array element limits)
+    /// refuses the whole list (rrf-differences.md section 3.1)
     /// </remarks>
     [TestCase("M572 D0 S-0.1")]
     [TestCase("M572 D0 S0.1:-0.1 L1")]

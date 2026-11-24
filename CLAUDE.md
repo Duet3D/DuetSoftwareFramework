@@ -147,7 +147,7 @@ The object model (`src/DuetAPI/ObjectModel`) is the machine's configuration, not
 
 Two separate places, for two audiences:
 
-- **`src/Documentation/articles/`**: the published DSF wiki (docfx). Current behaviour only, with no history, plans or migration status. A change a user can observe (G/M-code semantics, object model, IPC, firmware link, REST API, file handling) updates the matching article in the same change. `rrf-differences.md` lists only deliberate, implemented deviations from RRF; unimplemented gaps belong in `docs/devel`. New articles need an entry in `toc.yml`.
+- **`src/Documentation/articles/`**: the published DSF wiki (docfx). Current behaviour only, with no history, plans or migration status. A change a user can observe (G/M-code semantics, object model, IPC, firmware link, REST API, file handling) updates the matching article in the same change. `rrf-differences.md` lists, as concise bullet points, only the deliberate differences from RRF that will remain once the migration is complete, whether or not they are implemented yet; gaps that will be migrated later belong in `docs/devel`. New articles need an entry in `toc.yml`.
 
 When writing Markdown, put each paragraph and each list item on a single line. Do not insert newlines to wrap prose at a column width. Blank lines between paragraphs, code blocks, tables and headings are unaffected.
 

@@ -23,8 +23,7 @@ public class G0G1Tests : BenchFixture
     /// ("we now keep the raw value ... as we don't know whether to convert from inches yet"),
     /// GCodeMachineState.cpp initialises feedRate to DefaultFeedRate (3000 mm/min,
     /// Configuration.h), and Move.cpp reports userPosition from GetUserCoordinate and
-    /// machinePosition from LiveMachineCoordinate. The raw feedRate semantics are also
-    /// documented in rrf-differences.md section 5
+    /// machinePosition from LiveMachineCoordinate
     /// </remarks>
     [Test]
     public async Task G0AndG1SetFeedRateAndUserPosition()

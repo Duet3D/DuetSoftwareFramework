@@ -21,6 +21,13 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 
 ### Kinematics
 - [ ] Delta kinematics can't set `NumTowers` using gcode
+- [ ] A hangprinter takes no `M669` parameters beyond `K`, and `M666` is refused: the spool buildup and flex compensation, and the steps per mm RepRapFirmware works out from them, are not ported. `M669Tests.M669HangprinterSetsTheLineMotorsStepsPerMm`.
+
+### Babystepping
+- [ ] `M290` takes effect on the next move built; RepRapFirmware also pushes it into the moves already queued (`DDARing::PushBabyStepping`).
+
+### Expansion boards that reset
+- [ ] Nothing re-creates the input monitors of a board that has reset, and nothing fails if `expansion-reconnect.g` does not. RepRapFirmware's homing fails loudly, because it asks the board to prime each switch.
 
 ### Probing and the move transforms
 - [ ] `G30` without P first moves Z to the dive height above the axis minimum (`ProbeStartHeight`) and dives from there; RepRapFirmware dives from where the head is (`ExecuteG30` goes straight to `probingAtPoint2a`). On the regression bench, where Z's minimum is −100, that is a 99 mm move down before the dive. KnownGap scenario `GeneratedMoveTransformTests.G30WithoutPDivesFromWhereTheHeadIs`.
@@ -71,7 +78,6 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 ### Stall detection (M915)
 - [ ] `M915 P` takes a single driver; RepRapFirmware takes a list across boards. `M915Tests.M915PTakesADriverListAcrossBoards`.
 - [ ] `M915` forwards or clamps S outside −128..127, T ≥ 65536 and R ≥ 4 instead of refusing them before anything is sent. `M915Tests.M915RefusesAValueOutOfRange`.
-- [ ] `M915` asks the boards in the order the drivers were named; RepRapFirmware goes in ascending CAN address, so its reports are ordered by board. `M915Tests.M915AsksTheBoardsInAddressOrder`.
 - [ ] `M915` naming no driver is an error; RepRapFirmware replies OK and sends nothing. `M915Tests.M915NamingNoDriverIsNotAnError`.
 - [ ] `M915` records its settings for drivers whose board refused them, and adds a `boards[].drivers[]` entry for a driver past the end of the board. `M915Tests.M915DoesNotRecordWhatABoardRefused`, `M915OnADriverPastTheEndOfABoardIsIgnoredByTheBoard`.
 

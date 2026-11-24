@@ -234,7 +234,7 @@ public class M205M566Tests : BenchFixture
     }
 
     /// <summary>A negative extruder jerk refuses the code and leaves the extruder's jerk as it was</summary>
-    /// <remarks>RRF GCodes2.cpp case 566 clamps it to the minimum instead; see rrf-differences.md, Error handling</remarks>
+    /// <remarks>RRF GCodes2.cpp case 566 clamps it to the minimum instead; see rrf-differences.md section 3.1</remarks>
     [Test]
     public async Task M566RefusesANegativeExtruderJerk()
     {

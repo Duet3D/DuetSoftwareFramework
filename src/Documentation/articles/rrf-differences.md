@@ -1,606 +1,168 @@
 # Where DSF deliberately differs from RepRapFirmware
 
-Most of DuetSoftwareFramework's machine control is a port of RepRapFirmware. Where the port is
-faithful there is nothing to say; this article is the other list — the places where DSF was *chosen*
-to behave differently, and why.
-
-**This is not a list of gaps.** A feature that is not ported yet is missing, not different: those are
-tracked in the developer documentation. Everything below is present, works, and does
-something other than what RepRapFirmware does.
-
-The distinction is load-bearing, because the porting contract makes divergence expensive on purpose:
-a gap is a `// TODO` naming what it waits for, never an invention, and a structural departure is
-asked about rather than chosen by whoever is typing. A departure that produces the right answer today
-is the hardest kind of bug to find later, because the code looks considered and the difference only
-surfaces when the missing piece lands and nobody remembers it was traded away. So each entry here is
-a decision somebody had to argue for.
+DSF's machine control is a port of RepRapFirmware. This lists only the places where DSF is meant to behave differently.
 
 ---
 
-## 1. The architecture that forces most of it
+## 1. Architecture
 
-RepRapFirmware is one program on one board. It parses the G-code, plans the motion, generates the
-steps and reads the pins, all inside one address space and one step interrupt. Here the same work is
-four programs across three boards:
+- All drivers, heaters, fans, sensors and ports are on CAN expansion boards. Board 0 runs DuetCANMaster and has none.
+- A port has to name an expansion board: `io1.in` and `0.io1.in` are refused.
+- Not supported: `M954` (DSF is always the main board), `M576` (there is no DSF to RepRapFirmware SPI link), IOBits (`M670`) and main board stall detection. `M950 D` is refused, as RepRapFirmware refuses it in SBC mode.
+- `M950 R` takes its ports on an expansion board, where RepRapFirmware requires the main board. Each port is created as an output, numbered down from the top of `state.gpOut[]`, and the board in front of the first port applies to the others.
+- `boards[0]` describes DuetCANMaster: `maxMotors` and `maxHeaters` are 0, `supportsDirectDisplay` is false, `timeout` is null, `firmwareFileName` is `DuetCANMaster_<board>.bin`, and `state` is the state of the link to it.
+- The SBC's network belongs to DuetPiManagementPlugin, which answers `M552`, `M553`, `M554`, `M587`, `M588` and `M589`. Without it they reply `reserved - requires DuetPiManagementPlugin`.
+- The machine name is the Linux hostname. DuetPiManagementPlugin changes the hostname for `M550 P`; without it, `M550 P` takes only a name with the same letters and digits as the hostname.
 
-| Program | Runs on | What it is for |
-|---|---|---|
-| [DuetControlServer](src/DuetControlServer) | the SBC, managed | Interprets G-code, owns the object model, decides what a move means |
-| [DuetRealtimeCore](src/DuetRealtimeCore) | the SBC, native | Plans motion, holds the segment chain and the DDA ring |
-| [DuetCANMaster](src/DuetCANMaster) | the Duet 3 main board | Bridges SPI to CAN, and is close enough to the bus to stop a move in time |
-| [Duet3Expansion](src/Duet3Expansion) | each expansion board | Owns the pins and the drivers |
+## 2. Endstops and probes
 
-Two consequences run through everything else.
+[Endstops](endstops.md) describes the path in full.
 
-**Only the CAN path is ported.** DuetControlServer is the sole main board, and every driver, heater,
-fan and sensor lives on a CAN-connected expansion board. RepRapFirmware branches on local versus
-remote hardware throughout; here every `#if SUPPORT_CAN_EXPANSION` branch is the one that is kept and
-the local-hardware branch is dropped. In practice this makes the ports *smaller* than the originals.
-What it removes:
+- DuetCANMaster decides that an endstop stops a move, and DuetControlServer corrects the position from the time the switch fired.
+- A switch reports every change, where RepRapFirmware limits it to one report in 30 ms.
 
-| Dropped | Why |
-|---|---|
-| `M954` configure as expansion board | DSF is always the main board |
-| `M576` SPI communications parameters | The DSF/RRF SPI link is gone |
-| Local stall detection (`HAS_STALL_DETECT`) | Board 0 has no drivers |
-| Local heater, driver and filament faults | They arrive from the board as CAN events instead, which is the same event by a different door |
-| `M950 D` second SD card slot | The SBC owns the storage. RepRapFirmware refuses it in SBC mode too, `SD card attached to Duet is not supported in SBC mode` |
+### 2.1 Homing several axes in one move
 
-**A port name has to name an expansion board.** Board 0 runs DuetCANMaster and owns no pins, so
-`io1.in` and `0.io1.in` — the same port named by omission and named explicitly — are both refused,
-with the reason travelling with the refusal rather than being composed by the caller. RepRapFirmware
-has no equivalent rule because its main board does have ports. One function,
-[IoPorts.RemoveBoardAddress](src/DuetControlServer/Link/IoPorts.cs), knows the grammar and
-`TrySplitPort` is the policy on top of it, because two readers of one grammar diverge silently and
-did: a normally-closed endstop on an expansion board, which is how most machines are wired, was
-rejected outright.
+- Axes whose drives are coupled stop together, and separate groups stop separately: `G1 H1 X100 U100` on a CoreXYUV homes both pairs. RepRapFirmware stops every drive at the first switch.
+- Axes that share a drive cannot be homed in the same move.
 
-The same rule turns one RepRapFirmware refusal round. A spindle there is driven through main board pins only, and `M950 R` refuses a port on an expansion board with `Port must be on main board`. Here every port is on an expansion board, so each of a spindle's ports is created there as a general-purpose output, numbered down from the top of `state.gpOut[]` (`SpindleManager.PortNumberFor`), where those outputs also appear. As for a fan's tacho input, the board address in front of the first port applies to the ports after it.
+### 2.2 Motor stall probe
 
-**`boards[0]` describes itself over the SPI link rather than being read out of the program that serves
-it.** In RepRapFirmware `boards[0]` is the board the object model lives on, so its name, firmware and
-readings are compile-time constants and local sensors. Here they belong to DuetCANMaster, which is
-not on the CAN bus and so cannot announce itself or broadcast a board status report the way an
-expansion board does. It sends both over SPI instead: `FirmwareRequest::BoardInfo` once per
-connection with the identity, and `FirmwareRequest::BoardStatus` periodically with the same readings
-a board broadcasts. `maxMotors`, `maxHeaters` and `supportsDirectDisplay` are not in either message:
-board 0 owns no pins and never will, so they are `0`, `0` and `false` by architecture, where
-RepRapFirmware reports the main board's own hardware. `timeout` goes the other way and is `null` there:
-it is how long an expansion board may go unheard from before it is given up on, and the main board is
-reached over SPI rather than over the bus, so the link watches itself instead.
+- `M558 P10` works with drivers on expansion boards, where RepRapFirmware's never triggers.
 
-**`boards[0].firmwareFileName` is `DuetCANMaster_<board>.bin`, not `Duet3Firmware_<board>.bin`.** This is to help prevent flashing the incorrect firmware to the MB6HC while that board is used as a stand in for the future CAN board.
+### 2.3 Endstop state and reports
 
-**`boards[0].state` is the state of that link.** It is the one field with no RepRapFirmware
-counterpart at all: there the object model and the main board are the same program, so `boards[0]`
-cannot be absent and a state would say nothing. Here the controller is a separate board at the far end
-of a link that can drop, so the field carries what the link knows - `unknown` until it first comes up,
-`running` while it is up, `timedOut` once it has gone. The link is its only writer. The controller's
-own reports deliberately leave it alone, because they are applied off a queue rather than as they
-arrive, and one enqueued just before an outage is applied just after it - which would put the board
-back to `running` while it was gone.
+- `M119` and homing use the state the boards report as it changes. No board is asked before a homing move.
+- `M574` reports a switch from the port it was given, without asking its board.
+- `M574` on an existing endstop recreates its monitor without deleting it first.
 
----
+### 2.4 Probe report rate
 
-## 2. There is no step interrupt, so the endstop path is a different shape
-
-RepRapFirmware generates the steps, so it knows the instant a switch fired and where every drive was
-at that instant, and it can act on both inside one interrupt. Nothing here can. Every item in this
-section is what that costs.
-
-**The stop is decided on the controller.** An axis at 100 mm/s covers a millimetre every 10 ms, so a
-round trip out to DuetControlServer and back would overrun the switch visibly. DuetCANMaster matches
-an incoming input change against the move's own per-driver stop inputs and stops the drivers itself,
-needing no notion of what an endstop is. The change is still forwarded to DCS, because the object
-model has to see it whether or not anything was moving.
-
-**An endstop that is already closed is handled where the state is known.** The controller stops a
-move when an input *changes*, and a switch that is already closed never changes. So DCS holds
-`sensors.endstops[].triggered` and commands an axis that is already at its switch to stay where it
-is. RepRapFirmware reaches the same place from the other direction — its step interrupt tests the
-endstop before the first step — and the axis is latched as triggered by the arming code, because
-nothing moved and no stop will ever be reported for it.
-
-**Which endstops stopped a move is latched, not read back.** The wind-back unwinds the drives to
-where they were at the trigger instant, which is the point at which the switch had *just* closed, so
-reading the switch afterwards asks the question with the axis balanced on the threshold.
-[MovementState.EndstopsTriggered](src/DuetControlServer/Motion/MovementState.cs) accumulates the
-stopped drives as each stop is reported, which is RRF's `ms.endstopsTriggered` — the same answer, and
-the only one that works for probe and stall endstops, which report under handles that never touch
-`sensors.endstops[].triggered` at all.
-
-**The step clock has to be shared.** Moves are scheduled by absolute time in the controller's step
-clock and a stop report carries the tick the switch fired at, but the SBC has no such counter.
-`StepTimer` fits a linear model of the controller's clock onto `CLOCK_MONOTONIC`, disciplined by a
-reading in every SPI transfer header rather than in a packet, because what the fit rests on is the
-pairing between the reading and the local time it is stamped with. Until the fit is trusted, the
-trigger timestamp is ignored and the drives are corrected to where the report found them — the
-overshoot the timestamp exists to remove is a small error, and an unsynchronised clock gives a
-position with no relation to where the move stopped. `M122` reports whether the clock is synchronised
-and what the movement delay is, because nothing else shows either and an unfitted clock breaks
-nothing until an endstop fires.
-
-**The stop and the position update are not the same event, so both ends of that window are closed.**
-
-| Rule | Why RepRapFirmware needs no equivalent |
-|---|---|
-| A concluded move refuses a stop report that arrives late, counted as `too late` in `M122` | Its stop and its position update are one interrupt |
-| A move that has seen no stop waits 50 ms for one before concluding | Same |
-| A stop may only correct a drive the move actually armed, counted as `unarmed` | A report resolving to any other drive means the two sides disagree about driver numbering, which cannot happen inside one program |
-| The report quotes the move id it belongs to | A report for move 6 arriving after move 7 armed would otherwise be applied to move 7, whose drives are usually the same ones |
-| The move is held complete for `TotalDriverPositionRevertMillis` after the reverts go out | RRF waits for the same thing through `CanMotion::RevertStoppedDrivers`, but its ring counters can see the corrective move; here the boards synthesise it, so the SBC's counters know nothing about it |
-
-One race is inherent rather than fixed: if a switch fires within a transfer or two of the move's
-natural end, standstill can be reached before the correction arrives. An axis that triggered is still
-put right, because its coordinate comes from its switch; an axis in the same move that did not
-trigger keeps its planned endpoint.
-
-### 2.1 The three stop actions cross a wire
-
-RepRapFirmware decides `stopAxis` / `stopDriver` / `stopAll` inside `GetResult` and acts on the answer
-immediately. Here the decision has to be expressible to a program on another board, so it is a field:
-`ScheduleMoveDriver` carries a `stopGroup` and a `StopAction`, and the rules that read them live in
-[StopRules.h](lib/DuetSpiInterface/include/DuetSpiProtocol/StopRules.h) — a leaf header both builds
-compile, so the controller's own watch array *is* the tested type rather than a copy of it. The
-escalation from `driver` to `group` on the last motor of a set, which is RRF's `Acknowledge`
-decrementing `numDriversLeft`, belongs to the controller because it is the side that knows how many
-motors are still running.
-
-Two differences fall out of having named the group:
-
-- **A stall watch names the driver's own board.** A driver can only ever be stopped by its own stall,
-  so the native builder ignores the move's board list for a `typeStallEndstop` handle. The
-  round-robin that hands an axis' switches out across the drives is right for switches and wrong for
-  stalls.
-- **Any number of disjoint coupling sets can be homed in one move.** On a CoreXYUV, `G1 H1 X100 U100`
-  homes both pairs: X's endstop stops `{X, Y}` and U's stops `{U, V}`. RepRapFirmware accepts the
-  same move and half-homes it — both endstops get `stopAll`, so whichever switch closes first stops
-  every drive, U and V stop wherever they are, and no error is reported. Two axes that share a drive
-  are refused here, naming the drive they collide on, because a drive carries one watch and the
-  second axis could never reach its endstop in that move.
-
-### 2.2 A motor-stall Z probe works, which RepRapFirmware's does not
-
-`M558 P10` probes by driving Z into the bed until its motors stall. In RepRapFirmware the probe
-object is a stub — no port, `SetProbing` returns `true` — and the detection lives in
-`ZProbe::GetReading`, which for `zMotorStall` reads
-`GetAxisDriversConfig(Z_AXIS).GetLocalDriversBitmap()`. That bitmap is filtered to `IsLocal()`
-drivers, and nothing anywhere arms a *remote* stall endstop for a probe. So on a machine whose
-drivers are all on CAN boards — which is every machine here — RepRapFirmware's motor stall probe
-reads an empty bitmap and can never trigger.
-
-Rather than port a feature that cannot fire, the probing move arms the drivers, exactly as a
-stall-homed axis does: `StallArming` tells each driver that moves Z what speed to expect before the
-tap and releases it afterwards, the move watches the board-wide stall handle with an action of
-`all`, and the drivers to arm come from the same `EndstopPlanner.DriversMoving` a stall-homed axis
-uses — so on a CoreXZ or a delta the probe watches every motor that brings Z down, not only the one
-called Z.
-
-Two consequences are worth knowing. The speed is per tap, because it is what the driver compares the
-back-EMF against and `M558 F` may give the taps different speeds. And "was the probe triggered?" is
-answered from `MovementState.EndstopsTriggered` rather than from `sensors.probes[].value`: nothing
-writes a reading for a stall, because it is not an input on a pin. The latch is cleared before each
-tap so it can only describe that one, and the "already triggered before the move started" check is
-skipped, since a stall is a judgement about a move that is running and there is nothing for it to be
-already triggered by.
-
-### 2.3 An endstop's state is kept current, not fetched per move
-
-`SwitchEndstop::PrimeAxis` begins every homing move with a CAN round trip per remote switch. The
-message is `CanMessageChangeInputMonitorV1` with `actionDoMonitor`, but re-enabling is incidental —
-nothing in RepRapFirmware ever disables a handle. What the call is for is its out parameter, which
-refreshes `states[i]`, the endstop's cached level, before the move consults it.
-
-DSF has no such cache to refresh. Every board reports an input when it changes, DCS applies those
-reports to `sensors.endstops[].triggered` as they arrive, and three things read that value at moments
-no move chose: `M119`, the check that refuses to drive an axis into a switch that is already closed,
-and the levels DuetCANMaster holds so that a move armed on an input that closed while the move was in
-flight is stopped before it starts.
-
-The same difference explains the other direction. `SwitchEndstop::AppendDetails` asks each board what
-its pin is called — `actionReturnPinName` — every time `M574` reports the configuration, and two of RepRapFirmware's
-three callers of that action actually want the current level it also returns. DSF answers both from
-memory: the pin name is the string that was given to `M574`, and the level is already live.
-
-RepRapFirmware can afford to fetch on demand because its endstops are evaluated in the step interrupt
-on the board that owns them. Here the answer crosses CAN and then SPI before anything reads it, so it
-is kept current instead, and a per-move round trip per switch would add latency to the start of every
-homing move to learn something DSF already knows.
-
-One thing RepRapFirmware gets from that round trip which DSF does not: a board that reset mid-job has
-forgotten its monitors, and priming the axis fails loudly instead of the endstop silently never
-reporting again. DSF raises `expansion_reconnect` when a board re-announces, so `expansion-reconnect.g`
-is where a machine recovers, but nothing re-creates the monitors on its own and nothing fails if the
-macro does not. That is a gap rather than a difference.
-
-### 2.4 A Z probe standing in for an endstop is armed, and a probe left alone is quiet
-
-Two halves of one difference, and they only make sense together.
-
-RepRapFirmware creates a remote probe's input monitor at the *probing* report interval — 2 ms — and
-only slows it to 25 ms when a probing operation ends. A machine that configures a probe in
-`config.g` and does not use it therefore has it reporting every change it sees, forever, on a bus
-that every move shares. DSF creates at 25 ms and raises it for the duration of a tap, which is the
-state RepRapFirmware reaches anyway, reached immediately.
-
-That inverts who is exposed by the other half. `M574 Z1 S2` homes Z on the probe, and a homing move
-is not a tap: RepRapFirmware's `ZProbeEndstop::PrimeAxis` carries a `//TODO` where the remote probe
-ought to be prepared, so nothing raises the rate — it simply goes unnoticed, because until the first
-`G30` the probe was already fast. Creating slow would make that hole permanent, so DSF closes it:
-`ZProbeEndstopKind` arms the probe on a homing move exactly as a tap does, through the same
-`ProbeArming`.
-
-The result is a probe that reports quickly whenever it is being used to stop something, and quietly
-the rest of the time. RepRapFirmware manages the first only by accident and never manages the second.
-
----
+- A probe's board reports it every 25 ms, and every 2 ms only while a move may stop on it, including a homing move that uses it as an endstop. RepRapFirmware starts at 2 ms and slows down after the first probing move.
 
 ## 3. The object model has to be able to recreate the machine
 
-RepRapFirmware generates its object model on demand: `GetObjectValue` walks a lookup table at read
-time, so the reported value cannot be stale and settings the firmware keeps in its own variables cost
-nothing to omit. DSF's object model is a materialised tree that is diffed and patched out to clients,
-and it is the only description of the machine that survives a restart. So the rule here is stronger
-than RRF's: **sending a setting to a board is not storing it.** If the process restarted and had to
-rebuild the machine from `model` alone, whatever would be lost belongs in the object model.
+Every setting is in the object model, even when the board is what acts on it. RepRapFirmware does not report these:
 
-That adds fields RepRapFirmware does not keep, does not report, or both:
+- Ports: `fans[].port`, `spindles[].port`, `state.gpOut[].port`, `sensors.gpIn[].port`, `sensors.endstops[].port`, `sensors.probes[].port` and `heat.heaters[].port`.
+- Outputs and heaters: `state.gpOut[].servo`, `ledStrips[].frequency`, `heat.heaters[].frequency` and `.ambientSensor`.
+- Sensors: `sensors.probes[].sensor`, and the rest of `M308` for an expansion board's sensor.
+- Drivers: `boards[].drivers[].config`, with its `stallDetection`, `chopperControl`, `closedLoop`, `brake` and `waveformCorrection`.
+- Drives: `move.axes[].phaseStepKv`, `.phaseStepKa`, `.rotational` and `.continuousRotation`, `move.extruders[].phaseStepKv`, `.phaseStepKa` and `.endstopInput`, and `move.jerkPolicy`.
+- Heat: `heat.coldExtrusionAllowed`, `.minExtrusionTemperature` and `.minRetractionTemperature`.
+- Kinematics: the parameters of a rotary delta and a five-bar SCARA.
 
-| Field | Why |
-|---|---|
-| `fans[].port`, `spindles[].port`, `state.gpOut[].port`, `heat.heaters[].port` and `.frequency` | A device whose board is forgotten cannot be driven after a restart. Each of these hid behind an address derived from something else — a fan's from a dictionary, a heater's from its sensor |
-| `sensors.probes[].port` and `.sensor` | RRF keeps the temperature-compensation sensor on the probe but neither reports nor saves it, so a machine using it could not be recreated |
-| `boards[].drivers[].config` — direction, mode, timings, thresholds | M569 forwarded everything over CAN and stored nothing. The object model already said this was wrong: `DriverConfig` is documented as "Configured (M569) settings of a driver" |
-| `boards[].drivers[].config.stallDetection` | M915 had no home at all |
-| `move.axes[].phaseStepKv` and `.phaseStepKa`, and the same on `move.extruders[]` | M970.1 and M970.2 send the phase stepping feedforward gains to the board that applies them. RepRapFirmware keeps its own copy in `DriveMovement` and answers a bare M970.1 from it; here the board is the only other place they exist, so without these a restart would lose them and the bare form would have nothing to report |
-| `move.axes[].rotational` and `.continuousRotation` | M584's R and S say what kind of axis is being created, which RepRapFirmware keeps in bitmaps of its own and prints as `(r)` and `(c)` in the M584 report without reporting anywhere a client can read |
-| `heat.coldExtrusionAllowed`, `heat.minExtrusionTemperature` and `heat.minRetractionTemperature` | M302 P is a flag RepRapFirmware keeps beside the minimums S and R set, and while it allows cold extrusion `heat.coldExtrudeTemperature` and `heat.coldRetractTemperature` report 0, which hides the minimums. These hold the flag and the minimums; the two RRF fields still report what RRF's do |
-| `sensors.analog[].type` of an expansion board's sensor | RepRapFirmware reports every expansion board's sensor as `remote` (`RemoteSensor::GetShortSensorType`, "TODO save the actual type"). Here it is the type `M308 Y` gave, such as `thermistor` or `linearanalog`, because a sensor cannot be recreated without it |
-| `sensors.analog[].offsetAdj` and `.slopeAdj` of an expansion board's sensor | `M308 U` and `V` go to the board, which applies them, and RepRapFirmware then clears its own copy (`ClearAdjustments`) and reports 0. Here they record what the board was sent |
-| `sensors.analog[].r25`, `.beta`, `.c`, `.rRef`, `.lowReading`, `.highReading`, `.adcLowOffset`, `.adcHighOffset`, `.filtered`, `.mainsFrequency`, `.wires`, `.thermocoupleType`, `.objectMix`, `.auxMix` and `.radiationExponent` of an expansion board's sensor | RepRapFirmware sends the rest of `M308` to the board and keeps none of it. Each field holds what its letter set for the sensor's type: `B` and `C` are a thermistor's `beta` and `c` but a linear analog sensor's `lowReading` and `highReading`, `L` and `H` are a thermistor's ADC corrections, and a thermopile sensor's `T`, `B` and `C` describe its environment thermistor while `F`, `W` and `R` are its `objectMix`, `auxMix` and `radiationExponent` |
-| `move.extruders[].endstopInput` | `M574 E` binds a general purpose input to an extruder as its filament endstop. RepRapFirmware keeps the binding in `EndstopsManager::extruderGpinNumbers` and shows it only in the `M574` reply |
-| `boards[].drivers[].config.chopperControl` | `M569 C` writes a driver's whole chopper control register, whose off time, blanking time and hysteresis fields `F`, `B` and `Y` also set one at a time. RepRapFirmware forwards both and keeps neither. Here the register is recorded, and each of `C` and the single fields updates the other, so the model never holds a register and fields that disagree and a board given them in one `M569` ends up as the codes left it |
-| `boards[].drivers[].config.closedLoop` | `M569.1` sends the encoder type and counts, the steps per revolution, the magnetic encoder type, the PID and feedforward constants, the warning and error thresholds, the torque constant and the deadband to the closed loop board, and RepRapFirmware keeps none of it. A null value has not been set, so the board uses its default, and a `deadband` of null is the automatic deadband that a negative `B` restores |
-| `boards[].drivers[].config.brake` | `M569.7` binds the brake port, its delay and its PWM voltage limit on the driver's board, which RepRapFirmware does not keep either. A `delay` of null is the board's default, which a port given without `S` restores |
-| `boards[].drivers[].config.waveformCorrection` | `M569.2 S`, `J` and `O` write a harmonic correction into the driver's sine table, one entry per harmonic, which RepRapFirmware does not keep. A register written with `M569.2 R` and `V` is not recorded: it is a debugging aid that later driver configuration overwrites |
-| `heat.heaters[].ambientSensor` | `M950 H B` names the sensor a heater takes as its ambient temperature. RepRapFirmware keeps it on the heater but does not report it |
-| `state.gpOut[].servo` | `M950 S` and `M950 P` create the same kind of port, which the board drives as a servo or as a PWM output. RepRapFirmware keeps the difference in the pin's access mode and does not report it |
-| `sensors.gpIn[].port` | The pin `M950 J` asked a board to watch, which RepRapFirmware keeps in the remote handle's board address and the board's pin table |
-| `ledStrips[].frequency` | `M950 E Q` is sent to the board that drives the strip and RepRapFirmware keeps nothing of it. Null means the board's default for the strip type |
-| `move.kinematics` of a rotary delta: `armLengths`, `rodLengths`, `bearingHeights`, `armAngleLimits`, `deltaRadius`, `printRadius`, `angleCorrections` and `endstopAdjustments` | RepRapFirmware reports only the name (and a placeholder `dummy`). These are what `M669` and `M666` configure |
-| `move.kinematics` of a five-bar SCARA: `xOrigins`, `yOrigins`, `proximalLengths`, `distalLengths`, `cantileverLengths`, `workMode`, `homingAngles`, `headAngleLimits`, `proximalDistalAngleLimits`, `actuatorAngleLimits` and `printArea` | The same: RepRapFirmware reports only the name and `dummy`, and these are what `M669` configures |
-| `move.kinematics.anchors` of a hangprinter has one entry per anchor | RepRapFirmware always reports eight, the unused ones zero, and does not report how many there are, which `M669 N` sets |
-| `move.kinematics.ttSpeedMax` and `.ttAccMax` of a polar machine are in degrees per second and per second squared | RepRapFirmware reports its internal per-step-clock values (0.0008 for 600 deg/s), where its own `M669` report and the documentation use degrees per second |
+These are reported differently:
 
-**`move.compensation.probeGrid` holds the grid as `M557` defined it.** RepRapFirmware reports `mins`, `maxs`, `spacings` and `radius` rounded to one decimal place, so a spacing worked out from a point count, which is scaled by 0.9999 to keep the last point inside the range (9.999 for `P3` over 20 mm), reads 10.0. DSF keeps the exact values, which are what `G29` probes at.
+- `sensors.analog[].type` of an expansion board's sensor is its own type, where RepRapFirmware reports `remote`, and `offsetAdj` and `slopeAdj` are what `M308` set, where RepRapFirmware reports 0.
+- `move.compensation.probeGrid` is exact, where RepRapFirmware rounds to one decimal place.
+- `move.kinematics.anchors` of a hangprinter has one entry per anchor, where RepRapFirmware always has eight.
+- `move.kinematics.ttSpeedMax` and `.ttAccMax` of a polar machine are in degrees, where RepRapFirmware uses internal units.
 
-**`HeaterMonitorCondition` enum value matches the `C` param values of `M143`.** This removes the need to have converters between the OM and gcode parameter and makes error messages more clear and consistent.
+### 3.1 What DSF refuses and RepRapFirmware accepts
 
-**The kinematics engine is authoritative and the object model is a projection of it.** Kinematics is
-the one place where two objects genuinely have to exist: `KinematicsEngine` holds precomputed state —
-a delta's tower positions, a SCARA's arm-length squares, a core geometry's inverted matrix — that the
-object model does not and should not carry. When two representations exist, one has to be
-authoritative, and a hand-written translation *into* the planner is a coverage problem: `M669 S`/`T`
-was write-only for exactly that reason, changing the object model, changing nothing about how the
-machine moved, and reporting success. Each engine now owns `Configure` / `WriteTo` / `AppendReport`
-next to its transforms, reports come from the authoritative side, and
-[KinematicsRoundTripTests](src/UnitTests/Motion/KinematicsRoundTripTests.cs) asserts that configuring
-and projecting loses nothing. RRF needs none of this because its projection is generated at read time.
+- `M584` naming a driver that another drive uses.
+- `M584` naming a driver its board does not have, for an axis or an extruder. RepRapFirmware drops an axis' driver and does not check an extruder's.
+- `M584` with too many drivers for one drive, or more axes or drives than the machine can have. Nothing of the code is applied.
+- `M574` with more switches than an axis may have drivers.
+- `M669 N` outside 3 to 8 on a hangprinter.
+- Any bad parameter of `M669`. Nothing of the code is applied, where RepRapFirmware may already have selected the geometry.
+- `M572 D` and `M915 E` with an extruder that does not exist. Nothing of the code is applied.
+- A negative value for an extruder in `M92`, `M201`, `M203`, `M205`, `M350`, `M566`, `M906`, `M913` or `M917`.
 
-**Axes and extruders stay object-model authoritative, deliberately.** `move.axes[]` is a flat list of
-scalars with no derived state and nothing else holds a copy of it, so inverting it would mean adding
-a second representation that can drift in order to solve a problem that does not exist. The ownership
-is mixed on purpose.
-
-**`MotionParameters` is a snapshot RepRapFirmware has no equivalent of.** It exists because two
-consumers — the endstop correction and the live position publisher — run with no object model lock and
-cannot take one, and because the planner needs dense `float[NumDrives]` arrays it would otherwise
-materialise on every move. Nothing in it is authoritative and nothing is a second copy of a setting; a
-divergence between it and the object model refuses the move rather than being clamped away.
-
-### 3.1 Where DSF refuses what RepRapFirmware accepts
-
-| Refusal | RepRapFirmware |
-|---|---|
-| `M584` naming one driver on two drives | Checks only that the driver exists, then lets the two owners fight over its steps |
-| A driver claimed by an axis *and* an extruder | Same. Here the first claim wins — axes are walked before extruders — and any further claim is recorded and logged, because last-writer-wins was a real fault that corrupted the reverse map |
-| `M666` with parameters on a hangprinter | Its line buildup and flex compensation, and the steps per mm they set, are not ported, so it says so rather than accepting the parameters and behaving as something else |
-| `M669 N` on a hangprinter outside 3 to 8 | Takes any number, and a number above eight overruns its anchor arrays |
-| A refused `M669` | Selects the geometry `K` names before the geometry's own parameters are checked, so a five-bar SCARA missing `D`, or given `L3`, is left selected and half configured. Here nothing of a refused code is applied |
-| Homing two axes whose coupling sets overlap | See §2.1 |
-| `M574` naming more switches than an axis may have drivers (`MaxDriversPerAxis`) | Watches the first `MaxDriversPerAxis` and silently ignores the rest, where an over-long list is refused everywhere else (an `M584` array, for one) |
-| `M584` naming a driver that a board on the bus does not have | Reports `Driver 5.3 does not exist`, drops that driver from the list and applies the rest of the code. DSF refuses the whole code, as it does any array element it refuses (section 6.1) |
-| `M584 E` naming such a driver | Does not check the extruders' drivers at all. DSF checks them as it checks the axes' |
-| `M584` creating a 31st axis, or more axes and extruders together than the 32 drives | Ignores an axis letter past `MaxAxes` without saying so, and drops the last extruder when a new axis needs its drive. DSF refuses the code with `Too many axes`, as RRF refuses a list of more drivers than an axis can have, because a configuration it silently does not apply leaves the model and the motion engine disagreeing |
-
-And one thing DSF allows that RRF does not: **`M584 X` releases the drivers of X.** RRF never shrinks
-its axis count, so a drive refused a driver had no way to give one up. The axis stays in `move.axes[]`
-— positions and axis indices do not move — but owns nothing until it is mapped again.
-
----
+DSF accepts one thing RepRapFirmware does not: `M584 X` with no driver releases the drivers of X. The axis stays.
 
 ## 4. Events
 
-The whole event system lives in DuetControlServer. The consumer is the AutoPause channel, and that
-channel is here; leaving `Event.cpp` on the controller would have left a queue nothing drains and two
-producers whose events could never reach the macros named after them. The controller's copy, its
-board-timeout sweep and its diagnostics line are deleted rather than kept beside the ports.
-
-| Difference | Detail |
-|---|---|
-| **Two event types RRF does not have** | `controller_disconnect` and `controller_reconnect`, raised when the SPI link to DuetCANMaster drops and returns, running `sys/controller-disconnect.g` and `sys/controller-reconnect.g`. They are numbered **128 and 129**, outside CANlib's range, so an upstream addition can never silently collide |
-| **Priority is its own property** | In RRF the priority *is* the enum value, which works because RRF owns the numbering. Values 0-10 are fixed here by expansion firmware already in the field, so pinning priority to them would sort the two most consequential events last. The schema carries a `priority` per value and the generator emits the lookup beside the enum |
-| **`controller_reconnect`'s default action runs `config.g`** | The largest deliberate departure in the events work. A rebooted controller has lost every setting, so *something* must reconfigure it, and a macro a machine can delete is not a safe home for that. When `controller-reconnect.g` exists it replaces the default entirely, as every other event's macro does, and is expected to call `M98 P"config.g"` itself |
-| **`controller_disconnect` logs only** | A pause would need the link that just failed, and the job has already been aborted by the invalidation that precedes the event |
-| **The queue is capped at 64** | RRF's producers are interrupt-driven and bounded by the similarity rule; `M957` is not. The *lowest-priority* entry is dropped with a warning naming it, because a queue that silently truncates reads as one that kept up |
-| **The board watchdog moved rather than being duplicated** | Nothing on the controller read the `TimedOut` state it produced and the event it raised had no consumer there, while DCS already receives every message the sweep is derived from. Two timers that can disagree about whether a board is alive is the outcome that was avoided |
-| **`M957` may raise the link events** | RRF validates the type and nothing further, and keeping that is what makes `controller-disconnect.g` testable without pulling a cable. It raises the *event* only — nothing touches the link — so a simulated disconnect runs the macro against a live machine |
-
----
+- `controller_disconnect` and `controller_reconnect` are raised when the link to DuetCANMaster drops and returns. They run `controller-disconnect.g` and `controller-reconnect.g`, and are numbered 128 and 129.
+- The default action of `controller_reconnect` is to run `config.g`. The default action of `controller_disconnect` is to log it.
+- `M957` may raise either. It does not touch the link.
+- At most 64 events are queued. The one with the lowest priority is dropped with a warning.
 
 ## 5. Interpreter and move path
 
-**An unrecognised code is an error, not a pass-through.** There is nowhere to forward it to. A code
-no handler claims first looks for `sys/<letter><number>.g`, exactly as RRF's `TryMacroFile` does, and
-only then replies `<code>: Command is not supported` — as a *warning*, in RRF's wording, because
-macros and user interfaces have been reading that string for years. The practical consequence is
-worth knowing: a config.g written for RepRapFirmware will report errors for every code not yet
-ported, which is the point rather than a regression.
-
-**`M290` babystepping takes effect on the next move.** RRF pushes the change into moves already
-queued (`DDARing::PushBabyStepping`), so it is felt immediately; here it is applied as each move is
-built, so it waits for the look-ahead to drain. It is the one user-visible difference in the
-babystepping port and is marked at the point of use.
-
-**`LimitPosition` is not re-applied per segment.** RRF applies it inside `ReadMove`, which is also
-where it generates *arc* segments — and an arc's intermediate points are not on the line between its
-ends, so they can leave the reachable region when the endpoints do not. A straight move's segments all
-lie on a line whose ends have already been limited, so there is nothing left to find. It goes back in
-with arcs.
-
-**A move's interpolation base is derived, not stored.** RepRapFirmware keeps `ms.initialCoords` and
-the ring's `startCoordinates` as two arrays with different transforms baked into them. Collapsing them
-into one array put the previous move's mesh correction into the base every segment was interpolated
-from — nearly two corrections high on the first segment of every printing move with a height map
-loaded. The fix was not to keep a second copy but to evaluate the base through the same forward
-transform the target goes through, so a term added to the transform reaches both ends of the line at
-once. A stored copy would have needed updating in five places and been one forgotten line from the
-bug it was meant to fix.
-
-**Segments are emitted outside the planner lock, one channel at a time.** Giving the ring up is the
-point of segmenting a long move, so the loop cannot hold a lock across the wait; instead
-`MovementState.SegmentsLeft` — RRF's `ms.segmentsLeft` — is claimed when the move is *built* and
-released in a `finally`, so a second channel cannot measure from a `StartCoordinates` part-way through
-the first move.
-
-**Smaller ones, each with a reason:**
-
-| Difference | Reason |
-|---|---|
-| `G93` inverse time is carried as `RawMove.DurationSec` | Deliberately not a second meaning for `FeedRateMmPerSec`; the quantity is a duration, which is also why the speed factor divides rather than multiplies |
-| `inputs[].feedRate` holds the raw `F` value | The inch conversion depends on which axes the move mentions, which is not known when `F` is read — and this is what the field's documentation already said |
-| M906, M913 and M917 are one handler; M665, M666 and M669 are another | They differ only in which quantity they address, which is true in RRF too. Which parameters mean what is the geometry's business |
-| Hangprinter uses the constant-spool-radius model | Line buildup and flex compensation need `move.kinematics` fields that do not exist; this is the branch RRF itself takes when the buildup factor is zero |
-| `config-override.g` (`M501`) and `dsf-config.g` keep the interpreter state they finish with, as `config.g` does | They configure the machine the same way `config.g` does, so an `M83` in them is the machine's setting afterwards. RRF keeps the state of `config.g` alone and restores its caller's state after `M501` |
-| `G10 L2` and `G10 L20` take a rotary axis's origin in degrees under `G20` | RRF converts every axis from inches, rotary ones included, while its moves leave a rotary axis in degrees. DSF follows the moves, as its `G10 P` tool offsets already do, so the same number means the same angle in a move and in a workplace |
-| Heater fault blocks extrusion on expansion board heaters | Obvious |
+- `config-override.g` (`M501`) and `dsf-config.g` keep the interpreter state they finish with, as `config.g` does.
+- `G10 L2` and `G10 L20` take a rotary axis' origin in degrees under `G20`.
+- A faulted heater on an expansion board blocks extrusion.
 
 ### 5.1 There are no default axes, so X, Y and Z are found by letter
 
-RepRapFirmware creates X, Y and Z before config.g runs, so they are always its first three axes and its code treats axis numbers 0, 1 and 2 as X, Y and Z. DSF creates no axes of its own: `move.axes[]` starts empty and M584 creates each axis the first time it names the letter. One M584 creates its new axes in letter order, but config.g can create them across several M584 codes in any order (`M584 Y..` then `M584 X..`, or `M584 X.. Y.. U..` then `M584 Z..`), and it need not create X, Y or Z at all. Everything that means X, Y or Z therefore means the axis carrying that letter, wherever it is in `move.axes[]`:
+- `move.axes[]` is empty until `M584` creates an axis, and X, Y and Z may be anywhere in it or absent.
+- Kinematics take their axes by letter, where RepRapFirmware takes them by position:
+  - CoreXY, MarkForged, SCARA, five-bar SCARA and polar: X and Y. A SCARA's crosstalk acts on Z if there is one.
+  - CoreXZ: X and Z.
+  - CoreXYU and CoreXYUV: X, Y, U and V.
+  - Linear delta: X, Y and Z, then U, V and W for more towers.
+  - Rotary delta: X, Y and Z.
+  - Hangprinter: X, Y and Z, then U, V, W, A and B for more anchors.
+- `M669`, `M665` and `M666` are refused if an axis the geometry needs does not exist, so `M584` comes first.
+- Core matrices: a row for an axis the machine does not have is refused, where RepRapFirmware ignores it. A matrix that cannot be inverted is refused, where RepRapFirmware reports it and carries on.
+- `M290 S` is an error on a machine without Z.
+- `M851 Z` writes the offset of the axis lettered Z, where RepRapFirmware writes axis 2.
+- `M584 P` hides the axes created last.
 
-- **Kinematics need their axes by letter, and M584 comes before M669.** RepRapFirmware's geometries take their axes by position: a delta's towers and a Hangprinter's anchors are its first axes, and a CoreXYU's U and V motors are its fourth and fifth axes, whatever letters those carry, so `M584 X.. Y.. Z.. A..` followed by `M669 K5` makes A the U axis. DSF matches the letters instead. Each geometry needs these axes, and every other axis is an ordinary one with a motor of its own: CoreXY and MarkForged need X and Y; CoreXZ X and Z; CoreXYU and CoreXYUV X, Y, U and V; a linear delta X, Y and Z for towers A, B and C, and U, V and W for a fourth, fifth and sixth tower; a rotary delta X, Y and Z; a Hangprinter X, Y and Z for its first three anchors and then U, V, W, A and B for the fourth anchor onwards; a SCARA X and Y for its proximal and distal joints, with its crosstalk acting on Z only when there is a Z; a five-bar SCARA and a polar machine X and Y. Cartesian needs none. These are the letters RepRapFirmware's axes carry when config.g creates them in one M584, so a config.g written that way behaves as it does in RepRapFirmware.
-- **`M669`, `M665` and `M666` refuse a geometry whose axes do not exist yet.** Selecting a geometry with `M669 K`, switching to a delta with `M665 L`, or configuring a geometry with any of the three is an error naming the missing axes, for example `The machine has no U or V axis, which coreXYU kinematics needs`, and the geometry that was there stays. config.g therefore creates the axes a geometry needs with M584 before it selects the geometry. Only those have to exist: an axis M584 creates after `M669` is an ordinary axis with a motor of its own, which is the identity in the matrices, as is any other axis the geometry does not need. The exception is Z on a SCARA, which the geometry picks up when it is created so that its crosstalk can act on it.
-- **Core matrices.** The named matrices are RepRapFirmware's, written by letter and placed at the indices of the axes with those letters, and `move.kinematics.inverseMatrix` shows them where they are placed. An `M669` row parameter replaces the row of the axis carrying that letter, and its values are the motors of the machine's axes in axis order, so a row can have no more values than the machine has axes (`array too long for parameter 'X'`, as in RepRapFirmware). A row for a letter the machine has no axis for is an error, `The machine has no A axis`, where RepRapFirmware ignores it; nothing of the code is applied. A matrix that cannot be inverted is reported with RepRapFirmware's `Invalid kinematics matrix`, but where RepRapFirmware reports it as a message and carries on with the singular matrix, `M669` refuses it and keeps the geometry it had.
-- **Tools.** `M563` maps X, Y and Z by default to the axes carrying those letters at the time it runs, and a letter the machine does not have to no axis at all. The tool transform reads each coordinate from, and writes it back to, the axis with that letter, and the Z hop applies to the tool's Z map.
-- **Moves and homing.** The X and Y axes of a move, the axes that count towards a segment's length, the default XY speed limit, the delta bed tilt, Z being homed after X and Y when it homes with the probe, and the axes homed before probing are all found by letter. Where the letter is missing the step is skipped: a machine without Z has nothing to home last.
-- **`M290 S`** babysteps the axis lettered Z. On a machine without Z it is an error, `The machine has no Z axis`, rather than a value quietly dropped.
-- **`M851 Z`** writes the probe offset of the axis lettered Z, where RepRapFirmware writes axis 2.
+### 5.2 Probing moves and skew
 
-`M584 P` hides the highest-numbered axes, which are the last ones created and not necessarily the letters after Z.
+- `G30` applies the skew correction to its dive, as `G29` does.
+- After a probing move the position is read back with no tool axis map, as the move was made.
 
-### 5.2 A G30 dive makes its whole skew correction, and probing reads its position back with no tool
+### 5.3 The move back on resume
 
-`G30` and `G29` don't use tool axis mapping (as RRF), but they do apply skew and mesh compensation. In RRF skew correction is only applied for `G29` because of a bug in `G30` which doesn't apply skew correction for the move.
+- It is measured and skewed through the selected tool's axis map, so the `M204` limits apply to the axes that move.
 
-Also fixes a bug in RRF that incorrectly removes the correction from the tools mapped axes after probing moves even though the mapped axes weren't used.
+### 5.4 Temperature waits in a macro
 
-### 5.3 The move back on resume is measured and skewed through the selected tool's map
+- `M116`, `M190` and `M191` keep a movement lock held by the code that ran the macro, as `M109` does.
 
-When a print is paused, if the tool position is moved then the restore move will use the axis mapping to apply `M204` acceleration limits correctly (regression case `m24-resume-with-tool-axis-mapping`: with the tool's `X3` mapping the move is held to U's 5000 mm/s² axis limit, and without it to the 100 mm/s² `M204` limit).
+### 5.5 M108
 
-### 5.4 A temperature wait inside a macro keeps the movement lock of the code that ran the macro
-
-`M116`, `M190` and `M191` release only the movement lock they took themselves. A lock held by an outer code on the same channel, such as a `T` code running `tpost.g` or a `G28` running a homing file, is kept while the heaters come up, so no other channel can move in the middle of the tool change or homing. RepRapFirmware releases it for these three codes but keeps it for `M109` and `G4`; `M109` was changed to keep it because releasing it made homing fail when `M109` was used in a homing file, and DSF applies the same rule to all of them.
-
-### 5.5 M108 ends a temperature wait from the input that is waiting
-
-`M108` ends a temperature wait from any input, including the one the wait was sent from, because DSF runs it on an idle channel as it does `M112`. In RepRapFirmware only the USB and serial inputs see `M108` while the input is blocked; from Duet Web Control's console, `M108` waits behind the `M109` or `M190` it was meant to end.
-
----
+- It ends a temperature wait from any input, including the one that is waiting.
 
 ## 6. G-code and expressions
 
-## 6.1 Error handling
+### 6.1 Error handling
 
-Added minimum array limits to the following gcodes:
-- `M92` - steps per mm
-- `M201`/`M201.1` - acceleration
-- `M203` - max feedrate
-- `M205`/`M566` - jerk
-- `M350` - microstepping
-- `M572` - pressure advance
-- `M906`/`M913`/`M917` - motor current & standstill current
-A `GCodeException` is thrown if the value is below the minimum (typically `0.0f`)
+- `M140` and `M141` change nothing when `H` is refused. RepRapFirmware goes on to apply `S` and `R`.
+- `M140`, `M141`, `M190` and `M191` report every heater of the slot, where RepRapFirmware reports the last.
+- `M557` refuses fewer than 2 points along an axis and a third axis range.
+- A refused `M557` leaves the grid as it was. RepRapFirmware keeps a grid its check rejected.
+- `M915` tells every board when one refuses, as `M906` does. RepRapFirmware stops at the first.
+- `M121` with no `M120` of its own file is an error and pops nothing.
+- A stack overflow is the error reply of the code that caused it. RepRapFirmware reports a message and replies OK.
+- `M558` and `G30` carry on when a probe's board answers with a warning, and pass it on.
+- `G30 S-2` and `G30 S-3` change nothing when the probe does not trigger.
+- `M569.1` always waits for standstill.
+- `M569.4` sends each driver its own number, where RepRapFirmware sends the first driver's to every board.
+- `M584` reports a step mode reset that a board does not answer as an error.
+- An output that its board refuses is not recorded, as a refused heater or fan is not.
+- A fan is created when its board answers with a warning, as a heater is.
+- `M950 H Q` is limited to 1000 Hz on an existing heater too.
+- A new sensor is `notReady` until it has been read, and times out after 2 s. RepRapFirmware's times out at once.
+- A request from an expansion board for a firmware block past the end of the file gets one answer, `ErrBadOffset`.
 
-A sensor `M308` creates is `notReady` until its first reading, and times out if none arrives within 2 s of its creation. RepRapFirmware starts a new sensor's reading clock at zero (`TemperatureSensor::whenLastRead`), so the first poll before the board has reported times it out at once.
+### 6.2 Replies
 
-`M140` and `M141` stop at a refused `H` (an invalid heater number, a heater a tool uses, or a heater of the other kind of slot) and leave the slot and its heaters as they were. RepRapFirmware reports the refusal but goes on to apply `S` and `R` to the slot's existing heaters, and a heater switched on successfully there replaces the error with success.
+- The wording of reports and errors is not always RepRapFirmware's. Some is standardised, and some says more, such as the range a parameter takes.
+- `M115` and `M115 B0` report DSF and DuetCANMaster. `M122` and `M122 B0` include a `Duet Control Server` section.
 
-A refused `M557` leaves `move.compensation.probeGrid` as it was. RepRapFirmware does the same for refusals it finds while reading the parameters, but a definition its grid check rejects (spacing too small, range too small, too many points) is written into the grid before the check, so the refused values are reported and the previous grid is gone until the next good `M557`. `M557` also refuses a point count `P` below 2, where RepRapFirmware divides the range by `P - 1` and accepts `P1` with an infinite spacing, and a third axis range, where RepRapFirmware's two-axis check is off by one, so the third range replaces the second axis' range under the second axis' letter.
+### 6.3 Meta G-code
 
-When `M140`, `M141`, `M190` or `M191` switches on several heaters of a slot, every heater's reply is reported, with the worst result. RepRapFirmware reports only the last heater's result, so a heater that failed to switch on is not reported if a later one succeeds.
+- A variable cannot hold an object model reference, such as `var a = move.axes`.
+- A collection of objects, such as `move.axes`, has no value. A collection of scalars has.
+- An expression that cannot be evaluated is an error, not null.
 
-When `M915` names drivers on several boards and one board refuses, the remaining boards are still sent the settings, and every board's reply is reported with the worst result. RepRapFirmware's `GetSetRemoteDriverStallParameters` stops at the first board that does not reply OK, leaving the later boards untold, whereas `SetRemoteDriverValues` and `SetRemoteDriverStates`, which `M92`, `M350`, `M572`, `M906`, `M913`, `M917` and `M17`/`M18` use, tell every board. DSF does what those codes do.
+## 7. Input shaping
 
-`M121` pops only an `M120` level of its own file. With none to pop it is an error, `Pop(): stack underflow on <channel>`, and nothing is popped. RepRapFirmware reports the underflow as a message and replies OK, and an `M121` in a macro with no `M120` of its own pops the macro's level instead, which ends the macro but lets the lines it had already read run on. DSF never lets an `M121` reach a level its own file did not push.
-
-A code that would push an eleventh level on its channel's stack, `M120` or any code that starts a macro, fails with `Push(): stack overflow on <channel>` as its own error reply. Every file on the channel is aborted, as in RepRapFirmware, which reports the overflow as a separate message and replies OK to the code.
-
-`M558` keeps a probe whose board created the input monitor with a warning, and passes the warning on. RepRapFirmware's `RemoteZProbe::Create` keeps the handle for a warning, but `EndstopsManager::HandleM558` then deletes the new probe for any result other than success, so a board's warning leaves no probe.
-
-`G30` goes on probing when the probe's board accepts the request to watch it with a warning, and passes the warning on. RepRapFirmware's `RemoteZProbe::SetProbing` fails on any result other than success, so a board's warning fails the `G30` with "failed to enable probe", where elsewhere a warning counts as done.
-
-`G30 S-3` whose probe never triggers leaves `sensors.probes[].triggerHeight` as it was, as a failed plain `G30` leaves the Z datum. RepRapFirmware still calls `SetTriggerHeight(GetLastStoppedHeight())`, writing the height at which an earlier probe stopped.
-
-`G30 S-2` whose probe never triggers leaves the selected tool's Z offset and `tools[].offsetsProbed` as they were. RepRapFirmware still calls `SetOffset(Z_AXIS, -g30zHeightError, true)`, writing an offset of 0 and marking it probed.
-
-An expansion board that asks for a firmware block past the end of the file gets one `ErrBadOffset` response, and the bad offset is reported. RepRapFirmware's `HandleFirmwareBlockRequest` goes on to answer the same request with `ErrNoFile` and to report a missing file, because the request is still unserved when it reaches that test. The file exists, so DSF stops at the first answer. The update fails in both.
-
-`M569.4` with several drivers sends each driver its own driver number. RepRapFirmware loops over the drivers but builds every message from `GCodeBuffer::GetDriverId`, which reads the first, so every board after the first is sent the first driver's number and a driver of that number on the wrong board is put into torque mode.
-
-`M569.1` waits for standstill before changing any setting. RepRapFirmware waits only when it sees `C`, `D`, `E`, `H`, `I`, `R`, `S`, `T` or `V`, which leaves out the later `A`, `B`, `Q` and `Y`, although they change what the closed loop controller does in the same way.
-
-A device `M950` creates exists only once its board has taken the port. RepRapFirmware's `GpOutputPort::Configure` records the board before it sends, so an output whose pin is refused (`Pin 1.out6 is not free`) is still reported in `state.gpOut[]`; here the slot stays empty, as it does for a refused heater, fan or LED strip in both.
-
-A fan whose board answers `M950 F` with a warning is created. RepRapFirmware keeps a new remote fan only when the board answers with plain success, where a heater, an output and an LED strip are kept on a warning too; DSF follows the heater and the others.
-
-`M950 H Q` with no `C` is clamped to 1000 Hz, `MaxHeaterPwmFrequency`, as it is when the heater is created. RepRapFirmware clamps only the frequency a heater is created with, so a frequency changed afterwards could exceed the limit that protects the heater's MOSFET.
-
-`M584` reports a phase stepping drive's step-mode reset that a board does not answer as an error, after applying the rest of the code. RepRapFirmware discards the result of that reset, so the timeout text comes back at OK severity, where every other CAN timeout it reports, including the steps per mm `M584` sends next, is an error.
-
-## 6.2 G-code responses
-
-There are some improvements to warning and error messages for some gcodes, for example gcodes which take an int enum parameter now report the valid range of values in the error message instead of just reporting too high / low.
-
-`M115` and `M115 B0` describe DSF and DuetCANMaster.
-
-## 6.2 Meta G-code
-
-**A variable cannot hold an object model reference.** `var a = move.axes` and `global a = move` are
-refused, where RepRapFirmware stores pointers into its own model and lets `var.a[0].letter` work.
-Holding such a reference here means holding a model object that the update task mutates and that a
-reconfiguration — `M584`, or the invalidation a lost link performs — can detach from the model
-entirely, so the variable would read stale values rather than failing. A `global` could not hold one
-at all, because globals are serialised for clients. What fits instead is a *symbolic* reference: store
-the path and resolve it on each read, so it serialises, holds no lock across time, and cannot go
-stale. That is not built yet, and it would diverge from RRF only where RRF is arguably wrong.
-
-**An expression that cannot be produced is an error, not a null.** `cannot evaluate '<expression>'`
-rather than a value that reads as a valid answer, which is how two whole branches of the object model
-being unresolvable stayed invisible.
-
-**A collection of model objects is refused where a collection of scalars is not.**
-`move.axes[0].workplaceOffsets` resolves as an array, copied under the read lock;
-`move.axes` says so rather than handing out live elements the update task mutates.
-
----
-
-## 7. What the SBC motion engine does not do
-
-For a given set of move parameters the SBC-side DDA ring produces the same output RepRapFirmware's
-does — `DDA::InitFromParams` onward is upstream verbatim. Three things it deliberately never will:
-
-| Absent | Why |
-|---|---|
-| IOBits | The expansion boards own their own outputs, so there is nothing for a move to carry |
-| Babystepping into a queued move | Deliberate, see §5 |
-| Input shaping on the SBC | The boards shape. The tracked position therefore leads the real one by up to the configured shaping time during acceleration; endpoints still agree exactly |
-
----
+- The expansion boards shape the moves, so the reported position leads the real one while accelerating.
 
 ## 8. A pause stops the machine sooner than RepRapFirmware's does
 
-RepRapFirmware's pause does not *create* a stopping point — it looks for one that already exists.
-`DDARing::PauseMoves` walks the queued moves for the first junction whose end speed is at or below
-the instantaneous speed change of every drive, drops everything after it, and changes no move's
-profile. When there is no such junction it reports as much and the whole queue runs.
+- `M25`, and a pause caused by an event, decelerates to a stop at the earliest segment boundary it can and drops the rest of the queue. RepRapFirmware stops only where the queue already slows down enough, so it usually runs out everything queued.
+- Segments already sent to the boards are not recalled.
+- A pause from inside the job file (`M25`, `M226`, `M600` and `M601`) runs out the queue, as in RepRapFirmware.
 
-During a print at speed there usually is no such junction, because look-ahead has spent the print
-raising every junction speed above jerk — that is what look-ahead is for. So a RepRapFirmware pause
-typically lets the head travel to the end of everything already planned before it stops.
-
-**`M25` here plans its own stop instead.** The motion engine takes the earliest boundary far enough
-away to decelerate to rest by, forces the end speed there to zero, re-plans backwards to the last
-move it has already committed, and drops the rest. Moves are committed 50 ms ahead, so what a pause
-cannot recall is bounded by that plus one deceleration ramp — rather than by however long the rest of
-the queue takes.
-
-This is a real behavioural difference and not a refinement of the same behaviour: the machine comes
-to rest in a different place, and sooner. Everything after the stop is unchanged — the same
-`pause.g`, the same restore point, the same `PrintPausedReason`, and resuming rewinds the job file
-and re-reads it exactly as before.
-
-The boundaries it has to choose between are the *segments* a line is built from — a line becomes
-several moves wherever the height map or the geometry needs it — so a pause may stop part-way through
-a line, and the resume then asks that line for only the part that is left. RepRapFirmware's
-`moveFractionToSkip` is the same accounting for the same reason. It is also what keeps the stop
-short, because the boundaries are densest along exactly the long fast moves where the deceleration
-ramp is longest.
-
-Three things the deviation deliberately leaves alone:
-
-- **A committed move is never recalled.** Its segments have been generated and sent to the boards.
-  The stop begins at the first move after them, and the speed that move starts at is fixed by them.
-- **A boundary has to be restartable, not merely reachable.** An endstop move may stop short, so
-  where it would resume from is not known until it has run; the stop never chooses a boundary like
-  that, however much room there is to stop in. RepRapFirmware's own exclusions carry over as the
-  codes they belong to are implemented.
-- **It is not the emergency path.** RepRapFirmware's `LowPowerOrStallPause` cancels stepping
-  mid-move and accepts the position loss, which is right for a power failure and wrong here. The
-  stop stays under the motion planner throughout.
-
-A **synchronous** pause — `M25` from inside the job file, and `M226`, `M600` and `M601`, which may
-only appear there — is unaffected. The job file has already reached the pause point, so everything
-queued ahead of it is what has to run and there is nothing to stop early; those wait for standstill
-exactly as RepRapFirmware does.
-
-The pauses nobody typed take the same stop: the default action of a heater fault, a filament error or
-a driver error. *Which* events pause is unchanged — that is still `Event::GetDefaultPauseReason`'s
-decision, and an event RepRapFirmware does not pause for still does not pause here. Only the manner
-of stopping differs.
-
-[Pausing and resuming a job](pause-and-resume.md) has the mechanics: how the stop is requested and
-answered, what is recorded where the machine comes to rest, and how the resume asks the interrupted
-line for only the part of it that is left.
-
----
-
-## 9. Job macro sequences do not overlap
-
-RepRapFirmware gives every G-code channel its own state machine, so its job macros can overlap: an
-`M0` sent from one console runs `stop.g` on that channel while an `M24` from another starts
-`start.g` on the file channel. DSF's job is one actor with one macro sequence in flight at a time,
-so a command that would start a job macro while one is running
-waits its turn: `M24` or a second `M0` arriving while an operator stop runs `stop.g` from idle is
-held and performed when the macro ends, so the macros run one after the other and every caller is
-answered. RepRapFirmware would run them concurrently on their two channels. This is the one job
-behaviour the single-actor design forces; `M23`/`M32` chaining from inside a job file follows
-RepRapFirmware exactly (`M23` stores the file and the run carries on, as `fileToPrint` does; `M32`
-swaps the file in place and runs `start.g` only, with no `stop.g` and no teardown).
-
----
-
-## 10. What is deliberately *not* different
-
-The divergences above work inside constraints that were treated as fixed, and they are worth stating
-because they explain why several of the entries are shaped the way they are:
-
-- **Reporting strings are preserved exactly.** DWC, PanelDue and a decade of macros parse them, so a
-  code with no parameters reports in RepRapFirmware's format down to the wording of the punctuation —
-  including the segmentation clause on `M669` and the SCARA report, both of which were added back
-  when they were found missing.
-- **The event macro contract is preserved exactly.** The filename convention, `param.D/B/P/S`, and
-  the rule that a macro replaces the default action entirely rather than running alongside it.
-- **Wire values are preserved exactly.** `EventType` 0-10, the CAN message layouts, and
-  `CanMessageRevertPosition.finalStepCounts` meaning the same quantity on both sides — which is why
-  moving the endstop correction out of native and into DCS was a layering change with no behavioural
-  one.
-- **Error wording follows RepRapFirmware** where RRF has a message for the same situation, down to
-  `Probe was not triggered during probing move`.
-
----
+[Pausing and resuming a job](pause-and-resume.md) describes the mechanics.
 
 ## Further reading
 
-- [Endstops](endstops.md) — the endstop path as it stands, in the order it runs
+- [Endstops](endstops.md): the endstop path, in the order it runs

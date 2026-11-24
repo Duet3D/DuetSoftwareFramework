@@ -529,7 +529,7 @@ public class M915Tests : BenchFixture
     /// <remarks>
     /// RepRapFirmware skips a number at or past MaxExtruders and resolves any other to that extruder's
     /// driver, which defaults to a main board driver. DSF refuses an array element out of range, which
-    /// is a deliberate parsing difference (rrf-differences.md, Error handling)
+    /// is a deliberate difference (rrf-differences.md section 3.1)
     /// </remarks>
     [Test]
     public async Task M915RefusesAnExtruderThatDoesNotExist()
