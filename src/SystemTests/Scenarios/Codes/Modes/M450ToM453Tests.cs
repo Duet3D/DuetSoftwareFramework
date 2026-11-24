@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using DuetControlServer.Heat;
@@ -6,7 +5,6 @@ using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Tools.ToolSetup;
 
 namespace SystemTests.Scenarios.Codes.Modes;
 
@@ -15,29 +13,6 @@ namespace SystemTests.Scenarios.Codes.Modes;
 [GCode("M450", "M451", "M452", "M453", "M3", "M5")]
 public class M450ToM453Tests : BenchFixture
 {
-    /// <summary>
-    /// Poll an object model field until it reads the expected number, failing with the last reading
-    /// on timeout. Used for values that settle after the code's reply
-    /// </summary>
-    private static async Task WaitForNumberAsync(DcsTestHost host,
-                                                 Func<DuetControlServer.Model.ObjectModel, double?> read,
-                                                 double expected, string what, int timeoutMs = 10_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        double? value;
-        do
-        {
-            value = await host.ReadModelAsync(read);
-            if (value is double reading && Math.Abs(reading - expected) < 1e-3)
-            {
-                return;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        Assert.Fail($"{what}: reads '{value}', expected {expected}");
-    }
-
     /// <summary>
     /// M451 and M453 switch state.machineMode between FFF and CNC, and M450 reports the mode in
     /// RepRapFirmware's format
@@ -92,21 +67,21 @@ public class M450ToM453Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.Laser), "M452 sets state.machineMode to Laser (RRF GCodes2.cpp M452 case)");
-            Assert.That(await EvaluateNumberAsync(host, model => model.State.LaserPwm), Is.EqualTo(0).Within(1e-3), "laser mode starts with the beam off (RRF GCodes::GetLaserPwm)");
+            Assert.That(await host.ReadNumberAsync(model => model.State.LaserPwm), Is.EqualTo(0).Within(1e-3), "laser mode starts with the beam off (RRF GCodes::GetLaserPwm)");
         });
 
         await host.ExecuteCodeAsync("M3 S255");
-        Assert.That(await EvaluateNumberAsync(host, model => model.State.LaserPwm), Is.EqualTo(0).Within(1e-3),
+        Assert.That(await host.ReadNumberAsync(model => model.State.LaserPwm), Is.EqualTo(0).Within(1e-3),
                     "M3 S alone does not fire the beam; the power applies to moves (RRF M3 laser branch, DoStraightMove)");
 
         await host.ExecuteCodeAsync("G91");
         await host.ExecuteCodeAsync("G1 X1 F6000");
-        await WaitForNumberAsync(host, model => model.State.LaserPwm, 1.0,
-                                 "the move carries M3's sticky power, 255 of 255 (RRF DoStraightMove, GCodes::GetLaserPwm)");
+        Assert.That(await host.SettledNumberAsync(model => model.State.LaserPwm, 1), Is.EqualTo(1).Within(1e-3),
+                    "the move carries M3's sticky power, 255 of 255 (RRF DoStraightMove, GCodes::GetLaserPwm)");
 
         await host.ExecuteCodeAsync("M5");
         await host.ExecuteCodeAsync("G1 X1 F6000");
-        await WaitForNumberAsync(host, model => model.State.LaserPwm, 0.0,
-                                 "M5 clears the laser power for later moves (RRF M5 laser branch)");
+        Assert.That(await host.SettledNumberAsync(model => model.State.LaserPwm, 0), Is.EqualTo(0).Within(1e-3),
+                    "M5 clears the laser power for later moves (RRF M5 laser branch)");
     }
 }

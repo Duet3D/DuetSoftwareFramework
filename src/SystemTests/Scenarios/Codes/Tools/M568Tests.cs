@@ -23,26 +23,6 @@ namespace SystemTests.Scenarios.Codes.Tools;
 [GCode("M568")]
 public class M568Tests : BenchFixture
 {
-    /// <summary>Poll an object model field until it reaches the expected value</summary>
-    private static async Task WaitForValueAsync<T>(DcsTestHost host,
-                                                   Func<DuetControlServer.Model.ObjectModel, T> read,
-                                                   T expected, string what, int timeoutMs = 10_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        T value;
-        do
-        {
-            value = await host.ReadModelAsync(read);
-            if (Equals(value, expected))
-            {
-                return;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        Assert.Fail($"{what}: reads '{value}', expected '{expected}'");
-    }
-
     /// <summary>
     /// M568 sets the tool's active and standby temperatures, pushes them to the mapped heater's
     /// setpoints, and A moves the heater between off, standby and active
@@ -71,17 +51,17 @@ public class M568Tests : BenchFixture
 
         await host.ExecuteCodeAsync("M568 P0 A2");
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 0, HeaterMode.Heating, currentTemperature: 30.0f);
-        await WaitForValueAsync(host, model => model.Heat.Heaters[0]!.State, HeaterState.Active,
-                               "M568 A2 puts the heater in active (RRF Tool::HeatersToActiveOrStandby, Heater::GetStatus)");
+        Assert.That(await host.SettledValueAsync(model => model.Heat.Heaters[0]!.State, HeaterState.Active), Is.EqualTo(HeaterState.Active),
+                    "M568 A2 puts the heater in active (RRF Tool::HeatersToActiveOrStandby, Heater::GetStatus)");
 
         await host.ExecuteCodeAsync("M568 P0 A1");
-        await WaitForValueAsync(host, model => model.Heat.Heaters[0]!.State, HeaterState.Standby,
-                               "M568 A1 puts the heater in standby (RRF Tool::HeatersToActiveOrStandby, Heater::GetStatus)");
+        Assert.That(await host.SettledValueAsync(model => model.Heat.Heaters[0]!.State, HeaterState.Standby), Is.EqualTo(HeaterState.Standby),
+                    "M568 A1 puts the heater in standby (RRF Tool::HeatersToActiveOrStandby, Heater::GetStatus)");
 
         await host.ExecuteCodeAsync("M568 P0 A0");
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 0, HeaterMode.Off, currentTemperature: 30.0f);
-        await WaitForValueAsync(host, model => model.Heat.Heaters[0]!.State, HeaterState.Off,
-                               "M568 A0 switches the heater off (RRF Tool::HeatersToOff, Heater::GetStatus)");
+        Assert.That(await host.SettledValueAsync(model => model.Heat.Heaters[0]!.State, HeaterState.Off), Is.EqualTo(HeaterState.Off),
+                    "M568 A0 switches the heater off (RRF Tool::HeatersToOff, Heater::GetStatus)");
 
         string reply = (await host.ExecuteCodeAsync("M568 P0")).Trim();
         Assert.Multiple(() =>
@@ -490,7 +470,7 @@ public class M568Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(HeaterToolWithTemperatures);
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 0, HeaterMode.Fault, currentTemperature: 25.0f);
-        await bench.Host.WaitForModelAsync(model => model.Heat.Heaters[0]!.State, state => state == HeaterState.Fault, "heater 0 reported in fault");
+        await bench.Host.WaitForModelAsync(model => model.Heat.Heaters[0]!.State, HeaterState.Fault, "heater 0's state");
 
         string reply = await bench.Host.ExecuteCodeAsync("M568 P0 A2");
         Assert.Multiple(async () =>

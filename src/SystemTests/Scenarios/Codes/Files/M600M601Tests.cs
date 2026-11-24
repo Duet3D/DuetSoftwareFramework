@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Files.FileSetup;
 
 namespace SystemTests.Scenarios.Codes.Files;
 
@@ -54,7 +53,7 @@ public class M600M601Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
-        Assert.That(await NumberAsync(bench.Host, model => model.Job.FilePosition), Is.GreaterThan(0),
+        Assert.That(await bench.Host.ReadNumberAsync(model => model.Job.FilePosition), Is.GreaterThan(0),
                     "M600 paused with the file position of the pause point (PrintMonitor.cpp filePosition)");
 
         await bench.Host.ExecuteCodeAsync("M24");
@@ -64,7 +63,7 @@ public class M600M601Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
-        Assert.That(await SettledValueAsync(bench.Host, model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
+        Assert.That(await bench.Host.SettledValueAsync(model => model.Job.LastFileName, "0:/gcodes/job.gcode"), Is.EqualTo("0:/gcodes/job.gcode"),
                     "the job ran to its end through both pauses (PrintMonitor.cpp lastFileName)");
     }
 }

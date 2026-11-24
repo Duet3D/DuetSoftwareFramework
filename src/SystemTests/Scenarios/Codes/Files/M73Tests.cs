@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
-using static SystemTests.Scenarios.Codes.Files.FileSetup;
 
 namespace SystemTests.Scenarios.Codes.Files;
 
@@ -40,7 +39,7 @@ public class M73Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
         await bench.Host.WaitForStatusAsync(MachineStatus.Processing);
         await bench.Host.ExecuteCodeAsync("M73 R10");
-        double whilePrinting = await SettledNumberAsync(bench.Host, model => model.Job.TimesLeft.Slicer);
+        double whilePrinting = await bench.Host.SettledNumberAsync(model => model.Job.TimesLeft.Slicer);
 
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);

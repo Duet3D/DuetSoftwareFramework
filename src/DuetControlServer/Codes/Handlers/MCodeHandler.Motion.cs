@@ -16,6 +16,7 @@ using DuetControlServer.Link;
 using DuetControlServer.Motion.Kinematics;
 using DuetControlServer.Motion;
 using DuetControlServer.Model;
+using DuetControlServer.Ports;
 
 namespace DuetControlServer.Codes.Handlers;
 
@@ -1168,9 +1169,9 @@ internal partial class MCodeHandler
     /// <remarks>
     /// The drivers may be named directly with P or by the axes they belong to, and either way they
     /// have to be grouped by the board that carries them before the message can go out. Every board
-    /// is told whether or not an earlier one refused, as RepRapFirmware's loop over the boards does:
-    /// the drivers are independent of each other, and stopping part way would leave the rest watching
-    /// for nothing with no line saying so. What each board said is collected and reported together
+    /// is told whether or not an earlier one refused, as RepRapFirmware's SetRemoteDriverValues does for
+    /// M350 and M906; its M915 loop alone stops at the first refusal (rrf-differences.md, Error handling).
+    /// What each board said is collected and reported together
     /// </remarks>
     private async ValueTask<Message> HandleStallDetectionAsync(Commands.Code code, CancellationToken cancellationToken)
     {
@@ -1214,6 +1215,9 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "No drivers specified");
         }
 
+        // Read before anything is sent, so that a value that is refused changes nothing
+        code.TryGetEnum('R', out StallAction? action);
+
         List<Message> replies = [];
         foreach (IGrouping<int, DriverId> board in drivers.GroupBy(driver => driver.Board))
         {
@@ -1232,7 +1236,7 @@ internal partial class MCodeHandler
             replies.Add(await linkInterface.SendCanRequestAsync((byte)board.Key, in message, cancellationToken));
         }
 
-        await RecordStallDetectionAsync(drivers, code, cancellationToken);
+        await RecordStallDetectionAsync(drivers, code, action, cancellationToken);
         return replies.ToMessage();
     }
 
@@ -1241,8 +1245,10 @@ internal partial class MCodeHandler
     /// </summary>
     /// <param name="drivers">Drivers the code addressed</param>
     /// <param name="code">The code</param>
+    /// <param name="action">The code's R parameter, or null if it has none</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private async ValueTask RecordStallDetectionAsync(IEnumerable<DriverId> drivers, Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask RecordStallDetectionAsync(IEnumerable<DriverId> drivers, Commands.Code code, StallAction? action,
+                                                      CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1266,9 +1272,9 @@ internal partial class MCodeHandler
                 {
                     stall.CoolStep = coolStep;
                 }
-                if (code.TryGetInt('R', out int raiseEvent))
+                if (action is not null)
                 {
-                    stall.RaiseEvent = raiseEvent != 0;
+                    stall.RaiseEvent = action != StallAction.None;
                 }
             }
         }
@@ -2484,6 +2490,13 @@ internal partial class MCodeHandler
                 }
             }
 
+            if (code.HasParameter('E'))
+            {
+                return (configured.Count != 0)
+                    ? new Message(MessageType.Error, "Cannot configure axis and extruder endstops in the same command")
+                    : ConfigureExtruderEndstop(code);
+            }
+
             if (configured.Count == 0)
             {
                 StringBuilder builder = new("Endstop configuration:");
@@ -2494,6 +2507,13 @@ internal partial class MCodeHandler
                     builder.Append(endstop is null
                                    ? "none"
                                    : $"{(endstop.HighEnd ? "high end" : "low end")} {DescribeEndstop(endstop)}");
+                }
+                for (int extruder = 0; extruder < move.Extruders.Count; extruder++)
+                {
+                    if (move.Extruders[extruder].EndstopInput is int input)
+                    {
+                        builder.Append(CultureInfo.InvariantCulture, $"\nE{extruder}: input pin {input}");
+                    }
                 }
                 report = builder.ToString();
             }
@@ -2715,6 +2735,37 @@ internal partial class MCodeHandler
         EndstopType.MotorStallIndividual => "motor stall (individual drivers)",
         _ => "unknown"
     };
+
+    /// <summary>
+    /// M574 E: bind a general purpose input to an extruder as its filament endstop, or report the binding
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// The caller must hold the object model write lock. P-1 reverts to motor stall detection, as in
+    /// RepRapFirmware's EndstopsManager::HandleM574
+    /// </remarks>
+    private Message ConfigureExtruderEndstop(Commands.Code code)
+    {
+        int extruder = code.GetInt('E', min: 0, max: model.Move.Extruders.Count - 1);
+        Extruder drive = model.Move.Extruders[extruder];
+
+        if (!code.TryGetInt('P', out int input, min: -1, max: GpioManager.MaxGpInPorts - 1))
+        {
+            return new Message(MessageType.Success, drive.EndstopInput is int bound
+                                                    ? $"Extruder {extruder} endstop uses input pin {bound}"
+                                                    : $"Extruder {extruder} endstop uses motor stall detection");
+        }
+
+        if (input >= 0 && (input >= model.Sensors.GpIn.Count || model.Sensors.GpIn[input] is null))
+        {
+            return new Message(MessageType.Error, $"Input pin {input} is not configured");
+        }
+
+        // TODO stop a G1 H1/H4 move of this extruder alone on the input, as EndstopsManager::EnableExtruderEndstops does, once extruder endstops are supported
+        drive.EndstopInput = (input < 0) ? null : input;
+        return new Message();
+    }
 
     /// <summary>
     /// Find an axis' endstop, adding it if the axis has none yet

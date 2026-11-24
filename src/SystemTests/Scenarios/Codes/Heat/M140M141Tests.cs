@@ -395,7 +395,7 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync($"{code} H3");
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 3, HeaterMode.Fault, currentTemperature: 25.0f);
-        await bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Heat.Heaters[3]?.State == HeaterState.Fault, what: "heater 3 faulting");
+        await bench.Host.WaitForModelAsync(model => model.Heat.Heaters[3]?.State, HeaterState.Fault, "heater 3's state");
 
         string reply = await bench.Host.ExecuteCodeAsync($"{code} S50");
         Heater heater = await ReadHeaterAsync(bench, 3);
@@ -460,7 +460,7 @@ public class M140M141Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M141 P1 H3:7");
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 3, HeaterMode.Off, currentTemperature: 21.5f);
-        await bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Heat.Heaters[3]?.Current is > 21.0f, what: "heater 3's temperature");
+        await bench.Host.WaitForNumberAsync(model => model.Heat.Heaters[3]?.Current, 21.5, "heater 3's temperature");
         Assert.That((await bench.Host.ExecuteCodeAsync("M141 P1")).Trim(), Is.EqualTo("Chamber heaters for slot 1: 3 (21.5°C) 7 (-273.1°C)"),
                     "the slot's heaters");
     }

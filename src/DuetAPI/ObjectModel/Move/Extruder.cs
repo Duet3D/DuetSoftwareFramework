@@ -55,6 +55,21 @@ public partial class Extruder : ModelObject, IStaticModelObject, IPhaseSteppingD
     private DriverId? _driver;
 
     /// <summary>
+    /// Number of the general purpose input (<c>sensors.gpIn[]</c>) bound by M574 E as this extruder's
+    /// filament endstop, or null if its homing moves stop on motor stall detection
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware keeps the binding outside its object model and reports it only in the M574
+    /// reply. A DSF addition, per rrf-differences.md section 3
+    /// </remarks>
+    public int? EndstopInput
+    {
+        get => _endstopInput;
+        set => SetPropertyValue(ref _endstopInput, value);
+    }
+    private int? _endstopInput;
+
+    /// <summary>
     /// Motor jerk during the current print only (in mm/s)
     /// </summary>
     public float PrintingJerk

@@ -57,7 +57,7 @@ public class M23Tests : BenchFixture
                         "M23 sets job.file.numLayers (PrintMonitor.cpp numLayers)");
             Assert.That(jobFile!.GeneratedBy, Is.EqualTo("TestSlicer 1.2"),
                         "M23 sets job.file.generatedBy (PrintMonitor.cpp generatedBy)");
-            Assert.That(await NumberAsync(bench.Host, model => model.Job.File.PrintTime), Is.EqualTo(3600),
+            Assert.That(await bench.Host.ReadNumberAsync(model => model.Job.File.PrintTime), Is.EqualTo(3600),
                         "M23 sets job.file.printTime in seconds (PrintMonitor.cpp printTime)");
             Assert.That(jobFile!.Filament[0], Is.EqualTo(123.4).Within(0.05),
                         "M23 sets job.file.filament[0] in mm (PrintMonitor.cpp filamentNeeded)");

@@ -599,9 +599,7 @@ public class M106Tests : BenchFixture
 
 
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.Model.Fans.Count > 0 && bench.Host.Model.Fans[0] is { RequestedValue: > 0.74f and < 0.76f },
-            what: "the job's M106 S0.75 reaching fans[0]");
+        await bench.Host.WaitForNumberAsync(model => model.Fans.FirstOrDefault()?.RequestedValue, 0.75, "fans[0].requestedValue", tolerance: 0.01);
 
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);

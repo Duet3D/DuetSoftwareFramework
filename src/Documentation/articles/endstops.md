@@ -747,6 +747,4 @@ that was never tripped and looks exactly like a stop that was thrown away.
 - **Nothing sets an axis position from a stall or probe endstop's *own* end of travel.** RRF's
   `EndstopHitDetails::setAxisLow`/`setAxisHigh` are dead in the firmware too; the live mechanism -
   the kinematics' endstop position - is ported.
-- **Extruder endstops are not supported.** `G1 H1` refuses a move that mentions both an axis and an
-  extruder, as RepRapFirmware does, because the extruder speeds a stall endstop is validated against
-  are computed from the move's total extrusion.
+- **Extruder endstops are not supported.** `M574 E` records the general purpose input it binds to an extruder in `move.extruders[].endstopInput` and reports it, but no move stops on that input yet. `G1 H1` refuses a move that mentions both an axis and an extruder, as RepRapFirmware does, because the extruder speeds a stall endstop is validated against are computed from the move's total extrusion.

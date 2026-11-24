@@ -36,9 +36,7 @@ public class M119Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(XEndstopLine);
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, RemoteEndstops.HandleFor(0), active: true);
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.Model.Sensors.Endstops.Count > 0 && bench.Host.Model.Sensors.Endstops[0]?.Triggered == true,
-            what: "the input change reaching sensors.endstops[0].triggered");
+        await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, true, "sensors.endstops[0].triggered");
 
         string triggered = await bench.Host.ExecuteCodeAsync("M119");
         Assert.That(triggered.Trim(),
@@ -46,9 +44,7 @@ public class M119Tests : BenchFixture
                     "M119 matches sensors.endstops[].triggered (RRF EndstopsManager::GetM119report)");
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, RemoteEndstops.HandleFor(0), active: false);
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.Model.Sensors.Endstops[0]?.Triggered == false,
-            what: "the release reaching sensors.endstops[0].triggered");
+        await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, false, "sensors.endstops[0].triggered");
 
         string released = await bench.Host.ExecuteCodeAsync("M119");
         Assert.That(released.Trim(),
@@ -71,9 +67,7 @@ public class M119Tests : BenchFixture
         await using Bench bench = await StartBenchAsync($"M574 X2 S1 P\"{Expansion.GpioIn(Machines.DriverBoard, 0)}\"");
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, RemoteEndstops.HandleFor(0), active: true);
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.Model.Sensors.Endstops.Count > 0 && bench.Host.Model.Sensors.Endstops[0]?.Triggered == true,
-            what: "the input change reaching sensors.endstops[0].triggered");
+        await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, true, "sensors.endstops[0].triggered");
 
         string report = await bench.Host.ExecuteCodeAsync("M119");
         Assert.That(report, Does.Contain("X: at max stop"),

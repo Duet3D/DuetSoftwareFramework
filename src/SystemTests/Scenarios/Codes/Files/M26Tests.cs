@@ -42,7 +42,7 @@ public class M26Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
 
-        Assert.That(await NumberAsync(bench.Host, model => model.Job.FilePosition), Is.GreaterThanOrEqualTo(header.Length),
+        Assert.That(await bench.Host.ReadNumberAsync(model => model.Job.FilePosition), Is.GreaterThanOrEqualTo(header.Length),
                     "M26 S starts the job at that offset, so job.filePosition never precedes it (GCodes2.cpp case 26)");
 
         await bench.Host.ExecuteCodeAsync("M0");

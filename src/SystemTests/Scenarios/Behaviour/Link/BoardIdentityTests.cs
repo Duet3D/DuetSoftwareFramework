@@ -232,18 +232,14 @@ public class BoardIdentityTests : BenchFixture
         bench.CanMaster.PauseArming();
         try
         {
-            await bench.Host.WaitForModelAsync(model => model.FindBoard(0)?.State,
-                                               state => state == BoardState.TimedOut,
-                                               "the controller stopped answering");
+            await bench.Host.WaitForModelAsync(model => model.FindBoard(0)?.State, BoardState.TimedOut, "state of the controller");
         }
         finally
         {
             bench.CanMaster.ResumeArming();
         }
 
-        await bench.Host.WaitForModelAsync(model => model.FindBoard(0)?.State,
-                                           state => state == BoardState.Running,
-                                           "the controller started answering again");
+        await bench.Host.WaitForModelAsync(model => model.FindBoard(0)?.State, BoardState.Running, "state of the controller");
     }
 
     /// <summary>

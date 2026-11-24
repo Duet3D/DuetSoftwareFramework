@@ -12,20 +12,16 @@ namespace SystemTests.Host;
 /// <summary>Reads of the object model the scenarios repeat</summary>
 internal static class ModelReads
 {
+    /// <summary>
+    /// A field as a number, or NaN where the model leaves it null. Reading it as NaN fails the
+    /// assertion that wanted a number rather than the test that asked for the field
+    /// </summary>
+    public static Task<double> ReadNumberAsync(this DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, double?> read)
+        => host.ReadModelAsync(model => read(model) ?? double.NaN);
+
     /// <summary>Where an axis has got to, in mm</summary>
     public static Task<double> MachinePositionAsync(this DcsTestHost host, int axis)
         => host.ReadModelAsync(model => (double)(model.Move.Axes[axis].MachinePosition ?? 0.0f));
-
-    /// <summary>
-    /// Wait until an axis' live machine position reaches the expected value. The position is read
-    /// outside the model lock, as the controller's reports update it
-    /// </summary>
-    public static Task WaitForMachinePositionAsync(this Bench bench, int axis, double expected)
-        => bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.Model.Move.Axes.Count > axis
-                  && bench.Host.Model.Move.Axes[axis].MachinePosition is float position
-                  && Math.Abs(position - expected) < 1e-3,
-            what: $"move.axes[{axis}].machinePosition reaching {expected}");
 
     /// <summary>
     /// The index of a channel in inputs[], for a macro that reads it as <c>inputs[n]</c>. Found by
@@ -51,14 +47,6 @@ internal static class ModelReads
     public static Task<T> ReadInputAsync<T>(this DcsTestHost host, Func<InputChannel, T> read, CodeChannel channel = CodeChannel.HTTP)
         => host.ReadModelAsync(model => read(model.Inputs[channel] ?? throw new AssertionException($"inputs[] does not contain the {channel} channel")));
 
-    /// <summary>
-    /// Wait for a message of the given type containing the given text, and return it. A code run from a macro or a job
-    /// reports its reply as a message rather than to a caller
-    /// </summary>
-    public static async Task<string> WaitForMessageAsync(this DcsTestHost host, MessageType type, string containing, int timeoutMs = 10_000)
-        => (await host.WaitForModelAsync(model => model.Messages.FirstOrDefault(message => message.Type == type && message.Content.Contains(containing))?.Content,
-                                         content => content is not null, $"a {type} message containing \"{containing}\"", timeoutMs))!;
-
     /// <summary>Read one axis' value by its letter</summary>
     public static Task<T> ReadAxisAsync<T>(this DcsTestHost host, char letter, Func<Axis, T> read)
         => host.ReadModelAsync(model => read(model.Move.Axes.First(axis => axis.Letter == letter)));
@@ -66,27 +54,6 @@ internal static class ModelReads
     /// <summary>Read a global holding a number, such as a macro run counter</summary>
     public static Task<int> GlobalAsync(this DcsTestHost host, string name)
         => host.ReadModelAsync(model => GlobalValue(model, name).GetInt32());
-
-    /// <summary>
-    /// Poll a global holding a number, such as a macro run counter, until it reaches the expected
-    /// value, bounded so a macro that never runs fails the test naming the global
-    /// </summary>
-    public static async Task WaitForGlobalAsync(this DcsTestHost host, string name, int expected, int timeoutMs = 10_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        int value;
-        do
-        {
-            value = await host.GlobalAsync(name);
-            if (value == expected)
-            {
-                return;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        throw new TimeoutException($"global.{name} stayed {value}, expected {expected}");
-    }
 
     /// <summary>Read a global a macro records a yes or no in</summary>
     public static Task<bool> GlobalFlagAsync(this DcsTestHost host, string name)
@@ -105,7 +72,7 @@ internal static class ModelReads
     /// fields, so this fails naming the variable when it is not set at all, which is a different
     /// fault from it holding the wrong thing
     /// </summary>
-    private static JsonElement GlobalValue(DuetControlServer.Model.ObjectModel model, string name)
+    public static JsonElement GlobalValue(DuetControlServer.Model.ObjectModel model, string name)
         => model.Global.TryGetValue(name, out JsonElement? value) && value is JsonElement set
             ? set
             : throw new AssertionException($"global.{name} is not set");
@@ -115,34 +82,10 @@ internal static class ModelReads
     /// read, so a move landing between them cannot produce a pair the machine was never at
     /// </summary>
     public static Task<(double X, double Y)> RestorePointAsync(this DcsTestHost host, int slot)
-        => host.ReadModelAsync(model => ((double)model.Move.MotionSystems[0].RestorePoints[slot].Coords[0],
-                                         (double)model.Move.MotionSystems[0].RestorePoints[slot].Coords[1]));
+        => host.ReadModelAsync(model => RestorePoint(model, slot));
 
-    /// <summary>Wait until part of the object model equals the given value</summary>
-    /// <param name="host">The host to ask</param>
-    /// <param name="read">What to read out of the object model, e.g. an endstop's triggered flag</param>
-    /// <param name="expected">The value it should reach</param>
-    /// <param name="what">What is being waited for, for the timeout message</param>
-    /// <param name="timeoutMs">How long to wait</param>
-    /// <remarks>
-    /// What a board reports arrives asynchronously, so a scenario that depends on the machine having
-    /// taken it in has to wait for it rather than for a round trip of its own
-    /// </remarks>
-    public static async Task WaitForModelAsync<T>(this DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, T> read,
-                                                  T expected, string what, int timeoutMs = 10_000)
-    {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
-        T value;
-        do
-        {
-            value = await host.ReadModelAsync(read);
-            if (Equals(value, expected))
-            {
-                return;
-            }
-            await Task.Delay(25);
-        }
-        while (DateTime.UtcNow < deadline);
-        throw new TimeoutException($"{what} stayed \"{value}\", expected \"{expected}\"");
-    }
+    /// <summary>The coordinates <see cref="RestorePointAsync"/> reads, for a wait on them</summary>
+    public static (double X, double Y) RestorePoint(DuetControlServer.Model.ObjectModel model, int slot)
+        => (model.Move.MotionSystems[0].RestorePoints[slot].Coords[0],
+            model.Move.MotionSystems[0].RestorePoints[slot].Coords[1]);
 }
