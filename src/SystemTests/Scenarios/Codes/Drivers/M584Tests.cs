@@ -782,8 +782,8 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         bench.CanMaster.InjectAnnounce(AnnouncedBoard, "EXP3HC", "3.7.0", "2026-09-08", numDrivers: AnnouncedBoardDrivers);
-        await bench.Host.WaitForModelAsync(model => model.FindBoard(AnnouncedBoard)?.MaxMotors, count => count == AnnouncedBoardDrivers,
-                                           $"board {AnnouncedBoard} announced itself");
+        await bench.Host.WaitForModelAsync(model => model.FindBoard(AnnouncedBoard)?.MaxMotors, AnnouncedBoardDrivers,
+                                           $"driver count of board {AnnouncedBoard}");
         bench.CanMaster.ClearCapture();
 
         string missing = Expansion.Driver(AnnouncedBoard, AnnouncedBoardDrivers);

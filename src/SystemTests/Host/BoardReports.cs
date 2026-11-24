@@ -18,7 +18,7 @@ internal static class BoardReports
     public static Task ReportClosedLoopAsync(this Bench bench, byte board)
     {
         bench.CanMaster.InjectBoardStatus(board, hasClosedLoop: true);
-        return bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.FindBoard(board)?.ClosedLoop is not null,
-                                              what: $"board {board} reporting closed loop support");
+        return bench.Host.WaitForModelAsync(model => model.FindBoard(board)?.ClosedLoop is not null, true,
+                                            $"closed loop support of board {board}");
     }
 }

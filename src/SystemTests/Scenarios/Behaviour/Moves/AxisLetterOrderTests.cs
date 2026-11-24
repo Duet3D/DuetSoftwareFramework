@@ -117,8 +117,8 @@ public class AxisLetterOrderTests : BenchFixture
         // The machine position is published from the live position, so it is waited for
         foreach ((char letter, float position) in new[] { ('X', 5.0f), ('Y', 7.0f), ('Z', 3.0f), ('U', 2.0f) })
         {
-            await bench.Host.WaitForModelAsync(model => model.Move.Axes.First(axis => axis.Letter == letter).MachinePosition,
-                                               (float?)position, $"{letter}'s machine position");
+            await bench.Host.WaitForNumberAsync(model => model.Move.Axes.First(axis => axis.Letter == letter).MachinePosition,
+                                                position, $"{letter}'s machine position");
         }
         Assert.Multiple(async () =>
         {

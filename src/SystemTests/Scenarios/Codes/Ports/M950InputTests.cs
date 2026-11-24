@@ -88,8 +88,8 @@ public class M950InputTests : BenchFixture
         await using Bench bench = await Bench.StartAsync(InputConfig);
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, GpInHandle(InputNumber), active: true);
-        await bench.CanMaster.WaitUntilAsync(() => bench.Host.Model.Sensors.GpIn[InputNumber]?.Value == 1,
-                                             what: "sensors.gpIn[1].value to follow the report");
+        await bench.Host.WaitForModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(InputNumber)?.Value, 1,
+                                           $"sensors.gpIn[{InputNumber}].value");
     }
 
     /// <summary>
