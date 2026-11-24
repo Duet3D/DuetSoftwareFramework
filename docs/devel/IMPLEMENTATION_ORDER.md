@@ -30,7 +30,7 @@ Stages 1 to 4 touch mostly separate code and can be worked on in parallel once s
 ### Stage 0: a baseline that can be trusted
 
 - Decide which scenarios describe behaviour DSF should not copy, and change the scenario or add the deviation to `rrf-differences.md`: `M122` (the `=== Diagnostics ===` header), `M550` (DSF ties the name to the Linux hostname) and `M552` (owned by DuetPiManagementPlugin).
-- Remove the `KNOWN_BUGS.md` entries for `M557RefusesASecondPointCountUnderTwo` and `M915AsksTheBoardsInAddressOrder`, which no longer exist, and the link to the deleted `GCODE_COVERAGE.md` in `docs/devel/README.md`.
+- Remove the `KNOWN_BUGS.md` entries for `M557RefusesASecondPointCountUnderTwo` and `M915AsksTheBoardsInAddressOrder`, which no longer exist.
 
 ### Stage 1: pause, resume and cancel
 
