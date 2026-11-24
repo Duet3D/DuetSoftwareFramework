@@ -393,24 +393,28 @@ public class M950FanTests : BenchFixture
     [Test]
     public async Task AFanReportDoesNotCreateTheFanItReportsOn()
     {
-        await using Bench bench = await Bench.StartAsync(Fan0Config);
+        const int deletedFan = 0, markerFan = 1, unknownFan = 3;
+        const short markerRpm = 900;
+        await using Bench bench = await Bench.StartAsync(TwoFanConfig);
 
-        await bench.Host.ExecuteCodeAsync("M950 F0 C\"nil\"");
-        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
+        await bench.Host.ExecuteCodeAsync($"M950 F{deletedFan} C\"nil\"");
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[deletedFan]), Is.Null,
                     "the fan is gone before the board reports anything");
 
         // The board still holds the fan it was told to release until it acts on the message, so it
         // goes on reporting it. That report is what used to put the entry back
-        bench.CanMaster.InjectFansReport(Machines.DriverBoard, fanNumber: 0, actualPwm: 0, rpm: -1);
-        bench.CanMaster.InjectFansReport(Machines.DriverBoard, fanNumber: 3, actualPwm: 0.5f, rpm: 1200);
-        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.CompletedExchanges > 0,
-                                             what: "the reports to be carried over the link");
+        bench.CanMaster.InjectFansReport(Machines.DriverBoard, deletedFan, actualPwm: 0, rpm: -1);
+        bench.CanMaster.InjectFansReport(Machines.DriverBoard, unknownFan, actualPwm: 0.5f, rpm: 1200);
+
+        // Reports are applied in order, so once the marker fan's report is in, the two before it have been seen
+        bench.CanMaster.InjectFansReport(Machines.DriverBoard, markerFan, actualPwm: 0.5f, markerRpm);
+        await bench.Host.WaitForModelAsync(model => model.Fans[markerFan]!.Rpm, markerRpm, $"fans[{markerFan}].rpm");
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[deletedFan]), Is.Null,
                         "a report for the fan that was deleted does not bring it back");
-            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.LessThanOrEqualTo(1),
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.ElementAtOrDefault(unknownFan)), Is.Null,
                         "and a report for a fan that was never created adds nothing to fans[]");
         });
     }

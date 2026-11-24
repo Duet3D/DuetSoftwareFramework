@@ -86,9 +86,11 @@ public class M950InputTests : BenchFixture
     public async Task AnInputReportUpdatesTheValue()
     {
         await using Bench bench = await Bench.StartAsync(InputConfig);
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(InputNumber)?.Value), Is.Zero,
+                    "the input exists, and reads inactive, before the board reports anything");
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, GpInHandle(InputNumber), active: true);
-        await bench.Host.WaitForModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(InputNumber)?.Value, 1,
+        await bench.Host.WaitForModelAsync(model => model.Sensors.GpIn[InputNumber]!.Value, 1,
                                            $"sensors.gpIn[{InputNumber}].value");
     }
 
@@ -104,7 +106,9 @@ public class M950InputTests : BenchFixture
     [Category("KnownGap")]
     public async Task M950JDeletesAnInputWithCNil()
     {
-        await using Bench bench = await Bench.StartAsync(InputConfig);
+        const int markerInput = InputNumber + 1;
+        await using Bench bench = await Bench.StartAsync(
+            InputConfig + $"\nM950 J{markerInput} C\"{Expansion.GpioIn(Machines.DriverBoard, 1)}\"");
 
         string reply = await bench.Host.ExecuteCodeAsync($"M950 J{InputNumber} C\"nil\"");
         (byte board, CanMessageChangeInputMonitorV1 sent) = bench.CanMaster.LastCanMessage<CanMessageChangeInputMonitorV1>();
@@ -119,8 +123,11 @@ public class M950InputTests : BenchFixture
                         Is.Null, "sensors.gpIn[1] is empty");
         });
 
+        // Reports are applied in order, so once the marker input's report is in, the one before it has been seen
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, GpInHandle(InputNumber), active: true);
-        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.CompletedExchanges > 0, what: "the report to be carried");
+        bench.CanMaster.InjectInputChange(Machines.DriverBoard, GpInHandle(markerInput), active: true);
+        await bench.Host.WaitForModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(markerInput)?.Value, 1,
+                                           $"sensors.gpIn[{markerInput}].value");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(InputNumber)),
                     Is.Null, "a late report does not bring the input back");
     }
