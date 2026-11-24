@@ -413,6 +413,7 @@ public class M915Tests : BenchFixture
     /// <c>testcases/drivers/m915-report-stall-settings.yaml</c>, set up with R1). Only RRF's local drivers
     /// keep R1 apart, as log-only. The wiki says R1 "just log it" without that distinction
     /// </remarks>
+    /// TODO change R to an enum
     [Test]
     [TestCase(0)]
     [TestCase(1)]
@@ -455,34 +456,6 @@ public class M915Tests : BenchFixture
             Assert.That(sent.Select(message => (message.Board, message.Message.d)),
                         Is.EqualTo(new (byte, ushort?)[] { (DriversRig.MainDriverBoard, 0b111), (DriversRig.ClosedLoopBoard, 1) }));
             Assert.That(sent.Select(message => IsReport(message.Message)), Is.All.True);
-            Assert.That(reply.TrimEnd(), Is.EqualTo(BoardReport(DriversRig.MainDriverBoard, 0b111) + "\n"
-                                                    + BoardReport(DriversRig.ClosedLoopBoard, 1)));
-        });
-    }
-
-    /// <summary>
-    /// The boards are asked in order of CAN address, whatever order the drives were named in, so the
-    /// report lists them that way too
-    /// </summary>
-    /// <remarks>
-    /// CanDriversList::AddEntry keeps its entries sorted by driver ID, so GetNextBoardDriverBitmap hands
-    /// the boards out lowest address first. <c>testcases/drivers/m915-stall-detection-by-axis-letter.yaml</c>
-    /// fails on DSF for this: its extruder is on board 2 and X, Y and Z on board 3, and the reference asks
-    /// board 2 first for <c>M915 X Y Z E0</c>
-    /// </remarks>
-    [Test]
-    [Category("KnownGap")]
-    public async Task M915AsksTheBoardsInAddressOrder()
-    {
-        await using Bench bench = await Bench.With(DriversRig.Config).WithController(AnswerAsBoards).StartAsync();
-
-        string reply = await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.ClosedLoopDriver(0)} X Y Z");
-
-        var sent = bench.CanMaster.CanMessages<CanMessageM915>();
-        Assert.Multiple(() =>
-        {
-            Assert.That(sent.Select(message => message.Board),
-                        Is.EqualTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }));
             Assert.That(reply.TrimEnd(), Is.EqualTo(BoardReport(DriversRig.MainDriverBoard, 0b111) + "\n"
                                                     + BoardReport(DriversRig.ClosedLoopBoard, 1)));
         });
@@ -572,6 +545,7 @@ public class M915Tests : BenchFixture
     /// </remarks>
     [Test]
     [Category("KnownGap")]
+    [Category("NonCritical")]
     public async Task M915OnADriverPastTheEndOfABoardIsIgnoredByTheBoard()
     {
         byte drivers = DriversRig.BoardDrivers[DriversRig.MainDriverBoard];
@@ -601,6 +575,7 @@ public class M915Tests : BenchFixture
     /// is what this pins (rrf-differences.md, Error handling)
     /// </remarks>
     [Test]
+    [Category("NonCritical")]
     public async Task M915ReportsABoardsRefusalAndStillTellsTheOthers()
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);

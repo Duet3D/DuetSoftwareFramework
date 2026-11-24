@@ -176,6 +176,7 @@ public class G30Tests : BenchFixture
     /// Poll an object model value until it reaches the wanted value and return what it last read. A
     /// position published as a move winds down settles shortly after the code replies
     /// </summary>
+    /// TODO generalise this
     private static async Task<double> SettledValueAsync(DcsTestHost host, Func<DuetControlServer.Model.ObjectModel, double?> read,
                                                         double expected, double tolerance = 1e-3, int timeoutMs = 2_000)
     {

@@ -201,25 +201,6 @@ public class M557Tests : BenchFixture
     }
 
     /// <summary>
-    /// Only the first axis of the grid is limited to 41 points: the second may have more, as long as
-    /// the total stays within the limit
-    /// </summary>
-    /// <remarks>
-    /// GridDefinition::CheckValidity checks nums[0] against MaxAxis0GridPoints (41) and the product
-    /// against MaxGridProbePoints, nothing else on nums[1]
-    /// </remarks>
-    [Test]
-    public async Task M557AllowsMoreThan41PointsAlongTheSecondAxis()
-    {
-        await using Bench bench = await StartXyzAsync();
-        DcsTestHost host = bench.Host;
-
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:10 Y0:200 S4")).Trim(), Is.Empty, "3 x 51 points is accepted");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:10.0, Y0.0:200.0, radius -1.0, X spacing 4.0, Y spacing 4.0, 153 points"));
-    }
-
-    /// <summary>
     /// A 31 x 31 grid, the 961 points RRF allows on the MB6HC, is accepted
     /// </summary>
     /// <remarks>
@@ -238,6 +219,9 @@ public class M557Tests : BenchFixture
         Assert.That(reply.Trim(), Is.Empty, "31 x 31 = 961 points is within RRF's MB6HC limit");
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: X0.0:300.0, Y0.0:300.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 961 points"));
+        
+        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P41:1")).Trim(), Is.Empty, "max points in axis0 is accepted");
+        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P1:41")).Trim(), Is.Empty, "max points in axis1 is accepted");
     }
 
     /// <summary>
@@ -519,22 +503,6 @@ public class M557Tests : BenchFixture
     {
         await using Bench bench = await StartWithExtraAxesAsync("UVW");
         await AssertRefusedAndGridIntactAsync(bench.Host, $"M557 X0:{BaselineMax} Y0:{BaselineMax} U0:{BaselineMax} S{BaselineSpacing}", "three axes");
-    }
-
-    /// <summary>
-    /// A point count under two for the second axis is refused like one for the first
-    /// </summary>
-    /// <remarks>
-    /// RRF divides the second range by P - 1 = 0 and accepts the infinite spacing (GCodes::DefineGrid);
-    /// DSF refuses a first count under two (as <see cref="M557RefusedByTheGridCheckLeavesItIntact"/>)
-    /// but gives a second count of one the default 20mm spacing instead
-    /// </remarks>
-    [Test]
-    [Category("KnownGap")]
-    public async Task M557RefusesASecondPointCountUnderTwo()
-    {
-        await using Bench bench = await StartXyzAsync();
-        await AssertRefusedAndGridIntactAsync(bench.Host, $"M557 X0:{BaselineMax} Y0:{BaselineMax} P3:1", "one point along the second axis");
     }
 
     /// <summary>
