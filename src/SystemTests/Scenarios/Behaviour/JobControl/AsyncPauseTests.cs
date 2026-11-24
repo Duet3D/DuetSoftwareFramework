@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
+using static System.FormattableString;
 
 namespace SystemTests.Scenarios.Behaviour.JobControl;
 
@@ -186,6 +187,65 @@ public class AsyncPauseTests : BenchFixture
     }
 
     /// <summary>
+    /// M25 completes once pause.g has finished parking the head, not once the park move is queued
+    /// </summary>
+    /// <remarks>GCodes4.cpp pausing2 waits for standstill before it reports the pause</remarks>
+    [Test]
+    public async Task PausedIsReportedOnceThePauseMacrosMovesHaveRun()
+    {
+        const int parkX = 20;
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Segmented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteSys("pause.g", Invariant($"G90\nG1 X{parkX} F6000\n"));
+            sd.WriteGCode("job.gcode", "G91\nG1 X180 F6000\nG1 X-180\n");
+        }).StartAsync();
+
+        // Far enough past the park position that parking takes many moves
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.WaitForMovesAsync(100, "most of the first line being sent");
+        await bench.Host.ExecuteCodeAsync("M25");
+
+        // Both are needed: a park still queued on the SBC has sent no move that could be unfinished
+        ScheduledMove last = bench.CanMaster.ScheduledMoves()[^1];
+        Assert.Multiple(() =>
+        {
+            Assert.That(bench.CanMaster.ScheduledSteps(Machines.XDriver), Is.EqualTo(parkX * Machines.XyStepsPerMm),
+                        "every move of the park has been sent, so the moves sent so far add up to the park position");
+            Assert.That((int)(bench.CanMaster.Clock.MasterClock - (last.StartTime + last.TotalClocks)), Is.Positive,
+                        "and the last of them has finished");
+        });
+    }
+
+    /// <summary>
+    /// The head goes back to the pause point however much resume.g queues: more moves than the ring
+    /// holds leave it full when the move back is queued
+    /// </summary>
+    /// <remarks>GCodes4.cpp resuming1 waits for standstill, and resuming2 and resuming3 for the move back</remarks>
+    [Test]
+    [Category("LongRunning")]
+    public async Task ResumeMovesBackAfterAResumeMacroThatFillsTheQueue()
+    {
+        const int resumeY = 120;
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Segmented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteSys("resume.g", Invariant($"G90\nG1 Y{resumeY} F6000\n"));
+            sd.WriteGCode("job.gcode", "G91\nG1 X80 F6000\nG1 X-80\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.RunToPositionAsync(axis: 0, position: 20);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(bench.CanMaster.ScheduledMoves().Count(move => move.DriverFor(Machines.DriverBoard, Machines.YDriver)?.Steps == -resumeY * Machines.XyStepsPerMm),
+                    Is.EqualTo(1), "one move takes Y from where resume.g left it back to the pause point");
+    }
+
+    /// <summary>
     /// The resume fraction applied to relative axis words and relative extrusion: a G91 word is a
     /// distance to travel, so the remainder is the word scaled by the fraction not yet made. If
     /// the scaling were wrong the square would not close and the extrusion total would drift
@@ -343,7 +403,6 @@ public class AsyncPauseTests : BenchFixture
     /// </summary>
     [Test]
     [Category("LongRunning")]
-    [Category("KnownGap")]
     public async Task TwoPausesInsideOneLine()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.OneTool, Machines.Segmented, Machines.Xye.Homed)

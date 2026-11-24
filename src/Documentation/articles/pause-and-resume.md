@@ -277,8 +277,9 @@ point (`RestorePoint.PauseNumber`; 2 is the tool change, and `G60 S<n>` writes 0
 
 Then `pause.g` runs, or `filament-change.g` for `M600` with `pause.g` as the fallback, on the channel
 that asked for the pause. Neither runs unless every axis is homed: both are written to lift and park
-the head, and neither is meaningful on a machine that does not know where it is. The reply is
-`Printing paused at X... Y... Z...`, taken from the restore point.
+the head, and neither is meaningful on a machine that does not know where it is. Once the moves the
+macro made have run, the job is paused and the reply is `Printing paused at X... Y... Z...`, taken
+from the restore point.
 
 The job task, meanwhile, has stopped reading, drained what it had read ahead, seeked to the pause
 position, and is waiting. Block state does not survive that seek: an open `while` is re-parsed from
@@ -303,7 +304,7 @@ sequenceDiagram
     L->>L: Paused -> Resuming, publish
     L->>R: start the sequence
     R->>MR: resume.g, only when every axis is homed
-    R->>PL: MoveBackToRestorePointAsync
+    R->>PL: wait for standstill, then MoveBackToRestorePointAsync
     R->>PL: RestoreInterpreterStateAsync, the restore point's F and distance modes
     R->>PL: MoveFractionToSkip = rp.ProportionDone
     R->>L: SequenceCompleted

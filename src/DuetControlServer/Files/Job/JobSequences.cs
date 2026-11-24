@@ -279,6 +279,9 @@ internal sealed class JobSequences(
 
         await RunPauseMacroAsync(request.Channel, request.Macro, cancellationToken);
 
+        // The macro's own moves have to run before the job is paused, as RepRapFirmware's pausing2 waits for
+        await codeProcessor.WaitForStandstillAsync(cancellationToken);
+
         // TODO RRF writes resurrect.g here and reports "Resume state saved" before the paused-at line
         // (GCodes::SaveResumeInfo, regression case m25-pause-print)
         Message reply = await PausedAtMessageAsync(request.Macro, cancellationToken);
@@ -460,6 +463,9 @@ internal sealed class JobSequences(
     {
         // From reading where the head is until both legs are queued
         using IDisposable movementHold = await movementLock.AcquireAsync(CodeChannel.File, cancellationToken);
+
+        // The moves of resume.g, as RepRapFirmware's resuming1 waits for
+        await codeProcessor.WaitForStandstillAsync(cancellationToken);
 
         bool headIsAbovePausePoint;
         using (await model.AccessReadOnlyAsync(cancellationToken))

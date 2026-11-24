@@ -34,11 +34,7 @@ public class DeferredPauseTests : BenchFixture
     /// queued move is the case that names no purge boundary, and the pause must still settle rather
     /// than wait on codes whose anchors will never retire
     /// </summary>
-    /// <remarks>
-    /// This test is intermitent and it is undetermined if it is the test or program at fault
-    /// </remarks>
     [Test]
-    [Category("KnownGap")]
     [Category("LongRunning")]
     public async Task PauseTwiceAroundDeferredCodes()
     {
