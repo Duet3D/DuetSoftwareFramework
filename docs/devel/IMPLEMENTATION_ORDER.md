@@ -2,7 +2,7 @@
 
 The order in which to bring DSF to feature parity with RepRapFirmware 3.7. Part A covers the codes that already have system tests, Part B the codes that have none, and Part C the codes that need an architecture decision before either.
 
-The tests, not this document, say what is done. A stage is finished when its codes pass with `scripts/test.py system --code <code>`, the scenarios have lost `[Category("KnownGap")]`, the regression cases that cover the codes pass on the bench, and the affected articles and `KNOWN_BUGS.md` are updated. The counts below are a snapshot from a full run (`scripts/test.py system --all`) on 2026-11-24, with the pause and resume fixes of that day in: 1432 cases, 1117 passed, 315 failed, counting `PauseInsideWhileLoop`, which passed or failed by timing in that run, as failed. The causes are read from the failure messages and have not been confirmed by fixing them. No regression bench results were available.
+The tests, not this document, say what is done.
 
 ## Principles behind the order
 
@@ -16,38 +16,36 @@ The tests, not this document, say what is done. A stage is finished when its cod
 | Stage | Subject | Failing cases | Depends on |
 | --- | --- | --- | --- |
 | 0 | A baseline that can be trusted | 0 | |
-| 1 | Pause, resume and cancel | 4 | 0 |
-| 2 | Restore points and tools | 20 | 0 |
+| 1 | Pause, resume and cancel | 3 | 0 |
+| 2 | Restore points and tools | 19 | 0 |
 | 3 | Drives | 74 | 0 |
 | 4 | M950 devices, heat and spindles | 62 | 0 |
 | 5 | Kinematics | 58 | 3 (M584) |
 | 6 | Endstop and probe configuration | 44 | 3 (M584), 4 (M950 J) |
 | 7 | Probing and compensation | 37 | 2, 5, 6, M291/M292 |
-| 8 | Files, general and laser | 16 | 0; some cases need Part B |
+| 8 | Files, general and laser | 15 | 0; some cases need Part B |
 
 Stages 1 to 4 touch mostly separate code and can be worked on in parallel once stage 0 is done. Stages 5 to 7 are the critical path: M584, then M669, then M574/M558, then G30.
 
 ### Stage 0: a baseline that can be trusted
 
-- Decide which scenarios describe behaviour DSF should not copy, and change the scenario or add the deviation to `rrf-differences.md`: `M122` (the `=== Diagnostics ===` header), `M550` (DSF ties the name to the Linux hostname) and `M552` (owned by DuetPiManagementPlugin).
-- Remove the `KNOWN_BUGS.md` entries for `M557RefusesASecondPointCountUnderTwo` and `M915AsksTheBoardsInAddressOrder`, which no longer exist.
+Done.
 
 ### Stage 1: pause, resume and cancel
 
 1. `JobEdgeCaseTests.PauseInsideWhileLoop`: a job paused inside a `while` loop loses the iterations that were left, so part of the print is silently skipped. The rewind point has to carry the open code blocks.
 2. `CancelRestartTests.RestartFractionSchedulesOnlyThePartNotYetMade` (`M26 P`): the job re-runs the part of the line already made.
 3. `DeferredPauseTests.PauseDuringPlainMacroDefers`: the reply to a second `M25` while a pause is pending.
-4. `M0`/`M1`/`M2` outside a job are refused (`M0M1M2Tests`).
 
 `KNOWN_BUGS.md` also records that `Code.IsCurrentlyDeferred` is never cleared on a pooled code. No scenario shows its effect.
 
 ### Stage 2: restore points and tools
 
-Mechanism: restore points are published to the object model only by `G60` and the job sequences (`MovePlanner.PublishRestorePoints`), so scenarios that read them otherwise find an empty collection. Publish all of them from start-up, one coordinate per visible axis. `G60` also publishes the feed rate in mm/s where the scenario expects mm/min.
+Mechanism: restore points are published to the object model only by `G60` and the job sequences (`MovePlanner.PublishRestorePoints`), so scenarios that read them otherwise find an empty collection. Publish all of them from start-up, one coordinate per visible axis.
 
 Mechanism: bring the user position into step when the transform changes (`MoveInterpreter.SyncInterpreterToCoords`). `G10` offsets already do this; tool selection here and loading or clearing a height map in stage 7 need the same call.
 
-1. `G60`, then the initial `inputs[].drivesRelative` (`M82`/`M83`).
+1. The initial `inputs[].drivesRelative`, and absolute extrusion, which extrudes a repeated `G1 E2` again (`M82`/`M83`).
 2. `G10` (report wording, and `G10 P S R` through the `M568` path, which is not reached at all today) and the `M567` report wording.
 3. `M37` report, which `TTests.SimulatedToolChangeOnlySelects` relies on.
 4. `T`: `state.nextTool`/`previousTool`, restore point 2, `T{expression}` and `T T<n>`, `T R<n>`, generic `tfree.g`/`tpre.g`/`tpost.g`, reselecting the current tool, an undefined tool, simulation, then offsets and axis maps applied at selection. `ResumeReselectsTheToolThePauseRecorded` comes last, after stage 1.
@@ -79,7 +77,7 @@ Mechanism: one create, replace, delete and report flow for every `M950` device, 
 
 ### Stage 5: kinematics
 
-1. Names as RRF 3.7 spells them, in the model and in the reports (`scara`, `polar`, `rotaryDelta`, `delta`). This alone fixes or unblocks much of the stage: `AxisLetterOrderTests`, `M665Tests` and most `M669` reports.
+1. Names as RRF 3.7 spells them, in the model and in the reports (`scara`, `polar`, `rotaryDelta`, `linearDelta`). This alone fixes or unblocks much of the stage: `AxisLetterOrderTests` and most `M669` reports.
 2. The matrix in the `M669` report, then matrix rows and their refusals (Cartesian and core geometries).
 3. Selecting a geometry: what is kept, what is unhomed, where the head is afterwards, and nothing of a refused code applied. Resets `tiltCorrection`.
 4. SCARA and polar parameters.
@@ -109,6 +107,7 @@ Small and independent; suitable for filling gaps between the larger stages.
 
 - `M23`, `M30`, `M36` (invalid JSON for a missing file), `M36.2`, `M38`, `M472`, `M606` refusals.
 - `M118` and its channel targets.
+- `M122`: RRF's header, and the many sections DSF does not report.
 - `M581` report. `M581.1` did not run its macro in the scenario.
 - `M500 P68` needs `G68`, and `M501` inside `M502` needs `M502`; both are in Part B.
 - `LaserModeAppliesM3PowerToMoves` needs a decision (Part C).
@@ -144,4 +143,4 @@ Outside the dispatch tables, two things also belong before release: re-creating 
 | `M911`, `M912`, `M916` | Does auto save use DuetCANMaster's supply reading, and where does `resurrect.g` come from? |
 | `M21`, `M22`, `M540`, `M918` | Does the SBC have an equivalent, or are these refused with a reason? |
 
-Not to be ported: `M576` and `M954` (dropped in `rrf-differences.md` section 1), IOBits and so `M670` (section 7), `M674` (not implemented in RRF) and `M750` to `M756` (removed from RRF).
+Not to be ported: `M576` and `M954` (dropped in `rrf-differences.md` section 1), IOBits and so `M670` (section 1), `M674` (not implemented in RRF) and `M750` to `M756` (removed from RRF).
