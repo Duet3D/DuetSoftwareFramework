@@ -57,6 +57,8 @@ The SPI wire protocol shared by DuetRealtimeCore and DuetCANMaster lives in `lib
 
 ## Tests
 
+Always run tests with `scripts/test.py`, never `dotnet test`, including a single test, a repeated run and a quick check. `system` names each test as it starts and reports new failures, known gaps and known gaps that now pass separately. Arguments after `--` go to `dotnet test`. Pass `--no-build` only when nothing has changed since the last build.
+
 | Suite | Command | Notes |
 |---|---|---|
 | Unit (NUnit) | `scripts/test.py unit` | Run in full; with coverage, as CI does |
@@ -64,9 +66,9 @@ The SPI wire protocol shared by DuetRealtimeCore and DuetCANMaster lives in `lib
 | Native | `scripts/test.py native` | DuetRealtimeCore's ctest suite, in a host build used only for tests |
 | Scripts | `scripts/test.py scripts` | The Python scripts' tests (`tests/scripts`), with builds, git and boards faked; run with `pyright` after changing `scripts/` |
 
-Single unit test: `dotnet test src/UnitTests/UnitTests.csproj --filter "FullyQualifiedName~ClassName.MethodName"`.
+Single unit test: `scripts/test.py unit --filter "FullyQualifiedName~ClassName.MethodName"`.
 
-System tests host the real DuetControlServer in-process (`src/SystemTests/Host/DcsTestHost.cs`) with the real `libduet_realtime_core.so`, talking over a socket transport to a scripted controller (`src/SystemTests/ScriptedCanMaster`) that records the link traffic. Scenarios under `src/SystemTests/Scenarios` drive G-code and assert on the object model and the captured packets. Use `scripts/test.py system` rather than raw `dotnet test` on that project: it reports progress per test and splits failures into known and new.
+System tests host the real DuetControlServer in-process (`src/SystemTests/Host/DcsTestHost.cs`) with the real `libduet_realtime_core.so`, talking over a socket transport to a scripted controller (`src/SystemTests/ScriptedCanMaster`) that records the link traffic. Scenarios under `src/SystemTests/Scenarios` drive G-code and assert on the object model and the captured packets.
 
 - A code's scenarios go in `Scenarios/Codes/<Subsystem>/<Code>Tests.cs`, one fixture per code or family of codes documented together (`M140M141Tests`), tagged `[GCode("M140", "M141")]`; what is not one code's goes in `Scenarios/Behaviour/<Area>`. `scripts/test.py system --code M140` runs every scenario tagged with a code.
 - A scenario starts from `Bench.StartAsync()`, which enables CAN and configures nothing else, and adds only the parts it needs (`Machines.Xye`, `DriversRig.Config`, `JobMacros.Instrumented`, ... in `src/SystemTests/Host/Config`) or its own lines. Do not give a scenario a machine, macros or homing it does not use. The bench clears the controller's capture once `config.g` has finished, so a scenario does not call `ClearCapture()` after starting one; `KeepingConfigTraffic()` keeps the start-up traffic.
