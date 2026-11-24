@@ -27,6 +27,9 @@ internal partial class MCodeHandler
     /// <summary>Smallest range an axis of a grid may span, as in RepRapFirmware's <c>GridDefinition::MinRange</c></summary>
     private const float MinGridRange = 1.0f;
 
+    /// <summary>Fewest points a grid may have along an axis: one has no spacing to probe at</summary>
+    private const int MinGridPointsPerAxis = 2;
+
     /// <summary>Most points one row of a grid may have, as in RepRapFirmware's <c>MaxAxis0GridPoints</c></summary>
     private const int MaxGridPointsPerRow = 41;
 
@@ -92,7 +95,8 @@ internal partial class MCodeHandler
             }
 
             // One value stands for both axes, so M557 P20 is a square grid
-            bool seenPoints = code.TryGetIntArray('P', 2, out int[]? numPoints, pad: true, exactLength: true);
+            bool seenPoints = code.TryGetIntArray('P', 2, out int[]? numPoints, pad: true, exactLength: true, min: MinGridPointsPerAxis,
+                                                  errorString: _ => "Expected at least two points per axis");
             bool seenSpacing = false;
             if (!seenPoints && code.TryGetFloatArray('S', 2, out float[]? given, pad: true, exactLength: true))
             {
@@ -117,11 +121,6 @@ internal partial class MCodeHandler
                 return new Message(MessageType.Error, "Specify at least a radius or two axis ranges in M557");
             }
 
-            if (seenPoints && numPoints![0] < 2)
-            {
-                return new Message(MessageType.Error, "Expected at least two points per axis");
-            }
-
             int[] points = seenPoints ? [numPoints![0], numPoints[1]] : [0, 0];
 
             if (axesSeen > 0)
@@ -132,7 +131,7 @@ internal partial class MCodeHandler
                     // point count that was asked for rather than occasionally one less
                     for (int i = 0; i < 2; i++)
                     {
-                        if (points[i] >= 2 && ranges[i][1] > ranges[i][0])
+                        if (ranges[i][1] > ranges[i][0])
                         {
                             spacings[i] = (ranges[i][1] - ranges[i][0]) / (points[i] - 1) * 0.9999f;
                         }
@@ -146,7 +145,7 @@ internal partial class MCodeHandler
                     // The grid is inscribed in the circle, so a row that straddles the centre reaches
                     // further out than one that sits either side of it
                     float effective;
-                    if (seenPoints && points[i] >= 2)
+                    if (seenPoints)
                     {
                         effective = radius - 0.1f;
                         int otherPoints = points[1 - i];

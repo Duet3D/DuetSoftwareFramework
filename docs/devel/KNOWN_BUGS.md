@@ -64,7 +64,7 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 
 ### Probe grid and bed compensation (M557, M561)
 - [ ] `M557` caps the grid at 441 points; RepRapFirmware on the MB6HC allows 961. `M557Tests.M557AcceptsTheMb6hcGridPointLimit`.
-- [ ] `M557` accepts a radius between 0 and 1 and a second point count below 2; both should be refused. `M557Tests.M557RefusesARadiusUnderOne`, `M557RefusesASecondPointCountUnderTwo`.
+- [ ] `M557` accepts a radius between 0 and 1, which should be refused. `M557Tests.M557RefusesARadiusUnderOne`.
 - [ ] `move.compensation.probeGrid.radius` starts at 0; RepRapFirmware's `GridDefinition()` starts it at −1. `M557Tests.ProbeGridStartsUndefined`.
 - [ ] `M561` does not recompute the user position (`GCodes::ClearBedMapping`), so Z keeps reading the corrected height after the map is cleared. `M561Tests.M561KeepsTheHeadWhereItIs`, `M561RemovesTheMapFromTheUserPosition`.
 
