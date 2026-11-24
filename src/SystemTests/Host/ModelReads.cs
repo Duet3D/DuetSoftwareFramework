@@ -55,6 +55,10 @@ internal static class ModelReads
     public static Task<int> GlobalAsync(this DcsTestHost host, string name)
         => host.ReadModelAsync(model => GlobalValue(model, name).GetInt32());
 
+    /// <summary>Read a global holding a number that need not be whole, such as a coordinate a macro recorded</summary>
+    public static Task<double> GlobalNumberAsync(this DcsTestHost host, string name)
+        => host.ReadModelAsync(model => GlobalValue(model, name).GetDouble());
+
     /// <summary>Read a global a macro records a yes or no in</summary>
     public static Task<bool> GlobalFlagAsync(this DcsTestHost host, string name)
         => host.ReadModelAsync(model => GlobalValue(model, name).GetBoolean());

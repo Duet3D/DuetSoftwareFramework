@@ -101,7 +101,7 @@ Macros are started by DCS itself - nothing asks it to run one from outside any m
 | Any file | `M98 P"..."` |
 | `homeall.g`, `home<axis>.g` | `G28`, one macro at a time until every named axis is homed |
 | `deployprobe<n>.g` / `retractprobe<n>.g`, `mesh.g`, `bed.g` | The probing codes |
-| `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g` | A tool change |
+| `tfree<n>.g`, `tpre<n>.g`, `tpost<n>.g`, or `tfree.g`, `tpre.g`, `tpost.g` where a tool has none of its own | A tool change |
 | `<letter><number>.g` | A code no handler recognised - how a machine adds a code of its own |
 | `heater-fault.g`, `driver-stall.g`, `controller-disconnect.g`, ... | An [event](rrf-differences.md#4-events), on the `Autopause` channel |
 

@@ -110,9 +110,8 @@ public class M569Point5Tests : BenchFixture
                                              samples: [(0.02f, 102, 1.7f, 0.0f), (0.03f, 103, 1.8f, 0.5f)],
                                              lastPacket: true);
 
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.ReadModelAsync(model => model.Boards[board].ClosedLoop?.Runs ?? 0).Result == 1,
-            what: "the collected run being recorded");
+        await bench.Host.WaitForModelAsync(model => model.Boards[board].ClosedLoop?.Runs, 1,
+                                           "boards[].closedLoop.runs");
 
         Assert.Multiple(async () =>
         {
@@ -157,9 +156,8 @@ public class M569Point5Tests : BenchFixture
         bench.CanMaster.InjectClosedLoopData(board, firstSample: 3, filter: Filter,
                                              samples: [(0.03f, 103, 1.8f, 0.5f)], lastPacket: false);
 
-        await bench.CanMaster.WaitUntilAsync(
-            () => bench.Host.ReadModelAsync(model => model.Boards[board].ClosedLoop?.Runs ?? 0).Result == 1,
-            what: "the interrupted run being recorded");
+        await bench.Host.WaitForModelAsync(model => model.Boards[board].ClosedLoop?.Runs, 1,
+                                           "boards[].closedLoop.runs after the interrupted run");
 
         string[] lines = File.ReadAllLines(Path.Combine(bench.Host.Sd.Root, "sys", "closed-loop", "lost.csv"));
         Assert.Multiple(() =>
@@ -251,6 +249,19 @@ public class M569Point5Tests : BenchFixture
             Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty,
                         "the board is never asked for a collection there is nothing to collect");
         });
+    }
+
+    /// <summary>
+    /// M569.5 without P is refused before anything reaches the bus
+    /// </summary>
+    /// <remarks>RRF GCodes3.cpp ConfigureDriver <c>gb.MustSee('P')</c></remarks>
+    [Test]
+    public async Task M569Point5WithoutPIsRefused()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 S200 D{Filter}")).TrimEnd(), Is.EqualTo("Error: M569.5: missing parameter 'P'"));
+        Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
     }
 }
 

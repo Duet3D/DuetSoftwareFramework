@@ -1,0 +1,54 @@
+using System.Threading.Tasks;
+using NUnit.Framework;
+
+namespace SystemTests.Scenarios.Codes.Drivers;
+
+/// <summary>
+/// M569.3, reading a motor encoder over the secondary CAN bus
+/// </summary>
+/// <remarks>
+/// It needs ODrives on the second CAN bus and Hangprinter kinematics (RRF CanInterface.cpp ConfigureRemoteDriver case 3), so every other machine takes RepRapFirmware's errorNotSupported path: the drivers are parsed, then the code is declined as an error with nothing sent
+/// </remarks>
+[TestFixture]
+[GCode("M569.3")]
+public class M569Point3Tests : BenchFixture
+{
+    /// <summary>The forms <c>m569-3-read-encoder.yaml</c> sends, on the rig's drivers</summary>
+    private static readonly string[] Forms =
+    [
+        $"M569.3 P{DriversRig.MainDriver(0)}",
+        $"M569.3 P{DriversRig.MainDriver(0)} S",
+        $"M569.3 P{DriversRig.MainDriver(0)}:{DriversRig.ClosedLoopDriver(0)}",
+    ];
+
+    /// <summary>
+    /// Every form is declined as an error, not the warning a code nothing knows gets, and nothing reaches the bus
+    /// </summary>
+    /// <remarks><c>m569-3-read-encoder.yaml</c></remarks>
+    [TestCaseSource(nameof(Forms))]
+    [Category("KnownGap")]
+    public async Task M569Point3IsNotSupported(string code)
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        string reply = await bench.Host.ExecuteCodeAsync(code);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.3: Command is not supported"));
+            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "and no board is asked anything");
+        });
+    }
+
+    /// <summary>
+    /// M569.3 without P is refused as every M569 sub-code is, before it is declined
+    /// </summary>
+    /// <remarks><c>error-missing-parameters-drivers-m569.yaml</c> (RRF GCodes3.cpp ConfigureDriver <c>gb.MustSee('P')</c>)</remarks>
+    [Test]
+    [Category("KnownGap")]
+    public async Task M569Point3WithoutPIsRefused()
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        Assert.That((await bench.Host.ExecuteCodeAsync("M569.3")).TrimEnd(), Is.EqualTo("Error: M569.3: missing parameter 'P'"));
+    }
+}

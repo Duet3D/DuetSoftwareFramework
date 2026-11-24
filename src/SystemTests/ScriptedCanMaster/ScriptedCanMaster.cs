@@ -216,10 +216,10 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <typeparam name="TMessage">The CAN message being answered</typeparam>
     /// <param name="text">What the board says, given the request it is answering</param>
     /// <param name="result">The result code the board answers with</param>
-    public void ReportWith<TMessage>(Func<TMessage, string> text, CodeResult result = CodeResult.Ok)
+    /// <param name="extra">The reply's extra byte, which some requests read a result from</param>
+    public void ReportWith<TMessage>(Func<TMessage, string> text, CodeResult result = CodeResult.Ok, byte extra = 0)
         where TMessage : struct, ICanMessage<TMessage>
-        => OnCanMessage((ushort)TMessage.MessageType, (fake, header, payload) =>
-            fake.InjectStandardReply(header, result, text(CanMessageSerializer.Deserialize<TMessage>(payload))));
+        => AnswerWith<TMessage>(message => (result, text(message)), extra);
 
     /// <summary>
     /// Answer every request of one message type with a fixed text, whatever it asked
@@ -227,9 +227,25 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <typeparam name="TMessage">The CAN message being answered</typeparam>
     /// <param name="text">What the board says</param>
     /// <param name="result">The result code the board answers with</param>
-    public void ReportWith<TMessage>(string text, CodeResult result = CodeResult.Ok)
+    /// <param name="extra">The reply's extra byte, which some requests read a result from</param>
+    public void ReportWith<TMessage>(string text, CodeResult result = CodeResult.Ok, byte extra = 0)
         where TMessage : struct, ICanMessage<TMessage>
-        => ReportWith<TMessage>(_ => text, result);
+        => ReportWith<TMessage>(_ => text, result, extra);
+
+    /// <summary>
+    /// Answer every request of one message type with a result and text that depend on what it asked,
+    /// as a board that accepts some requests and refuses others does
+    /// </summary>
+    /// <typeparam name="TMessage">The CAN message being answered</typeparam>
+    /// <param name="answer">The result code and text, given the request it is answering</param>
+    /// <param name="extra">The reply's extra byte, which some requests read a result from</param>
+    public void AnswerWith<TMessage>(Func<TMessage, (CodeResult Result, string Text)> answer, byte extra = 0)
+        where TMessage : struct, ICanMessage<TMessage>
+        => OnCanMessage((ushort)TMessage.MessageType, (fake, header, payload) =>
+        {
+            (CodeResult result, string text) = answer(CanMessageSerializer.Deserialize<TMessage>(payload));
+            fake.InjectStandardReply(header, result, text, extra);
+        });
 
     /// <summary>
     /// Leave every request of one message type unanswered, as a board that does not know the command
