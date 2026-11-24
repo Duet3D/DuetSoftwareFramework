@@ -1215,6 +1215,9 @@ internal partial class MCodeHandler
             return new Message(MessageType.Error, "No drivers specified");
         }
 
+        // Read before anything is sent, so that a value that is refused changes nothing
+        code.TryGetEnum('R', out StallAction? action);
+
         List<Message> replies = [];
         foreach (IGrouping<int, DriverId> board in drivers.GroupBy(driver => driver.Board))
         {
@@ -1233,7 +1236,7 @@ internal partial class MCodeHandler
             replies.Add(await linkInterface.SendCanRequestAsync((byte)board.Key, in message, cancellationToken));
         }
 
-        await RecordStallDetectionAsync(drivers, code, cancellationToken);
+        await RecordStallDetectionAsync(drivers, code, action, cancellationToken);
         return replies.ToMessage();
     }
 
@@ -1242,8 +1245,10 @@ internal partial class MCodeHandler
     /// </summary>
     /// <param name="drivers">Drivers the code addressed</param>
     /// <param name="code">The code</param>
+    /// <param name="action">The code's R parameter, or null if it has none</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    private async ValueTask RecordStallDetectionAsync(IEnumerable<DriverId> drivers, Commands.Code code, CancellationToken cancellationToken)
+    private async ValueTask RecordStallDetectionAsync(IEnumerable<DriverId> drivers, Commands.Code code, StallAction? action,
+                                                      CancellationToken cancellationToken)
     {
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
@@ -1267,9 +1272,9 @@ internal partial class MCodeHandler
                 {
                     stall.CoolStep = coolStep;
                 }
-                if (code.TryGetInt('R', out int raiseEvent))
+                if (action is not null)
                 {
-                    stall.RaiseEvent = raiseEvent != 0;
+                    stall.RaiseEvent = action != StallAction.None;
                 }
             }
         }

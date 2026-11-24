@@ -4,6 +4,7 @@ using DuetAPI;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Motion;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.Drivers;
@@ -30,7 +31,7 @@ public class M915Tests : BenchFixture
 
         // T, the coolStep register, is the one parameter the references leave alone: the datasheet
         // warns that a wrong value silently reduces motor current, so no case sends it to the rig
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{Expansion.Driver(board, 0)} S5 F1 H300 T100 R1")).Trim(), Is.Empty);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{Expansion.Driver(board, 0)} S5 F1 H300 T100 R{StallAction.Log:D}")).Trim(), Is.Empty);
 
         (byte sentTo, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         Assert.Multiple(() =>
@@ -43,7 +44,7 @@ public class M915Tests : BenchFixture
             Assert.That(sent.H, Is.EqualTo(300), "H is the full steps per second below which "
                                                  + "StallGuard is not trusted");
             Assert.That(sent.T, Is.EqualTo(100), "T is the coolStep register value");
-            Assert.That(sent.R, Is.EqualTo(1), "R is the action on stall");
+            Assert.That((StallAction?)sent.R, Is.EqualTo(StallAction.Log), "R is the action on stall");
         });
 
         DriverStallDetection stall = await bench.Host.ReadModelAsync(
@@ -268,7 +269,7 @@ public class M915Tests : BenchFixture
                                              .StartAsync();
         int xThreshold = (await ThresholdsAsync(bench, DriversRig.MainDriverBoard))[0];
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 {letters} S5 F1 H150 R0")).Trim(), Is.Empty);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 {letters} S5 F1 H150 R{StallAction.None:D}")).Trim(), Is.Empty);
         (byte board, CanMessageM915 set) = bench.CanMaster.LastCanMessage<CanMessageM915>();
 
         string report = await bench.Host.ExecuteCodeAsync($"M915 {letters}");
@@ -278,7 +279,7 @@ public class M915Tests : BenchFixture
         {
             Assert.That(board, Is.EqualTo(DriversRig.MainDriverBoard));
             Assert.That(set.d, Is.EqualTo(0b111000), "the three axes are drivers 3, 4 and 5 of the board");
-            Assert.That((set.S, set.F, set.H, set.R), Is.EqualTo(((sbyte?)5, (byte?)1, (ushort?)150, (byte?)0)));
+            Assert.That((set.S, set.F, set.H, (StallAction?)set.R), Is.EqualTo(((sbyte?)5, (byte?)1, (ushort?)150, (StallAction?)StallAction.None)));
             foreach (int driver in new[] { 3, 4, 5 })
             {
                 DriverStallDetection stall = await bench.Host.ReadModelAsync(
@@ -309,7 +310,7 @@ public class M915Tests : BenchFixture
     public async Task M915SendsOnlyTheParametersGiven()
     {
         string driver = DriversRig.MainDriver(0);
-        await using Bench bench = await Bench.StartAsync(DriversRig.Config, $"M915 P{driver} S3 F0 H200 T100 R0");
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config, $"M915 P{driver} S3 F0 H200 T100 R{StallAction.None:D}");
 
         Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} S5 F1")).Trim(), Is.Empty);
         (_, CanMessageM915 first) = bench.CanMaster.LastCanMessage<CanMessageM915>();
@@ -317,7 +318,7 @@ public class M915Tests : BenchFixture
         (int, bool, int, int, bool) firstModel = (afterFirst.Threshold, afterFirst.Filter, afterFirst.MinimumSpeed,
                                                   afterFirst.CoolStep, afterFirst.RaiseEvent);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} R1 H300")).Trim(), Is.Empty);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{StallAction.Log:D} H300")).Trim(), Is.Empty);
         (_, CanMessageM915 second) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         DriverStallDetection afterSecond = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
 
@@ -329,7 +330,7 @@ public class M915Tests : BenchFixture
             Assert.That(firstModel, Is.EqualTo((5, true, 200, 100, false)),
                         "and the object model keeps the H, T and R it had");
 
-            Assert.That((second.d, second.H, second.R), Is.EqualTo(((ushort?)1, (ushort?)300, (byte?)1)));
+            Assert.That((second.d, second.H, (StallAction?)second.R), Is.EqualTo(((ushort?)1, (ushort?)300, (StallAction?)StallAction.Log)));
             Assert.That((second.S, second.F, second.T), Is.EqualTo(((sbyte?)null, (byte?)null, (ushort?)null)));
             Assert.That((afterSecond.Threshold, afterSecond.Filter, afterSecond.MinimumSpeed, afterSecond.CoolStep, afterSecond.RaiseEvent),
                         Is.EqualTo((5, true, 300, 100, true)));
@@ -338,9 +339,9 @@ public class M915Tests : BenchFixture
 
     private static readonly TestCaseData[] Limits =
     [
-        new TestCaseData("S-128 T65535 R3", -128, 65535, 3).SetArgDisplayNames("lowest S, highest T and R"),
-        new TestCaseData("S127 T0 R2", 127, 0, 2).SetArgDisplayNames("highest S, lowest T"),
-        new TestCaseData("S-10 T1 R1", -10, 1, 1).SetArgDisplayNames("negative S"),
+        new TestCaseData(-128, 65535, StallAction.RaiseEventAlias).SetArgDisplayNames("lowest S, highest T and R"),
+        new TestCaseData(127, 0, StallAction.RaiseEvent).SetArgDisplayNames("highest S, lowest T"),
+        new TestCaseData(-10, 1, StallAction.Log).SetArgDisplayNames("negative S"),
     ];
 
     /// <summary>
@@ -355,17 +356,17 @@ public class M915Tests : BenchFixture
     /// </remarks>
     [Test]
     [TestCaseSource(nameof(Limits))]
-    public async Task M915AcceptsTheLimitsOfEachParameter(string values, int threshold, int coolStep, int action)
+    public async Task M915AcceptsTheLimitsOfEachParameter(int threshold, int coolStep, StallAction action)
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} {values}")).Trim(), Is.Empty);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} S{threshold} T{coolStep} R{action:D}")).Trim(), Is.Empty);
 
         (_, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         DriverStallDetection stall = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
         Assert.Multiple(() =>
         {
-            Assert.That((sent.S, sent.T, sent.R), Is.EqualTo(((sbyte?)threshold, (ushort?)coolStep, (byte?)action)));
+            Assert.That((sent.S, sent.T, (StallAction?)sent.R), Is.EqualTo(((sbyte?)threshold, (ushort?)coolStep, (StallAction?)action)));
             Assert.That((stall.Threshold, stall.CoolStep, stall.RaiseEvent), Is.EqualTo((threshold, coolStep, true)));
         });
     }
@@ -384,22 +385,31 @@ public class M915Tests : BenchFixture
     [TestCase("S-129")]
     [TestCase("S128")]
     [TestCase("T65536")]
+    public Task M915RefusesAValueOutOfRange(string value) => AssertRefusedAsync(value);
+
+    /// <summary>An R that is no action is refused before anything is sent, like <see cref="M915RefusesAValueOutOfRange"/></summary>
+    [Test]
     [TestCase("R4")]
-    public async Task M915RefusesAValueOutOfRange(string value)
+    [TestCase("R-1")]
+    [TestCase("S5 F1 R4")]
+    public Task M915RefusesAnActionThatDoesNotExist(string values) => AssertRefusedAsync(values, 'R');
+
+    /// <summary>Assert that M915 with the given values is refused naming a parameter, the first one by default, and changes nothing</summary>
+    private static async Task AssertRefusedAsync(string values, char? parameter = null)
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         DriverStallDetection before = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
-        (int, int, bool) expected = (before.Threshold, before.CoolStep, before.RaiseEvent);
+        (int, bool, int, bool) expected = (before.Threshold, before.Filter, before.CoolStep, before.RaiseEvent);
 
-        string reply = await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} {value}");
+        string reply = await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} {values}");
 
         DriverStallDetection after = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
         Assert.Multiple(() =>
         {
             Assert.That(reply, Does.StartWith("Error:"));
-            Assert.That(reply, Does.Contain($"'{value[0]}'"), "naming the parameter");
+            Assert.That(reply, Does.Contain($"'{parameter ?? values[0]}'"), "naming the parameter");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>(), Is.Empty, "nothing reaches the board");
-            Assert.That((after.Threshold, after.CoolStep, after.RaiseEvent), Is.EqualTo(expected));
+            Assert.That((after.Threshold, after.Filter, after.CoolStep, after.RaiseEvent), Is.EqualTo(expected));
         });
     }
 
@@ -413,24 +423,24 @@ public class M915Tests : BenchFixture
     /// <c>testcases/drivers/m915-report-stall-settings.yaml</c>, set up with R1). Only RRF's local drivers
     /// keep R1 apart, as log-only. The wiki says R1 "just log it" without that distinction
     /// </remarks>
-    /// TODO change R to an enum
     [Test]
-    [TestCase(0)]
-    [TestCase(1)]
-    [TestCase(2)]
-    [TestCase(3)]
-    public async Task M915RecordsTheActionOnStall(int action)
+    [TestCase(StallAction.None)]
+    [TestCase(StallAction.Log)]
+    [TestCase(StallAction.RaiseEvent)]
+    [TestCase(StallAction.RaiseEventAlias)]
+    public async Task M915RecordsTheActionOnStall(StallAction action)
     {
         string driver = DriversRig.MainDriver(0);
-        await using Bench bench = await Bench.StartAsync(DriversRig.Config, $"M915 P{driver} R{(action == 0 ? 1 : 0)}");
+        StallAction other = action == StallAction.None ? StallAction.Log : StallAction.None;
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config, $"M915 P{driver} R{other:D}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{action}")).Trim(), Is.Empty);
+        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{action:D}")).Trim(), Is.Empty);
 
         (_, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         Assert.Multiple(async () =>
         {
-            Assert.That(sent.R, Is.EqualTo(action), "R goes to the board as it was written");
-            Assert.That((await StallAsync(bench, DriversRig.MainDriverBoard, 0)).RaiseEvent, Is.EqualTo(action != 0));
+            Assert.That((StallAction?)sent.R, Is.EqualTo(action), "R goes to the board as it was written");
+            Assert.That((await StallAsync(bench, DriversRig.MainDriverBoard, 0)).RaiseEvent, Is.EqualTo(action != StallAction.None));
         });
     }
 
