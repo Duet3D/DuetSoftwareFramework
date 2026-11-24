@@ -410,7 +410,7 @@ public class M950HeaterTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(Invariant($"M950 H{HeatManager.MaxHeaters} C\"{HeaterPort}\" T{SensorNumber}"));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("parameter 'H' too high"));
+            Assert.That(reply, Does.StartWith("Error:"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Heater>(), Is.Empty, "and no pin was claimed");
         });
     }

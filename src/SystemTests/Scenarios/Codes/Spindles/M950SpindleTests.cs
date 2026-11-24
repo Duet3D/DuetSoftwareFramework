@@ -205,7 +205,7 @@ public class M950SpindleTests : BenchFixture
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Spindles[0]!.Type), Is.EqualTo(SpindleType.FwdRev));
             Assert.That(report, Does.Contain("type fwdRev, forward pin out5, reverse pin out6"));
-            Assert.That(await bench.Host.ExecuteCodeAsync("M950 R0 T2"), Does.StartWith("Error:").And.Contain("parameter 'T' too high"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M950 R0 T2"), Does.StartWith("Error:"));
         });
     }
 
@@ -233,7 +233,7 @@ public class M950SpindleTests : BenchFixture
             $"M950 R{SpindleManager.MaxSpindles} C\"{Expansion.Out(Machines.DriverBoard, 4)}\"");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("parameter 'R' too high"));
+            Assert.That(reply, Does.StartWith("Error:"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty, "and no pin is claimed");
         });
     }

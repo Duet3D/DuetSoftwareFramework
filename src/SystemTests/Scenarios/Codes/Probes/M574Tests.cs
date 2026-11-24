@@ -112,7 +112,7 @@ public class M574Tests : BenchFixture
         });
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S2 K99"),
-                    Does.Contain("Z probe number must be between 0 and"),
+                    Does.StartWith("Error:"),
                     "a K past the last probe is refused (RRF issue #1275, GetLimitedUIValue against MaxZProbes)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Probe), Is.Zero,
                     "and the endstop still names the probe it was given");

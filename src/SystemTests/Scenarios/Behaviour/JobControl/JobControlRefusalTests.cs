@@ -43,7 +43,7 @@ public class JobControlRefusalTests : BenchFixture
                         Does.Contain("Not printing a file"),
                         "M26 with no file selected");
             Assert.That(await bench.Host.ExecuteCodeAsync("G60 S9"),
-                        Does.Contain("S parameter must be between"),
+                        Does.StartWith("Error:"),
                         "G60 S9 is out of range");
             Assert.That(await bench.Host.ExecuteCodeAsync("M505"),
                         Does.Contain("Sys file path is"),

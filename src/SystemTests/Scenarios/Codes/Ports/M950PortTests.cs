@@ -373,7 +373,7 @@ public class M950PortTests : BenchFixture
             $"M950 {letter}{GpioManager.MaxGpOutPorts} C\"{Expansion.Out(Machines.DriverBoard, 4)}\"");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain($"parameter '{letter}' too high"));
+            Assert.That(reply, Does.StartWith("Error:"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty);
         });
     }

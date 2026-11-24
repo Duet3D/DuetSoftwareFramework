@@ -12,10 +12,10 @@ using static SystemTests.Scenarios.Codes.Files.FileSetup;
 
 namespace SystemTests.Scenarios.Codes.Files;
 
-/// <summary>M361, a file's embedded thumbnail</summary>
+/// <summary>M36.1, a file's embedded thumbnail</summary>
 [TestFixture]
-[GCode("M361")]
-public class M361Tests : BenchFixture
+[GCode("M36.1")]
+public class M36Point1Tests : BenchFixture
 {
     /// <summary>A file carrying one PNG thumbnail of known dimensions and data</summary>
     private const string ThumbnailFile = """
@@ -40,7 +40,7 @@ public class M361Tests : BenchFixture
     /// with the data and the next offset
     /// </remarks>
     [Test]
-    public async Task M361ReturnsTheEmbeddedThumbnail()
+    public async Task M36Point1ReturnsTheEmbeddedThumbnail()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
                                              .WithSd(sd => sd.WriteGCode("thumb.gcode", ThumbnailFile))

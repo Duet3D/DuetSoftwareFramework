@@ -12,10 +12,10 @@ using static SystemTests.Scenarios.Codes.Files.FileSetup;
 
 namespace SystemTests.Scenarios.Codes.Files;
 
-/// <summary>M362, a fragment of a file</summary>
+/// <summary>M36.2, a fragment of a file</summary>
 [TestFixture]
-[GCode("M362")]
-public class M362Tests : BenchFixture
+[GCode("M36.2")]
+public class M36Point2Tests : BenchFixture
 {
     /// <summary>The data a fragment or thumbnail answer carries, or null when it carries none</summary>
     private static string? FragmentData(JsonElement root, string key)
@@ -34,7 +34,7 @@ public class M362Tests : BenchFixture
     /// </remarks>
     [Category("KnownGap")]
     [Test]
-    public async Task M362ReturnsAFileFragment()
+    public async Task M36Point2ReturnsAFileFragment()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
                                              .WithSd(sd => sd.WriteGCode("info.gcode", InfoFile))
