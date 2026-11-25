@@ -542,7 +542,7 @@ public class CodeFile(
     /// False if reading has been stopped, so that some of the codes may have been cancelled. They are going to be read again
     /// </returns>
     private async ValueTask<bool> FlushAsync(CancellationToken cancellationToken)
-        => await codeProcessor.FlushAsync(this, cancellationToken) && !IsClosed && !cancellationToken.IsCancellationRequested;
+        => await codeProcessor.FlushAsync(this, cancellationToken) && !IsClosed && !HoldAtNextCode && !cancellationToken.IsCancellationRequested;
 
     /// <summary>
     /// Record the state a code was read in
