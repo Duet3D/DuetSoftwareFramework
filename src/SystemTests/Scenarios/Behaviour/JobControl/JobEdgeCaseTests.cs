@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
@@ -67,6 +68,25 @@ public class JobEdgeCaseTests : BenchFixture
             Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((80.0, 30.0)),
                         "having made all of its motion");
         });
+    }
+
+    /// <summary>DuetControlServer stops at once although a macro of the job has more moves than the queue takes</summary>
+    [Test]
+    public async Task ShutdownWhileAMacroWaitsForTheQueue()
+    {
+        Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed).WithSd(sd =>
+        {
+            sd.WriteMacro("moves.g", "G1 X100 F1000\nG1 X20\nG1 X100\nG1 X20\nG1 X100\n");
+            sd.WriteGCode("job.gcode", "M98 P\"0:/macros/moves.g\"\nG1 X0\n");
+        }).StartAsync();
+        Stopwatch shutdown = new();
+        await using (bench)
+        {
+            await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+            await bench.RunToPositionAsync(axis: 0, position: 5);
+            shutdown.Start();
+        }
+        Assert.That(shutdown.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)));
     }
 
     /// <summary>A job paused inside a while loop makes the iterations that were left when it resumes</summary>

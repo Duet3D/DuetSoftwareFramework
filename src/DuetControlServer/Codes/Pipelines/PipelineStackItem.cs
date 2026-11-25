@@ -59,68 +59,91 @@ public sealed class PipelineStackItem
         // Feed incoming codes to the code handler
         ProcessorTask = Task.Factory.StartNew(async delegate
         {
-            await foreach (Code code in PendingCodes.Reader.ReadAllAsync(_lifetime.ApplicationStopping))
+            try
             {
-                // Set it up
-                lock (this)
+                await ProcessCodesAsync(pipeline, codeProcessor);
+            }
+            finally
+            {
+                // On shutdown nothing else is going to complete the codes left, and whatever waits for them would hang
+                PendingCodes.Writer.TryComplete();
+                while (PendingCodes.Reader.TryRead(out Code? code))
                 {
-                    CodeBeingExecuted = code;
+                    code.SetCancelled();
                 }
-                code.Stage = pipeline.Stage;
-
-                // Process it
-                try
-                {
-                    if (pipeline.Stage != PipelineStage.Executed &&
-                        (code.CancellationToken.IsCancellationRequested || File?.HoldAtNextCode == true ||
-                         (pipeline.Stage <= PipelineStage.ProcessInternally && File is MacroFile { IsAborted: true })))
-                    {
-                        // Do not deal with cancelled codes, nor with the codes of a file a pause is
-                        // waiting to reach the end of: the barrier belongs in the dispatch path, so
-                        // that the code after the macro is cancelled where it would have been started.
-                        // A macro's codes run under the channel's token, so the ones it read ahead of
-                        // an abort or M99 are dropped here, before they execute
-                        codeProcessor.CancelCode(code);
-                    }
-                    else if (pipeline.Stage == PipelineStage.ProcessInternally &&
-                             !code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.IsInternallyProcessed) &&
-                             codeProcessor.ShouldDefer(code, pipeline.LastDeferredCodeTask() is not null, out int ring, out uint anchor))
-                    {
-                        // A Deferred-class code with a live anchor is deferred: dispatched
-                        // without being awaited, so the channel continues past it while its
-                        // handler waits for the anchor move to retire. Every other class is awaited,
-                        // which keeps dispatch order FIFO. The flush comes first and is awaited,
-                        // because it freezes the code's parameters and its place in the
-                        // evaluation order, which must happen before anything later runs
-                        if (await codeProcessor.FlushAsync(code, cancellationToken: code.CancellationToken))
-                        {
-                            pipeline.DeferCode(code, ring, anchor);
-                        }
-                        else
-                        {
-                            codeProcessor.CancelCode(code);
-                        }
-                    }
-                    else
-                    {
-                        await pipeline.ProcessCodeAsync(code);
-                    }
-                }
-                catch (Exception e)
-                {
-                    pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
-                }
-
-                // Code processed, see if there is more to do
-                lock (this)
-                {
-                    Busy = PendingCodes.Reader.TryPeek(out _);
-                    CodeBeingExecuted = null;
-                }
+                Busy = false;
             }
         }).Unwrap();
     }
 
+    /// <summary>
+    /// Process the codes written to this item until it is popped or the application stops
+    /// </summary>
+    /// <param name="pipeline">Pipeline holding this stack item</param>
+    /// <param name="codeProcessor">Code processor</param>
+    /// <returns>Asynchronous task</returns>
+    private async Task ProcessCodesAsync(PipelineBase pipeline, CodeProcessor codeProcessor)
+    {
+        await foreach (Code code in PendingCodes.Reader.ReadAllAsync(_lifetime.ApplicationStopping))
+        {
+            // Set it up
+            lock (this)
+            {
+                CodeBeingExecuted = code;
+            }
+            code.Stage = pipeline.Stage;
+
+            // Process it
+            try
+            {
+                if (pipeline.Stage != PipelineStage.Executed &&
+                    (code.CancellationToken.IsCancellationRequested || File?.HoldAtNextCode == true ||
+                     (pipeline.Stage <= PipelineStage.ProcessInternally && File is MacroFile { IsAborted: true })))
+                {
+                    // Do not deal with cancelled codes, nor with the codes of a file a pause is
+                    // waiting to reach the end of: the barrier belongs in the dispatch path, so
+                    // that the code after the macro is cancelled where it would have been started.
+                    // A macro's codes run under the channel's token, so the ones it read ahead of
+                    // an abort or M99 are dropped here, before they execute
+                    codeProcessor.CancelCode(code);
+                }
+                else if (pipeline.Stage == PipelineStage.ProcessInternally &&
+                         !code.Flags.HasFlag(DuetAPI.Commands.CodeFlags.IsInternallyProcessed) &&
+                         codeProcessor.ShouldDefer(code, pipeline.LastDeferredCodeTask() is not null, out int ring, out uint anchor))
+                {
+                    // A Deferred-class code with a live anchor is deferred: dispatched
+                    // without being awaited, so the channel continues past it while its
+                    // handler waits for the anchor move to retire. Every other class is awaited,
+                    // which keeps dispatch order FIFO. The flush comes first and is awaited,
+                    // because it freezes the code's parameters and its place in the
+                    // evaluation order, which must happen before anything later runs
+                    if (await codeProcessor.FlushAsync(code, cancellationToken: code.CancellationToken))
+                    {
+                        pipeline.DeferCode(code, ring, anchor);
+                    }
+                    else
+                    {
+                        codeProcessor.CancelCode(code);
+                    }
+                }
+                else
+                {
+                    await pipeline.ProcessCodeAsync(code);
+                }
+            }
+            catch (Exception e)
+            {
+                pipeline.ChannelProcessor.Logger.LogError(e, "Failed to process code in stage {0}", pipeline.Stage);
+            }
+
+            // Code processed, see if there is more to do
+            lock (this)
+            {
+                Busy = PendingCodes.Reader.TryPeek(out _);
+                CodeBeingExecuted = null;
+            }
+        }
+    }
 
     /// <summary>
     /// Pending codes to be executed
@@ -198,6 +221,11 @@ public sealed class PipelineStackItem
         }
         if (!PendingCodes.Writer.TryWrite(code))
         {
+            if (_lifetime.ApplicationStopping.IsCancellationRequested)
+            {
+                code.SetCancelled();
+                return;
+            }
             _pipeline.ChannelProcessor.Logger.LogError("Pipeline failed to store code immediately so waiting synchronously for it to be added");
             PendingCodes.Writer.WriteAsync(code, _lifetime.ApplicationStopping).AsTask().Wait();
         }
@@ -209,12 +237,19 @@ public sealed class PipelineStackItem
     /// <param name="code">Code to enqueue</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    public ValueTask WriteCodeAsync(Code code, CancellationToken cancellationToken = default)
+    public async ValueTask WriteCodeAsync(Code code, CancellationToken cancellationToken = default)
     {
         lock (this)
         {
             Busy = true;
         }
-        return PendingCodes.Writer.WriteAsync(code, cancellationToken);
+        try
+        {
+            await PendingCodes.Writer.WriteAsync(code, cancellationToken);
+        }
+        catch (ChannelClosedException) when (_lifetime.ApplicationStopping.IsCancellationRequested)
+        {
+            code.SetCancelled();
+        }
     }
 }
