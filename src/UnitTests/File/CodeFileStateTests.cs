@@ -119,6 +119,25 @@ public class CodeFileStateTests
     }
 
     [Test]
+    public async Task APositionNothingIsKnownAboutHasNoBlocksAndNoVariables()
+    {
+        await System.IO.File.WriteAllTextAsync(_path, "var x = 1\nG1 X1\nG1 X2\n");
+        using CodeFile file = NewFile();
+        Code var = await file.ReadCodeAsync(NewCode());
+        file.Variables.TryCreateVariable("x", 1, var.FileState.Block!.Depth);
+
+        file.Rewind(CodeFileState.At("var x = 1\n".Length), atEnd: true);
+        Code code = await ReadAsync(file);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.ToString(), Is.EqualTo("G1 X1"));
+            Assert.That(code.FileState.Block, Is.Null);
+            Assert.That(code.FileState.Variables, Is.Empty);
+        });
+    }
+
+    [Test]
     public void LeavingALoopSkipsTheRestOfTheBlocksInIt()
     {
         static CodeBlock NewBlock(KeywordType keyword, CodeBlock parent)

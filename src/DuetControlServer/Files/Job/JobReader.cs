@@ -267,14 +267,7 @@ internal sealed class JobReader
     /// <returns>Asynchronous task</returns>
     /// <remarks>M26, which only ever names a position for a job that is selected or paused</remarks>
     public async ValueTask SetPositionAsync(long position, CancellationToken cancellationToken)
-    {
-        using (await File.LockAsync(cancellationToken))
-        {
-            File.Position = position;
-            _position = new ReaderPosition(File.State, AtEnd: true);
-        }
-        _codeProcessor.ResolveSyncRequestsAfter(position);
-    }
+        => await ReadFromAsync(new ReaderPosition(CodeFileState.At(position), AtEnd: true), cancellationToken);
 
     /// <summary>
     /// Set where the stream reads from next

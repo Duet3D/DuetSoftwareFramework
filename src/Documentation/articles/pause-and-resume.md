@@ -369,8 +369,7 @@ resume that fails settles back to `Paused` and reports the error rather than res
 
 ## 8. Starting part-way through a line: M26
 
-`M26` is the same problem from the other end. `M26 S<offset>` seeks the job file, and the two
-parameters that go with it describe how the line at that offset is to be read:
+`M26` is the same problem from the other end. `M26 S<offset>` seeks the job file, leaving any code blocks and local variables behind, and the two parameters that go with it describe how the line at that offset is to be read:
 
 - `P<fraction>` is how much of the line the machine has already made,
 - `C<number>` is the modal G command it was read under.

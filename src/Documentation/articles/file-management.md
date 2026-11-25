@@ -77,7 +77,7 @@ tells the reader to rewind there; on **resume** the reader is told to read on fr
 position that is, and how a line the machine is half way through is finished rather than repeated, is
 [Pausing and resuming a job](pause-and-resume.md). The rewind puts back the open blocks, including the iteration count of a `while`, and the local variables as they were at that point.
 
-`M606 S1` **forks** the job (`ForkAsync`): a second stream on the [`File2` channel](gcode-flow.md#code-channels) reads on after the `M606`, with the open code blocks and local variables of that point, so two motion systems can print in parallel.
+`M606 S1` **forks** the job (`ForkAsync`): a second stream on the [`File2` channel](gcode-flow.md#code-channels) reads on after the `M606`, with the open code blocks and local variables of that point, so two motion systems can print in parallel. `M26` seeks without either.
 
 ## Macros
 

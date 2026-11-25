@@ -205,6 +205,40 @@ public class JobEdgeCaseTests : BenchFixture
         Assert.That(shutdown.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)));
     }
 
+    /// <summary>M26 leaves the loop a job was paused in</summary>
+    [Test]
+    [Category("LongRunning")]
+    public async Task M26WhilePausedInsideWhileLoop()
+    {
+        const string job = """
+            G90
+            G1 X10 Y10 F6000
+            while iterations < 4
+                G1 X80 Y30 F6000
+                G1 X10 Y10 F6000
+            G1 X50 Y50 F6000
+            G60 S3
+            """;
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd => sd.WriteGCode("job.gcode", job)).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.RunToPositionAsync(axis: 0, position: 40);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync($"M26 S{job.IndexOf("G1 X50")}");
+        bench.CanMaster.ClearCapture();
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(bench.CanMaster.MoveDistances(), Has.Exactly(2).Items, "back to where it paused, and to X50 Y50");
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((50.0, 50.0)), "final position");
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job ended normally");
+        });
+    }
+
     /// <summary>A job that pauses itself inside a while loop makes the iterations that were left when it resumes</summary>
     [Test]
     [Category("LongRunning")]
