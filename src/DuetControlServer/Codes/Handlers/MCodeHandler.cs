@@ -718,10 +718,22 @@ internal partial class MCodeHandler(
             cancellationToken = code.DetachFromChannelCancellation();
         }
 
-        return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, PrintPausedReason.User, Files.Job.PauseMacro.Pause,
-                                                               Synchronous: code.IsFromFileChannel,
-                                                               ReportPosition: true),
-                                              cancellationToken);
+        // A pause that waits for a macro of the job waits for the moves of that macro
+        MovementLock.Suspension? suspension = code.IsFromFileChannel ? null : code.SuspendMovementLock();
+        try
+        {
+            return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, PrintPausedReason.User, Files.Job.PauseMacro.Pause,
+                                                                   Synchronous: code.IsFromFileChannel,
+                                                                   ReportPosition: true),
+                                                  cancellationToken);
+        }
+        finally
+        {
+            if (suspension is not null)
+            {
+                await suspension.RestoreAsync(cancellationToken);
+            }
+        }
     }
 
     /// <summary>

@@ -197,6 +197,26 @@ public class DeferredPauseTests : BenchFixture
         });
     }
 
+    /// <summary>An M25 that waits for a macro of the job lets that macro move, although its own input holds the movement lock</summary>
+    [Test]
+    public async Task DeferredPauseFromAnInputThatHoldsTheMovementLock()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteSys("homeall.g", "M25\n");
+            sd.WriteMacro("plain.g", "set global.macroRuns = 1\nG4 P500\nG1 X20 F6000\n");
+            sd.WriteGCode("job.gcode", "M98 P\"0:/macros/plain.g\"\nG4 P0\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("G28");
+
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(bench.CanMaster.MoveDistances(), Is.EqualTo(new[] { 20.0f }).Within(0.1f), "the move of the macro was made");
+    }
+
     /// <summary>A pause that waits for a macro called in a loop leaves the iterations that are left</summary>
     [Test]
     [Category("LongRunning")]

@@ -19,8 +19,8 @@ namespace DuetControlServer.Motion;
 /// </para>
 /// <para>
 /// A code waiting on something unrelated to motion, such as heaters or a dwell, releases only its own
-/// hold. A code waiting for motion that another channel has to make, such as starting or resuming
-/// the job (and TODO: a blocking M291 and manual probing, once they are implemented), suspends every
+/// hold. A code waiting for motion that another channel has to make, such as starting, resuming
+/// or pausing the job (and TODO: a blocking M291 and manual probing, once they are implemented), suspends every
 /// hold its channel has and restores them afterwards.
 /// </para>
 /// </remarks>
