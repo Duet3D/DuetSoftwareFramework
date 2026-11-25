@@ -8,11 +8,15 @@ Tracking known issues to keep Github issues from being spammed by issues for the
 - [ ] Nothing maintains `job.layer`, so `JobMonitor.UpdateLayers` never records `job.layers[]` statistics and DWC's layer chart stays empty. RepRapFirmware's PrintMonitor derives the current layer from the Z height and the layer height reported by the file info.
 
 
+### Progress of a job in a loop
+- [ ] `job.filePosition` lags by up to `BufferedPrintCodes` codes while a job is in a block whose conditions have to be evaluated, and stays 0 until that many have been read: `JobReader` fills its whole window, waiting for each condition, before it looks at the codes that have completed.
+
 ### A deferred code stalls the moves behind it
 - [ ] Found on hardware as a stutter whenever a deferred command is sent, with `Underruns [0, 96]` on the ring to go with it. A deferred code's handler runs on its channel's `ProcessInternally` stage, and the channel submits no further moves while it runs, so the ring drains. The `Movement delay` in the same report is the scheduling horizon and is constant; it is not this.
 
 ### Object Model
 - [ ] `om-default-boards` records `1`; DSF reports `true`.
+- [ ] Nothing sets `state.thisInput`, so `inputs[state.thisInput]` is an error.
 
 ### Kinematics
 - [ ] Delta kinematics can't set `NumTowers` using gcode
