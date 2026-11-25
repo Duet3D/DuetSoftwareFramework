@@ -505,10 +505,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// </summary>
     /// <param name="command">The request, or null for a pause the reader reported a boundary for</param>
     /// <param name="request">What kind of pause</param>
-    /// <param name="boundaryPosition">
-    /// Where the reader stopped, for a pause that asked the engine for nothing
-    /// </param>
-    private async ValueTask BeginPauseAsync(JobCommand? command, PauseRequest request, long? boundaryPosition = null)
+    private async ValueTask BeginPauseAsync(JobCommand? command, PauseRequest request)
     {
         // The finish a pause landed on top of is dropped: the reader reports Finished again once the
         // job resumes and runs out of codes a second time
@@ -533,7 +530,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             command?.Reply(new Message());
             command = null;
         }
-        StartSequence(command, token => _sequences.PauseAsync(_state, request, boundaryPosition, token));
+        StartSequence(command, token => _sequences.PauseAsync(_state, request, token));
     }
 
     /// <summary>
@@ -680,7 +677,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
 
         JobStream stream = NewStream(1, forked);
         await PublishAsync(state with { Streams = state.Streams.Add(stream) });
-        await stream.Reader.RunAsync(null, restartMacro: false, RunToken, _lifetime.ApplicationStopping);
+        await stream.Reader.RunAsync(restartMacro: false, RunToken, _lifetime.ApplicationStopping);
         command.Reply(new Message());
     }
 
@@ -695,7 +692,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             // The macro was let finish, so the File channel is inside none by construction and
             // nothing was submitted past the last code's moves. The ring drains to rest at the
             // boundary, so the pause makes no stop and rewinds to where the reader says it is
-            await BeginPauseAsync(null, request with { Synchronous = true }, command.Position);
+            await BeginPauseAsync(null, request with { Synchronous = true });
         }
         command.Reply(new Message());
     }
@@ -856,12 +853,11 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         await PublishAsync(state with { Phase = JobPhase.Running });
         foreach (JobStream stream in state.Streams)
         {
-            await stream.Reader.RunAsync(stream.RewindPoint, stream.AbandonedMacros, RunToken,
-                                         _lifetime.ApplicationStopping);
+            await stream.Reader.RunAsync(stream.AbandonedMacros, RunToken, _lifetime.ApplicationStopping);
         }
         await PublishAsync(_state with
         {
-            Streams = [.. ClearRewindPoints(_state.Streams)]
+            Streams = [.. Restarted(_state.Streams)]
         });
     }
 
@@ -1093,7 +1089,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     {
         JobReader reader = new(index, file, _commands.Writer, _codeFactory, _codeProcessor, _eventLogger,
                                _loggerFactory.CreateLogger<JobReader>(), _settings.BufferedPrintCodes);
-        return new JobStream(index, file.Channel, reader, null, false, false);
+        return new JobStream(index, file.Channel, reader, AbandonedMacros: false, Finished: false);
     }
 
     /// <summary>
@@ -1108,13 +1104,13 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     }
 
     /// <summary>
-    /// The streams with the rewind points a resume has just spent taken back off
+    /// The streams with what a resume has just spent taken back off
     /// </summary>
-    private static IEnumerable<JobStream> ClearRewindPoints(ImmutableArray<JobStream> streams)
+    private static IEnumerable<JobStream> Restarted(ImmutableArray<JobStream> streams)
     {
         foreach (JobStream stream in streams)
         {
-            yield return stream with { RewindPoint = null, AbandonedMacros = false, Finished = false };
+            yield return stream with { AbandonedMacros = false, Finished = false };
         }
     }
 
@@ -1133,7 +1129,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 {
                     if (rewind.Stream == stream.Index)
                     {
-                        result = stream with { RewindPoint = rewind.Point, AbandonedMacros = rewind.AbandonedMacros };
+                        result = stream with { AbandonedMacros = rewind.AbandonedMacros };
                         break;
                     }
                 }

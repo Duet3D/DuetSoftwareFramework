@@ -217,6 +217,26 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal Files.CodeFile? File { get; set; }
 
     /// <summary>
+    /// State to rewind the file to this code in, if it was read from one
+    /// </summary>
+    internal Files.CodeFileState FileState { get; set; }
+
+    /// <summary>
+    /// Record the local variables of the job file as they are now in <see cref="FileState"/>
+    /// </summary>
+    /// <remarks>
+    /// Must be called while no later code of the file can run. Macros are only run again from their start, so theirs are
+    /// not recorded
+    /// </remarks>
+    internal void SaveVariables()
+    {
+        if (File is not null and not Files.MacroFile)
+        {
+            FileState = FileState with { Variables = File.Variables.Snapshot() };
+        }
+    }
+
+    /// <summary>
     /// Whether the ProcessInternally worker is deferring this code: the channel continues past it,
     /// and its handler runs when its anchor move has retired
     /// </summary>
@@ -662,6 +682,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         Connection = null;
         Stage = Codes.PipelineStage.Start;
         File = null;
+        FileState = default;
         _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         BinarySize = 0;
         ErrorColumn = DuetAPI.Commands.CodeParameter.NoColumn;

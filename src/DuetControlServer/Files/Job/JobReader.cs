@@ -17,13 +17,18 @@ namespace DuetControlServer.Files.Job;
 /// <summary>
 /// Where a reader has got to in its file
 /// </summary>
-/// <param name="Value">Byte offset of the end of the last code that completed</param>
+/// <param name="State">State of the code it has got to</param>
+/// <param name="AtEnd">Whether it has got to the end of that code rather than to its start</param>
 /// <remarks>
-/// A record rather than a field because a <c>volatile long</c> does not compile and a plain one
-/// tears on the 32-bit ARM target: the reference is what is published, and the value it points at
-/// never changes
+/// A class, so that the reference is what is published and the value it points at never changes
 /// </remarks>
-internal sealed record ReaderPosition(long Value);
+internal sealed record ReaderPosition(CodeFileState State, bool AtEnd)
+{
+    /// <summary>
+    /// Byte offset of it
+    /// </summary>
+    public long Value => AtEnd ? State.EndPosition : State.StartPosition;
+}
 
 /// <summary>
 /// Reads one stream of a job and executes what it reads
@@ -70,6 +75,7 @@ internal sealed class JobReader
         _codeProcessor = codeProcessor;
         _eventLogger = eventLogger;
         _logger = logger;
+        _position = new ReaderPosition(file.State, AtEnd: true);
 
         for (int i = 0; i < Math.Max(bufferedCodes, 1); i++)
         {
@@ -101,7 +107,7 @@ internal sealed class JobReader
     /// controller, so asking for it costs no command and no lock
     /// </remarks>
     public long Position => _position.Value;
-    private volatile ReaderPosition _position = new(0);
+    private volatile ReaderPosition _position;
 
     /// <summary>
     /// Cancels the codes of the stretch of reading between a <c>Run</c> and the next freeze
@@ -128,26 +134,18 @@ internal sealed class JobReader
     private volatile bool _frozenAtBoundary;
 
     /// <summary>
-    /// Start reading, from the point the controller says the job carries on from
+    /// Start reading from where the file stands
     /// </summary>
-    /// <param name="from">Where to carry on from, or null to read on from where the file stands</param>
     /// <param name="restartMacro">
     /// Whether the first command is one the job is running again, which is RepRapFirmware's
     /// <c>firstCommandAfterRestart</c>
     /// </param>
     /// <param name="runToken">Token cancelled when the run this reading belongs to is torn down</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    public async ValueTask RunAsync(JobResumePoint? from, bool restartMacro, CancellationToken runToken,
-                                    CancellationToken cancellationToken)
+    public async ValueTask RunAsync(bool restartMacro, CancellationToken runToken, CancellationToken cancellationToken)
     {
         using (await File.LockAsync(cancellationToken))
         {
-            if (from is JobResumePoint point && point.GCommandNumber >= 0)
-            {
-                // A resumed line may be a bare "X100 Y100 E5", and what makes that a move is a G1
-                // several lines above it. RepRapFirmware's SetModalGCommand
-                File.ModalGCommand = point.GCommandNumber;
-            }
             File.FirstCommandAfterRestart = restartMacro || File.Position > 0;
             File.HoldAtNextCode = false;
         }
@@ -244,22 +242,21 @@ internal sealed class JobReader
     /// <summary>
     /// Set where the stream carries on from and report that it has stopped there
     /// </summary>
-    /// <param name="position">Byte offset to read from next</param>
+    /// <param name="point">Where to carry on from, or null for where the stream has got to</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <returns>Byte offset the stream carries on from</returns>
     /// <remarks>
     /// Separate from the freeze because the rewind point is not known until the machine has stopped.
     /// A frozen reader answers this whether or not it had reached the end of the file, and never
     /// reports <c>Finished</c> after a freeze
     /// </remarks>
-    public async ValueTask RewindAsync(long position, CancellationToken cancellationToken)
+    public async ValueTask<long> RewindAsync(JobResumePoint? point, CancellationToken cancellationToken)
     {
-        using (await File.LockAsync(cancellationToken))
-        {
-            File.Position = position;
-        }
-        Publish(position);
-        _codeProcessor.ResolveSyncRequestsAfter(position);
+        ReaderPosition position = (point is JobResumePoint resume)
+            ? new ReaderPosition(resume.FileState, AtEnd: resume.FilePosition == resume.FileState.EndPosition)
+            : _position;
+        await ReadFromAsync(position, cancellationToken);
+        return position.Value;
     }
 
     /// <summary>
@@ -269,8 +266,31 @@ internal sealed class JobReader
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>M26, which only ever names a position for a job that is selected or paused</remarks>
-    public ValueTask SetPositionAsync(long position, CancellationToken cancellationToken)
-        => RewindAsync(position, cancellationToken);
+    public async ValueTask SetPositionAsync(long position, CancellationToken cancellationToken)
+    {
+        using (await File.LockAsync(cancellationToken))
+        {
+            File.Position = position;
+            _position = new ReaderPosition(File.State, AtEnd: true);
+        }
+        _codeProcessor.ResolveSyncRequestsAfter(position);
+    }
+
+    /// <summary>
+    /// Set where the stream reads from next
+    /// </summary>
+    /// <param name="position">Position to read from</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private async ValueTask ReadFromAsync(ReaderPosition position, CancellationToken cancellationToken)
+    {
+        using (await File.LockAsync(cancellationToken))
+        {
+            File.Rewind(position.State, position.AtEnd);
+            _position = position;
+        }
+        _codeProcessor.ResolveSyncRequestsAfter(position.Value);
+    }
 
     /// <summary>
     /// Close the file and release what the stream held
@@ -386,7 +406,7 @@ internal sealed class JobReader
                         // actually stopped at
                         if (!code.IsNonFirmwareComment)
                         {
-                            Publish((code.FilePosition ?? 0L) + (code.Length ?? 0L));
+                            _position = new ReaderPosition(code.FileState, AtEnd: true);
                         }
                     }
                     catch (OperationCanceledException)
@@ -440,7 +460,7 @@ internal sealed class JobReader
         {
             // The boundary the pause was waiting for: the end of the job code that was running, and
             // of the macro it was inside. Reported whether or not the file also ran out
-            await Post(new JobCommand.ReaderStopped(Index, Position));
+            await Post(new JobCommand.ReaderStopped(Index));
             return;
         }
 
@@ -467,12 +487,6 @@ internal sealed class JobReader
 
         // A freeze reports nothing here: the controller has the rewind point to send first
     }
-
-    /// <summary>
-    /// Record where the stream has got to
-    /// </summary>
-    /// <param name="position">Byte offset</param>
-    private void Publish(long position) => _position = new ReaderPosition(position);
 
     /// <summary>
     /// Tell the controller what the stream did

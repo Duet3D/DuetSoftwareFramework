@@ -9,9 +9,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Code = DuetControlServer.Commands.Code;
@@ -87,9 +86,10 @@ public class CodeFile(
     public CodeChannel Channel { get; } = channel;
 
     /// <summary>
-    /// Internal stack for conditional G-code execution
+    /// Innermost open code block of the conditional G-code being read
     /// </summary>
-    private readonly Stack<CodeBlock> _codeBlocks = new();
+    /// <remarks>Written by the reader, and read by the codes that ask for the iterations</remarks>
+    private volatile CodeBlock? _codeBlock;
 
     /// <summary>
     /// Last ended code block
@@ -115,6 +115,38 @@ public class CodeFile(
     }
 
     /// <summary>
+    /// State to read on from the current position in
+    /// </summary>
+    internal CodeFileState State
+    {
+        get
+        {
+            long position = Position;
+            return new CodeFileState(position, position, _parserBuffer.State, _parserBuffer.State, _codeBlock, _lastCodeBlock, Variables.Snapshot());
+        }
+    }
+
+    /// <summary>
+    /// Read from the code the given state is of
+    /// </summary>
+    /// <param name="state">State of the code</param>
+    /// <param name="atEnd">Whether to read from the end of the code rather than from its start</param>
+    /// <remarks>
+    /// This instance must be locked when this is called
+    /// </remarks>
+    internal void Rewind(CodeFileState state, bool atEnd)
+    {
+        if (!IsClosed)
+        {
+            Position = atEnd ? state.EndPosition : state.StartPosition;
+            _parserBuffer.State = atEnd ? state.End : state.Start;
+            _codeBlock = state.Block;
+            _lastCodeBlock = state.LastBlock;
+            Variables.Restore(state.Variables ?? ImmutableDictionary<string, LocalVariable>.Empty);
+        }
+    }
+
+    /// <summary>
     /// File position of the next code to actually run
     /// </summary>
     public long NextFilePosition { get; set; }
@@ -134,13 +166,7 @@ public class CodeFile(
     /// <summary>
     /// The G-code number a line that names no command letter repeats, or -1 if there is none
     /// </summary>
-    /// <remarks>
-    /// Reading from a new position throws this away with the rest of the parser state, which is
-    /// right for a seek to somewhere unrelated and wrong for the seek a pause makes: the job carries
-    /// on from a line that may well be a bare <c>X100 Y100 E5</c>, and what makes that a move is the
-    /// G1 several lines above it. So a resume puts it back, which is RepRapFirmware's
-    /// <c>SetModalGCommand</c>
-    /// </remarks>
+    /// <remarks>Set by <c>M26 C</c>, RepRapFirmware's <c>SetModalGCommand</c>. A rewind puts it back with the rest of the parser state</remarks>
     public int ModalGCommand
     {
         get => _parserBuffer.LastGCode;
@@ -155,17 +181,7 @@ public class CodeFile(
     /// <exception cref="CodeParserException">Query came outside a while loop</exception>
     public int GetIterations(Code code)
     {
-        lock (_codeBlocks)
-        {
-            foreach (CodeBlock codeBlock in _codeBlocks)
-            {
-                if (codeBlock.Keyword == KeywordType.While)
-                {
-                    return codeBlock.Iterations;
-                }
-            }
-        }
-        throw new CodeParserException("'iterations' used when not inside a loop", code);
+        return _codeBlock?.Loop?.Iterations ?? throw new CodeParserException("'iterations' used when not inside a loop", code);
     }
 
     /// <summary>
@@ -229,12 +245,8 @@ public class CodeFile(
         IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
     {
         // Copy conditional states
-        _codeBlocks.Clear();
-        foreach (CodeBlock block in copyFrom._codeBlocks.Reverse())
-        {
-            _codeBlocks.Push(block with { });
-        }
-        _lastCodeBlock = (copyFrom._lastCodeBlock is not null) ? copyFrom._lastCodeBlock with { } : null;
+        _codeBlock = copyFrom._codeBlock;
+        _lastCodeBlock = copyFrom._lastCodeBlock;
 
         // Seek to the next code's file position and shallow-copy the parser state
         Position = copyFrom.NextFilePosition;
@@ -313,6 +325,7 @@ public class CodeFile(
 
             // Read the next available code
             bool codeRead;
+            CodeParserState startOfCode;
             using (await LockAsync(cancellationToken))
             {
                 if (IsClosed)
@@ -329,6 +342,7 @@ public class CodeFile(
                     }
 
                     // Get the next code
+                    startOfCode = _parserBuffer.State;
                     codeRead = await DuetAPI.Commands.Code.ParseAsync(_fileStream, code, _parserBuffer, cancellationToken);
                 }
                 while (!codeRead && _parserBuffer.GetPosition(_fileStream) < _fileStream.Length);
@@ -341,7 +355,7 @@ public class CodeFile(
 
             // Check if this is the end of the last block(s)
             bool readAgain = false;
-            while (_codeBlocks.TryPeek(out CodeBlock? state))
+            while (_codeBlock is CodeBlock state)
             {
                 if (!codeRead || (code.Type != CodeType.Comment && state.IsFinished(code.Indent)))
                 {
@@ -352,16 +366,15 @@ public class CodeFile(
                     // this instance instead, which is when RepRapFirmware deletes them too: its
                     // StopPrint clears the job file's blocks, not the read-ahead reaching the end of
                     // the file
-                    if (!codeRead && !IsInsideActiveLoop())
+                    if (!codeRead && !state.IsInsideActiveLoop)
                     {
                         break;
                     }
 
-                    if (state.HasLocalVariables)
+                    // Wait for pending commands to be executed so all the local variables can be disposed of again
+                    if (state.HasLocalVariables && !await FlushAsync(cancellationToken))
                     {
-                        // Wait for pending commands to be executed so all the local variables can be disposed of again.
-                        // We don't care if this fails, because we need to tidy up in any case
-                        await codeProcessor.FlushAsync(this, cancellationToken);
+                        return null;
                     }
 
                     if (state.Keyword == KeywordType.While)
@@ -376,30 +389,33 @@ public class CodeFile(
                             // End of while loop
                             if (state.ProcessBlock || state.ContinueLoop)
                             {
-                                if (!state.HasLocalVariables)
+                                // Wait for pending codes to be fully executed so that "iterations" can be incremented
+                                if (!state.HasLocalVariables && !await FlushAsync(cancellationToken))
                                 {
-                                    // Wait for pending codes to be fully executed so that "iterations" can be incremented.
-                                    // We don't care if this fails, because we need to tidy up in any case
-                                    await codeProcessor.FlushAsync(this, cancellationToken);
+                                    return null;
                                 }
 
                                 using (await LockAsync(cancellationToken))
                                 {
                                     Position = state.FilePosition ?? 0;
                                     _parserBuffer.LineNumber = state.LineNumber;
-                                    state.ProcessBlock = true;
-                                    state.ContinueLoop = false;
-                                    state.Iterations++;
                                     DeleteLocalVariables(state);
+                                    _codeBlock = state with
+                                    {
+                                        ProcessBlock = true,
+                                        ContinueLoop = false,
+                                        Iterations = state.Iterations + 1,
+                                        HasLocalVariables = false
+                                    };
                                     readAgain = true;
                                     if (!IsClosed)
                                     {
-                                        logger.LogRestartingBlock(state.Keyword, state.Iterations);
+                                        logger.LogRestartingBlock(state.Keyword, state.Iterations + 1);
                                     }
                                 }
                                 break;
                             }
-                            await EndCodeBlockAsync(cancellationToken);
+                            EndCodeBlock(state);
                         }
                         else
                         {
@@ -410,7 +426,7 @@ public class CodeFile(
                     else
                     {
                         // End of generic code block
-                        await EndCodeBlockAsync(cancellationToken);
+                        EndCodeBlock(state);
                     }
                 }
                 else
@@ -432,12 +448,13 @@ public class CodeFile(
             }
 
             // Process only codes where the corresponding condition is met
-            if (!_codeBlocks.TryPeek(out CodeBlock? codeBlock) || codeBlock.ProcessBlock)
+            CodeBlock? codeBlock = _codeBlock;
+            if (codeBlock is null || codeBlock.ProcessBlock)
             {
                 // FIXME If/ElseIf/Else/While are not sent to the interceptors
-                if (codeBlock is not null && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.FilePosition))
+                if (codeBlock is { SeenCodes: false } && (code.Keyword != KeywordType.While || code.FilePosition != codeBlock.FilePosition))
                 {
-                    codeBlock.SeenCodes = true;
+                    _codeBlock = codeBlock = codeBlock with { SeenCodes = true };
                 }
 
                 switch (code.Keyword)
@@ -458,16 +475,13 @@ public class CodeFile(
                             {
                                 // Last if/elif condition was true, ignore the following block
                                 logger.LogDebug("Skipping {Keyword} block", code.Keyword);
-                                lock (_codeBlocks)
-                                {
-                                    _codeBlocks.Push(new CodeBlock(code, false));
-                                }
+                                _codeBlock = new CodeBlock(code, false, codeBlock);
                                 break;
                             }
                         }
 
                         // Start a new conditional block if necessary
-                        if (!await codeProcessor.FlushAsync(this, cancellationToken) || IsClosed)
+                        if (!await FlushAsync(cancellationToken))
                         {
                             return null;
                         }
@@ -475,11 +489,7 @@ public class CodeFile(
                         logger.LogDebug("Evaluating {Keyword} block", code.Keyword);
                         if (code.Keyword != KeywordType.While || codeBlock is null || codeBlock.FilePosition != code.FilePosition)
                         {
-                            codeBlock = new CodeBlock(code, false);
-                            lock (_codeBlocks)
-                            {
-                                _codeBlocks.Push(codeBlock);
-                            }
+                            _codeBlock = codeBlock = new CodeBlock(code, false, codeBlock);
                         }
 
                         // Evaluate the condition
@@ -487,8 +497,11 @@ public class CodeFile(
                         if (bool.TryParse(stringEvaluationResult, out bool evaluationResult))
                         {
                             logger.LogDebug("Evaluation result: ({KeywordArgument}) = {Result}", code.KeywordArgument, evaluationResult);
-                            codeBlock.ProcessBlock = evaluationResult;
-                            codeBlock.ExpectingElse = (code.Keyword != KeywordType.While) && !evaluationResult;
+                            _codeBlock = codeBlock with
+                            {
+                                ProcessBlock = evaluationResult,
+                                ExpectingElse = (code.Keyword != KeywordType.While) && !evaluationResult
+                            };
                         }
                         else
                         {
@@ -505,34 +518,23 @@ public class CodeFile(
 
                         // else condition is true if the last if/elif condition was false
                         logger.LogDebug("{Operation} {Keyword} block", _lastCodeBlock.ExpectingElse ? "Starting" : "Skipping", code.Keyword);
-                        lock (_codeBlocks)
-                        {
-                            _codeBlocks.Push(new CodeBlock(code, _lastCodeBlock.ExpectingElse));
-                        }
+                        _codeBlock = new CodeBlock(code, _lastCodeBlock.ExpectingElse, codeBlock);
                         break;
 
                     case KeywordType.Break:
                     case KeywordType.Continue:
-                        if (!_codeBlocks.Any(codeBlock => codeBlock.Keyword == KeywordType.While))
+                        if (codeBlock?.Loop is null)
                         {
                             throw new CodeParserException("break or continue cannot be called outside while loop", code);
                         }
 
-                        if (!await codeProcessor.FlushAsync(this, cancellationToken) || IsClosed)
+                        if (!await FlushAsync(cancellationToken))
                         {
                             return null;
                         }
 
                         logger.LogDebug("Doing {Keyword}", code.Keyword);
-                        foreach (CodeBlock state in _codeBlocks)
-                        {
-                            state.ProcessBlock = false;
-                            if (state.Keyword == KeywordType.While)
-                            {
-                                state.ContinueLoop = code.Keyword == KeywordType.Continue;
-                                break;
-                            }
-                        }
+                        _codeBlock = codeBlock.Leave(code.Keyword == KeywordType.Continue);
                         break;
 
                     case KeywordType.Abort:
@@ -543,19 +545,13 @@ public class CodeFile(
                     case KeywordType.Var:
                         if (codeBlock is null || code.Indent > codeBlock.Indent)
                         {
-                            codeBlock = new CodeBlock(code, true)
-                            {
-                                HasLocalVariables = true
-                            };
-                            lock (_codeBlocks)
-                            {
-                                _codeBlocks.Push(codeBlock);
-                            }
+                            _codeBlock = new CodeBlock(code, true, codeBlock) { HasLocalVariables = true };
                         }
-                        else
+                        else if (!codeBlock.HasLocalVariables)
                         {
-                            codeBlock.HasLocalVariables = true;
+                            _codeBlock = codeBlock with { HasLocalVariables = true };
                         }
+                        SaveState(code, startOfCode);
                         return code;
 
                     case KeywordType.Skip:
@@ -566,6 +562,7 @@ public class CodeFile(
                     case KeywordType.Global:
                     case KeywordType.None:
                     case KeywordType.Set:
+                        SaveState(code, startOfCode);
                         return code;
 
                     default:
@@ -573,6 +570,27 @@ public class CodeFile(
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Wait for the codes read from this file to be executed
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>
+    /// False if reading has been stopped, so that some of the codes may have been cancelled. They are going to be read again
+    /// </returns>
+    private async ValueTask<bool> FlushAsync(CancellationToken cancellationToken)
+        => await codeProcessor.FlushAsync(this, cancellationToken) && !IsClosed && !cancellationToken.IsCancellationRequested;
+
+    /// <summary>
+    /// Record the state a code was read in
+    /// </summary>
+    /// <param name="code">Code that has just been read</param>
+    /// <param name="startOfCode">State of the parser where it starts</param>
+    private void SaveState(Code code, CodeParserState startOfCode)
+    {
+        long start = code.FilePosition ?? 0L;
+        code.FileState = new CodeFileState(start, start + (code.Length ?? 0L), startOfCode, _parserBuffer.State, _codeBlock, _lastCodeBlock, null);
     }
 
     /// <summary>
@@ -585,96 +603,38 @@ public class CodeFile(
     public VariableSet Variables { get; } = new();
 
     /// <summary>
-    /// Add a new local variable to the current code block
-    /// </summary>
-    /// <param name="varName">Name of the variable</param>
-    public void AddLocalVariable(string varName)
-    {
-        lock (_codeBlocks)
-        {
-            if (_codeBlocks.TryPeek(out CodeBlock? codeBlock))
-            {
-                if (!codeBlock.LocalVariables.Contains(varName))
-                {
-                    codeBlock.LocalVariables.Add(varName);
-                }
-            }
-            else
-            {
-                logger.LogWarning("Cannot add local variable because there is no open code block");
-            }
-        }
-    }
-
-    /// <summary>
     /// Delete the local variables a code block created
     /// </summary>
     /// <param name="codeBlock">Code block that is ending or restarting</param>
     private void DeleteLocalVariables(CodeBlock codeBlock)
     {
-        foreach (string varName in codeBlock.LocalVariables)
+        if (codeBlock.HasLocalVariables)
         {
-            Variables.DeleteVariable(varName);
+            Variables.DeleteVariables(codeBlock.Depth);
         }
-        codeBlock.LocalVariables.Clear();
-        codeBlock.HasLocalVariables = false;
-    }
-
-    /// <summary>
-    /// Whether any code block on the stack is a while loop that is going to run again
-    /// </summary>
-    /// <returns>True if an enclosing while loop is still looping</returns>
-    private bool IsInsideActiveLoop()
-    {
-        lock (_codeBlocks)
-        {
-            foreach (CodeBlock codeBlock in _codeBlocks)
-            {
-                if (codeBlock.Keyword == KeywordType.While && (codeBlock.ProcessBlock || codeBlock.ContinueLoop))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /// <summary>
     /// Called to finish the current code block
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    private async Task EndCodeBlockAsync(CancellationToken cancellationToken)
+    /// <param name="codeBlock">The current code block</param>
+    private void EndCodeBlock(CodeBlock codeBlock)
     {
-        using (await LockAsync(cancellationToken))
+        // Log the end of this block
+        if (codeBlock.Keyword is KeywordType.If or KeywordType.ElseIf or KeywordType.Else or KeywordType.While)
         {
-            CodeBlock? codeBlock;
-            lock (_codeBlocks)
-            {
-                if (!_codeBlocks.TryPop(out codeBlock))
-                {
-                    codeBlock = null;
-                }
-            }
-
-            if (codeBlock is not null)
-            {
-                // Log the end of this block
-                if (codeBlock.Keyword is KeywordType.If or KeywordType.ElseIf or KeywordType.Else or KeywordType.While)
-                {
-                    logger.LogDebug("End of {Keyword} block", codeBlock.Keyword);
-                }
-                else
-                {
-                    logger.LogDebug("End of generic block");
-                }
-
-                // Delete previously created local variables
-                DeleteLocalVariables(codeBlock);
-
-                // End
-                _lastCodeBlock = codeBlock;
-            }
+            logger.LogDebug("End of {Keyword} block", codeBlock.Keyword);
         }
+        else
+        {
+            logger.LogDebug("End of generic block");
+        }
+
+        // Delete previously created local variables
+        DeleteLocalVariables(codeBlock);
+
+        // End
+        _codeBlock = codeBlock.Parent;
+        _lastCodeBlock = codeBlock;
     }
 }

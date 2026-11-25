@@ -93,6 +93,11 @@ public sealed class PipelineStackItem
             }
             code.Stage = pipeline.Stage;
 
+            if (pipeline.Stage == PipelineStage.ProcessInternally)
+            {
+                code.SaveVariables();
+            }
+
             // Process it
             try
             {

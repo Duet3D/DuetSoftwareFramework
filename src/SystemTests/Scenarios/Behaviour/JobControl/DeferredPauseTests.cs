@@ -137,6 +137,40 @@ public class DeferredPauseTests : BenchFixture
         });
     }
 
+    /// <summary>A pause that waits for a macro called in a loop leaves the iterations that are left</summary>
+    [Test]
+    [Category("LongRunning")]
+    public async Task PauseDuringMacroInsideWhileLoop()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteMacro("plain-moves.g", SquareMacro);
+            sd.WriteGCode("job.gcode", """
+                G90
+                G1 X20 Y20 F6000
+                while iterations < 2
+                    M98 P"0:/macros/plain-moves.g"
+                G1 X10 Y10 F6000
+                G60 S3
+                """);
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.RunToPositionAsync(axis: 0, position: 30);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(1), "the pause follows the first iteration");
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(2), "the second iteration ran");
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)), "final position");
+        });
+    }
+
     /// <summary>
     /// A pause during an M98 R1 macro feedholds immediately, and the resume reruns the whole
     /// macro from its first line: one M98 call, two executions

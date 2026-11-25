@@ -89,6 +89,12 @@ public sealed class Executed : PipelineBase
             // Update the file position
             await code.UpdateNextFilePositionAsync(code.CancellationToken);
 
+            if (code.FileState.Variables is null)
+            {
+                // A plugin resolved it before it got to the internal processing
+                code.SaveVariables();
+            }
+
             // Notify code handlers
             switch (code.Type)
             {

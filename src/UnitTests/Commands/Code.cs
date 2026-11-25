@@ -1198,7 +1198,29 @@ public class Code
 
         await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
         long end = code.FilePosition!.Value + code.Length!.Value;
-        Assert.That(end, Is.EqualTo(content.IndexOf("G1 X2")), "where the second code starts");
+        CodeParserState state = buffer.State;
+        Assert.Multiple(() =>
+        {
+            Assert.That(end, Is.EqualTo(content.IndexOf("G1 X2")), "where the second code starts");
+            Assert.That(state, Is.EqualTo(new CodeParserState(true, 4, false, null, 1)));
+        });
+
+        // Seek there from somewhere else
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        stream.Seek(end, SeekOrigin.Begin);
+        buffer.Invalidate();
+        buffer.State = state;
+
+        code.Reset();
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetInt('X'), Is.EqualTo(2));
+            Assert.That(code.Indent, Is.EqualTo(4), "the indentation of the line");
+            Assert.That(code.FilePosition + code.Length, Is.EqualTo(content.IndexOf("    G1 X3")), "the rest of the line");
+            Assert.That(buffer.State, Is.EqualTo(new CodeParserState(false, 0, false, null, 2)));
+        });
     }
 
     /// <summary>Read a value the way <c>GetFloat</c> and its siblings do</summary>

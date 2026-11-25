@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -70,6 +71,121 @@ public class JobEdgeCaseTests : BenchFixture
         });
     }
 
+    /// <summary>
+    /// Loops making moves from X10 Y10 out to X20, X40, X60 and X80 in turn. A pause after X25 lands in the move out to
+    /// X40, by when the loop has been read further or to its end
+    /// </summary>
+    private static readonly TestCaseData[] Loops =
+    [
+        new TestCaseData("""
+            while iterations < 4
+                G1 X{20 + iterations * 20} Y30 F6000
+                G1 X10 Y10 F6000
+            """).SetArgDisplayNames("iterations"),
+        new TestCaseData("""
+            while iterations < 4
+                var x = 20 + iterations * 20
+                G1 X{var.x} Y30 F6000
+                G1 X{var.x} Y20 F6000
+                G1 X10 Y10 F6000
+            """).SetArgDisplayNames("variable of the body"),
+        new TestCaseData("""
+            var count = {0, 0}
+            while var.count[1] < 4
+                G1 X{20 + var.count[1] * 20} Y30 F6000
+                G1 X10 Y10 F6000
+                set var.count[1] = var.count[1] + 1
+            """).SetArgDisplayNames("variable outside the loop"),
+        new TestCaseData("""
+            while iterations < 2
+                var outer = iterations
+                while iterations < 2
+                    G1 X{20 + var.outer * 40 + iterations * 20} Y30 F6000
+                    if iterations == 5
+                        G1 X10 Y10 F600
+                    else
+                        G1 X10 Y10 F6000
+            """).SetArgDisplayNames("nested"),
+        new TestCaseData("""
+            while iterations < 4
+                G1 X{20 + iterations * 20} Y30 F6000 G1 X{20 + iterations * 20} Y20 F6000 G1 X10 Y10 F6000
+            """).SetArgDisplayNames("several codes per line"),
+        new TestCaseData("""
+            while iterations < 4
+                G1 X10 Y10 F6000 G1 X{20 + iterations * 20} Y30 F6000
+            G1 X10 Y10 F6000
+            """).SetArgDisplayNames("second code of a line"),
+        new TestCaseData("""
+            while iterations < 4
+                M98 P"0:/macros/out-and-back.g" X{20 + iterations * 20}
+            """).SetArgDisplayNames("restartable macro"),
+        new TestCaseData("""
+            while iterations < 4
+                G1 X{20 + iterations * 20} Y30 F6000
+                if iterations > 0
+                    G1 X10 Y10 F6000
+                    continue
+                G1 X10 Y10 F6000
+            """).SetArgDisplayNames("continue")
+    ];
+
+    /// <summary>A job paused inside a while loop makes the iterations that were left when it resumes</summary>
+    /// <remarks>
+    /// RRF keeps the loop it has read ahead to (GCodeBuffer::RestartFrom only seeks), so an iteration that was read
+    /// before the pause counts as made
+    /// </remarks>
+    [TestCaseSource(nameof(Loops))]
+    [Category("LongRunning")]
+    public async Task PauseInsideWhileLoop(string loop)
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteMacro("out-and-back.g", "M98 R1\nG1 X{param.X} Y30 F6000\nG1 X10 Y10 F6000\n");
+            sd.WriteGCode("job.gcode", $"G90\nG1 X10 Y10 F6000\n{loop}\nM400\nG60 S3\n");
+        }).StartAsync();
+
+        // Only the second iteration and those after it pass X25
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.RunToPositionAsync(axis: 0, position: 25);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        await AssertEveryIterationWasMadeAsync(bench);
+    }
+
+    /// <summary>The local variables of an iteration are put back by a pause that no move of the job comes before</summary>
+    [Test]
+    public async Task PauseInsideWhileLoopBeforeTheFirstMove()
+    {
+        const string job = """
+            while iterations < 3
+                G4 P800
+                set global.macroRuns = iterations + 1
+                var x = iterations
+                if var.x == 2
+                    set global.lastX = var.x
+            """;
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "global lastX = 0", Machines.Xye.Homed)
+                                             .WithSd(sd => sd.WriteGCode("job.gcode", job)).StartAsync();
+
+        // The variable of the first iteration has been deleted by the time the dwell of the second one is interrupted
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("lastX"), Is.EqualTo(2), "the last iteration ran");
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job ended normally");
+        });
+    }
+
     /// <summary>DuetControlServer stops at once although a macro of the job has more moves than the queue takes</summary>
     [Test]
     public async Task ShutdownWhileAMacroWaitsForTheQueue()
@@ -89,43 +205,58 @@ public class JobEdgeCaseTests : BenchFixture
         Assert.That(shutdown.Elapsed, Is.LessThan(TimeSpan.FromSeconds(5)));
     }
 
-    /// <summary>A job paused inside a while loop makes the iterations that were left when it resumes</summary>
-    /// <remarks>GCodeBuffer::RestartFrom seeks the file and leaves the block state alone, so the loop carries on</remarks>
+    /// <summary>A job that pauses itself inside a while loop makes the iterations that were left when it resumes</summary>
     [Test]
     [Category("LongRunning")]
-    [Category("KnownGap")]
-    public async Task PauseInsideWhileLoop()
+    public async Task M25InsideWhileLoop()
     {
-        const int lastX = 80;
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
                                              .WithSd(sd => sd.WriteGCode("job.gcode", """
                 G90
                 G1 X10 Y10 F6000
                 while iterations < 4
-                    G1 X{20 + iterations * 20} Y30 F6000
+                    var x = 20 + iterations * 20
+                    if iterations == 1
+                        M25
+                    G1 X{var.x} Y30 F6000
                     G1 X10 Y10 F6000
+                M400
                 G60 S3
                 """)).StartAsync();
 
-        // Only the second iteration and those after it pass X25
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
-        await bench.RunToPositionAsync(axis: 0, position: 25);
-        await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
-
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        await AssertEveryIterationWasMadeAsync(bench);
+    }
 
-        int x = 0, furthestX = 0;
+    /// <summary>Assert that the loop went out to X20, X40, X60 and X80 in turn, and came back to X10 Y10</summary>
+    private static async Task AssertEveryIterationWasMadeAsync(Bench bench)
+    {
+        // Where X turned back beyond X10, which is all the loops make it do apart from pause.g parking at X0
+        List<int> turns = [];
+        int x = 0, lastSteps = 0;
         foreach (ScheduledMove move in bench.CanMaster.ScheduledMoves())
         {
-            x += move.DriverFor(Machines.DriverBoard, Machines.XDriver)?.Steps ?? 0;
-            furthestX = Math.Max(furthestX, x);
+            int steps = move.DriverFor(Machines.DriverBoard, Machines.XDriver)?.Steps ?? 0;
+            if (steps == 0)
+            {
+                continue;
+            }
+            int position = (int)(x / Machines.XyStepsPerMm);
+            if (steps < 0 && lastSteps > 0 && position > 10 && (turns.Count == 0 || turns[^1] != position))
+            {
+                turns.Add(position);
+            }
+            x += steps;
+            lastSteps = steps;
         }
         Assert.Multiple(async () =>
         {
-            Assert.That(furthestX, Is.EqualTo(lastX * Machines.XyStepsPerMm), "the last iteration was made");
+            Assert.That(turns, Is.EqualTo(new[] { 20, 40, 60, 80 }), "every iteration was made, in order");
             Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)), "final position");
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job ended normally");
         });
     }
 

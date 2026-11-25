@@ -189,9 +189,6 @@ internal sealed class JobSequences(
     /// </summary>
     /// <param name="state">What the controller holds</param>
     /// <param name="request">What kind of pause, and why</param>
-    /// <param name="boundaryPosition">
-    /// Where the reader stopped, for a pause that asked the engine for nothing
-    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What the sequence did, including where each stream carries on from</returns>
     /// <remarks>
@@ -208,8 +205,7 @@ internal sealed class JobSequences(
     /// known point and the machine has been told to stop
     /// </para>
     /// </remarks>
-    public async Task<SequenceOutcome> PauseAsync(JobState state, PauseRequest request, long? boundaryPosition,
-                                                  CancellationToken cancellationToken)
+    public async Task<SequenceOutcome> PauseAsync(JobState state, PauseRequest request, CancellationToken cancellationToken)
     {
         // The streams were frozen by the transition that started this sequence, so nothing more has
         // been read or dispatched since the pause was accepted. Waiting for the codes already in
@@ -261,10 +257,7 @@ internal sealed class JobSequences(
                 restartMacro = abandonedMacros || rewind.RestartMacro;
             }
 
-            long position = point?.FilePosition
-                            ?? (stream.Index == 0 ? boundaryPosition : null)
-                            ?? stream.Reader.Position;
-            await stream.Reader.RewindAsync(position, cancellationToken);
+            long position = await stream.Reader.RewindAsync(point, cancellationToken);
             rewinds.Add(new StreamRewind(stream.Index, point, restartMacro));
 
             logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}",

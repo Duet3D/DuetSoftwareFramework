@@ -159,6 +159,7 @@ DSF accepts one thing RepRapFirmware does not: `M584 X` with no driver releases 
 
 - `M25`, and a pause caused by an event, decelerates to a stop at the earliest segment boundary it can and drops the rest of the queue. RepRapFirmware stops only where the queue already slows down enough, so it usually runs out everything queued.
 - Segments already sent to the boards are not recalled.
+- A job paused inside a `while` loop carries on in the iteration it stopped in, with the local variables of that point. RepRapFirmware keeps the iteration count and the variables that it had read ahead to.
 - A pause from inside the job file (`M25`, `M226`, `M600` and `M601`) runs out the queue, as in RepRapFirmware.
 
 [Pausing and resuming a job](pause-and-resume.md) describes the mechanics.

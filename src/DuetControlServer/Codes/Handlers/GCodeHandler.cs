@@ -428,6 +428,7 @@ internal sealed partial class GCodeHandler(
                                     AxesRelative = input.AxesRelative,
                                     DrivesRelative = input.DrivesRelative,
                                     FractionAtStart = fractionAtStart,
+                                    FileState = code.FileState,
                                     SegmentCount = segments.Count
                                 };
                             }
@@ -444,6 +445,7 @@ internal sealed partial class GCodeHandler(
                                     FeedRate = raw.OriginalFeedRate,
                                     AxesRelative = input.AxesRelative,
                                     DrivesRelative = input.DrivesRelative,
+                                    FileState = invocation.FileState,
                                     SegmentCount = segments.Count,
                                     IsMacroInvocation = true
                                 };

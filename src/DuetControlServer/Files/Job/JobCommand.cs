@@ -143,7 +143,7 @@ internal abstract record JobCommand
     public sealed record Fork : JobCommand;
 
     /// <summary>A stream has stopped where it was told to stop</summary>
-    public sealed record ReaderStopped(int Stream, long Position) : JobCommand;
+    public sealed record ReaderStopped(int Stream) : JobCommand;
 
     /// <summary>A stream has run out of codes and the last of them has completed</summary>
     public sealed record ReaderFinished(int Stream) : JobCommand;

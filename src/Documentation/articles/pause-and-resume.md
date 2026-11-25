@@ -249,13 +249,13 @@ The last row includes absolute extrusion. An axis has a start that the resume mo
 not, because the engine carries the fraction of a step between moves, so the amount itself is what
 shrinks.
 
-Two more things travel with the fraction, because the line being resumed is one the file was already
-reading rather than one it was about to start:
+Three more things travel with the fraction, because the line being resumed is one the file was already reading rather than one it was about to start:
 
-- **the modal G command**, since the line may be a bare `X100 Y100 E5` whose `G1` is several lines
-  above the rewind point, and seeking throws the parser's modal state away;
-- **the feed rate the line was read with**, unscaled by `M220`, since the line need not name `F`.
-  Restoring the scaled one would fold the speed factor into the file's own feed rate on every pause.
+- **the feed rate the line was read with**, unscaled by `M220`, since the line need not name `F`. Restoring the scaled one would fold the speed factor into the file's own feed rate on every pause;
+- **the state of the parser** at that code: the modal G command, since the line may be a bare `X100 Y100 E5` whose `G1` is several lines above the rewind point, and the indentation and `G53` of a line the rewind lands in the middle of;
+- **the open code blocks and the local variables**. The file is usually read past the rewind point, so the `while` loop the rewind lands in may have moved on to a later iteration or ended, and its variables may have changed or been deleted. The rewind puts both back, so the loop carries on in the iteration the machine stopped in. Global variables are not put back: a `set global` after the rewind point that has already run runs again.
+
+The last two are the `CodeFileState` that every code of the job carries: what the reader had open when it read the code, and the local variables when the code ran. Blocks and variables are immutable and replaced when they change, so a code only refers to them and nothing is copied per code.
 
 Only the job file's own codes may spend the fraction. A macro invoked between the resume and the
 job's next move runs on the same channel, and would otherwise be shortened by what the job is owed.
@@ -283,9 +283,7 @@ the head, and neither is meaningful on a machine that does not know where it is.
 macro made have run, the job is paused and the reply is `Printing paused at X... Y... Z...`, taken
 from the restore point.
 
-The job task, meanwhile, has stopped reading, drained what it had read ahead, seeked to the pause
-position, and is waiting. Block state does not survive that seek: an open `while` is re-parsed from
-the rewound position, so its counter starts again ([file management](file-management.md#print-jobs)).
+The job task, meanwhile, has stopped reading, drained what it had read ahead, seeked to the pause position, put back the code blocks and local variables that go with it (§4), and is waiting.
 
 ---
 
@@ -411,6 +409,7 @@ one restore point and one interpreter state.
 | `Files/Job/JobController.cs` | the transition table: what each of M0, M23, M24, M25, M26, M32, M37, M226 and M606 does from the phase the job is in |
 | `Files/Job/JobSequences.cs` | `PauseAsync`, `ResumeAsync`, `StopAsync`, `SaveRestorePointAsync`, `MoveBackToRestorePointAsync` |
 | `Files/Job/JobReader.cs` | the read-ahead loop, the freeze, the rewind, the published file position |
+| `Files/CodeFileState.cs` | the open code blocks, local variables and place in the line that a rewind puts back |
 | `Codes/Handlers/MCodeHandler.cs` | `M25`, `M226`/`M600`/`M601`, `M24`, `M26` |
 | `Motion/MovePlanner.cs` | `StopEarlyAsync`, `JobRewindPointFor`, `FeedholdOutcome` |
 | `Motion/JobMoveIndex.cs` | `JobMoveOrigin` and its `PointAt`, `JobResumePoint`, the move id index |
