@@ -8,6 +8,8 @@
 #include "TestSupport.h"
 
 #include <CApi.h>
+#include <Motion/MoveParams.h>
+#include <Motion/StepClock.h>
 
 #include <cstdio>
 #include <string>
@@ -51,6 +53,38 @@ namespace
 		DuetRT_MotionStop(handle);
 		DuetRT_Destroy(handle);
 	}
+
+	// A ring takes no more than 2 seconds of movement, however fast the moves are submitted. The motion
+	// thread takes them up once per millisecond, so most of these are offered before it has seen any
+	void TestMovesNotTakenUpYetCountAsQueued(const std::string& socketPath) noexcept
+	{
+		DuetRTHandle* const handle = CreateUnconnected(socketPath);
+		CHECK(handle != nullptr, "the interface is created");
+		if (handle == nullptr)
+		{
+			return;
+		}
+		CHECK(DuetRT_MotionStart(handle, 0) == 1, "the engine starts");
+
+		// 10 seconds of movement each. No drives, so the ring discards each one as it takes it up
+		Duet::Sbc::Motion::MoveParamsHeader move{};
+		move.totalDistance = 1000.0F;
+		move.requestedSpeed = 100.0F / stepClockRate;
+
+		constexpr int numOffered = 200;
+		int added = 0;
+		for (int i = 0; i < numOffered && DuetRT_MotionCanAddMove(handle, 0) == 1; ++i)
+		{
+			move.moveId = static_cast<uint32_t>(i) + 1;
+			CHECK(DuetRT_MotionSubmitMove(handle, &move, sizeof(move)) == 1, "the move is submitted");
+			++added;
+		}
+		CHECK(added > 0, "some moves are accepted");
+		CHECK(added < numOffered, "the moves that have not been taken up count against the limit");
+
+		DuetRT_MotionStop(handle);
+		DuetRT_Destroy(handle);
+	}
 }
 
 int main()
@@ -59,6 +93,7 @@ int main()
 
 	std::printf("Motion lifecycle:\n");
 	TestNoRoomBeforeTheEngineStarts(socketPath);
+	TestMovesNotTakenUpYetCountAsQueued(socketPath);
 
 	return TestSupport::Summarise("motion lifecycle");
 }

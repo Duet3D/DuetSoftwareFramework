@@ -183,7 +183,7 @@ namespace Duet::Sbc
 			}
 
 			const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record->data());
-			const unsigned int ring = (params.ringNumber < numRings) ? params.ringNumber : 0;
+			const unsigned int ring = RingOf(params);
 
 			// Stop taking moves once the ring is full, and leave the rest where they are: the ring
 			// is a queue, so a move taken out of order would be planned against the wrong neighbour.
@@ -202,7 +202,7 @@ namespace Duet::Sbc
 				// Nothing to do, but DCS is still waiting to hear that this move is done with.
 				PostMoveCompleted(ring, params.moveId);
 			}
-			m_submissions.Consume();
+			ConsumeSubmission(params);
 		}
 	}
 
@@ -217,13 +217,35 @@ namespace Duet::Sbc
 			}
 
 			const auto& params = *reinterpret_cast<const Motion::MoveParamsHeader *>(record->data());
-			const unsigned int recordRing = (params.ringNumber < numRings) ? params.ringNumber : 0;
-			if (recordRing != ring)
+			if (RingOf(params) != ring)
 			{
 				break;
 			}
-			m_submissions.Consume();
+			ConsumeSubmission(params);
 		}
+	}
+
+	unsigned int MotionService::RingOf(const Motion::MoveParamsHeader& params) noexcept
+	{
+		return (params.ringNumber < numRings) ? params.ringNumber : 0;
+	}
+
+	uint32_t MotionService::MinimumClocksFor(const Motion::MoveParamsHeader& params) noexcept
+	{
+		constexpr auto limit = static_cast<float>(DDARing::maxUncommittedClocks);
+		return (params.totalDistance < params.requestedSpeed * limit)
+			? static_cast<uint32_t>(params.totalDistance / params.requestedSpeed)
+			: static_cast<uint32_t>(limit);
+	}
+
+	void MotionService::ConsumeSubmission(const Motion::MoveParamsHeader& params)
+	{
+		// The record is not to be read once it has been consumed
+		RingState& ringState = m_ringState[RingOf(params)];
+		const uint32_t clocks = MinimumClocksFor(params);
+		m_submissions.Consume();
+		ringState.pendingClocks.fetch_sub(clocks, std::memory_order_relaxed);
+		ringState.pendingMoves.fetch_sub(1, std::memory_order_release);
 	}
 
 	void MotionService::PublishPositions()
@@ -466,7 +488,9 @@ namespace Duet::Sbc
 		// DuetControlServer starts the engine on a thread of its own while the G-code channels are
 		// already running, so a move can be offered before the rings exist. No room is the answer
 		// it already retries on
-		return ring < numRings && m_initialised.load(std::memory_order_acquire) && m_rings[ring].CanAddMove();
+		return ring < numRings && m_initialised.load(std::memory_order_acquire)
+			&& m_rings[ring].CanAddMove(m_ringState[ring].pendingMoves.load(std::memory_order_acquire),
+										m_ringState[ring].pendingClocks.load(std::memory_order_relaxed));
 	}
 
 	bool MotionService::SubmitMove(std::span<const uint8_t> params)
@@ -477,8 +501,18 @@ namespace Duet::Sbc
 		{
 			return false;
 		}
+
+		// Counted before the motion thread can take it up
+		const auto& header = *reinterpret_cast<const Motion::MoveParamsHeader *>(params.data());
+		RingState& ringState = m_ringState[RingOf(header)];
+		const uint32_t clocks = MinimumClocksFor(header);
+		ringState.pendingClocks.fetch_add(clocks, std::memory_order_relaxed);
+		ringState.pendingMoves.fetch_add(1, std::memory_order_relaxed);
+
 		if (!m_submissions.Write(params))
 		{
+			ringState.pendingClocks.fetch_sub(clocks, std::memory_order_relaxed);
+			ringState.pendingMoves.fetch_sub(1, std::memory_order_relaxed);
 			m_submissionsDropped.fetch_add(1, std::memory_order_relaxed);
 			return false;
 		}

@@ -18,13 +18,17 @@ namespace SystemTests.Scenarios.Behaviour.JobControl;
 public class DeferredPauseTests : BenchFixture
 {
     /// <summary>Four slow edges the pause can land in, counting its runs</summary>
+    /// <remarks>
+    /// The second and third edges take over 2 seconds between them, so the fourth does not fit into the
+    /// queue and the macro is still running while the first one is made (DDARing::CanAddMove)
+    /// </remarks>
     private const string SquareMacro = """
         set global.macroRuns = global.macroRuns + 1
         G90
         G1 X50 Y20 F3000
-        G1 X50 Y50 F3000
-        G1 X20 Y50 F3000
-        G1 X20 Y20 F3000
+        G1 X50 Y50 F1600
+        G1 X20 Y50 F1600
+        G1 X20 Y20 F6000
         """;
 
     /// <summary>
