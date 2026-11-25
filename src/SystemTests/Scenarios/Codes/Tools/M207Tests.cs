@@ -62,7 +62,8 @@ public class M207Tests : BenchFixture
     /// <summary>M207 P sets every parameter of that tool only</summary>
     /// <remarks>
     /// S, R and Z are stored as given; F and T are mm/min, reported in mm/s (Tool objectModelTable
-    /// InverseConvertSpeedToMmPerSec). The other tool keeps the defaults from Tool::Create
+    /// InverseConvertSpeedToMmPerSec). The other tool keeps the defaults from Tool::Create.
+    /// Regression: m207-set-retract-parameters, where M207 P1 changes only tools[1].retraction
     /// </remarks>
     [Category("KnownGap")]
     [Test]
@@ -82,7 +83,10 @@ public class M207Tests : BenchFixture
     }
 
     /// <summary>M207 without P sets every tool</summary>
-    /// <remarks>Tool::SetAllToolsFirmwareRetraction calls SetFirmwareRetraction on each tool in turn</remarks>
+    /// <remarks>
+    /// Tool::SetAllToolsFirmwareRetraction calls SetFirmwareRetraction on each tool in turn.
+    /// Regression: m207-set-retract-parameters, where M207 without P sets both tools
+    /// </remarks>
     [Category("KnownGap")]
     [Test]
     public async Task M207WithoutPSetsEveryTool()
@@ -171,7 +175,8 @@ public class M207Tests : BenchFixture
     /// <summary>M207 with no parameter to set reports every tool, one line each</summary>
     /// <remarks>
     /// Tool::SetFirmwareRetraction with nothing seen: "Tool %u retract/reprime: length %.2f/%.2fmm,
-    /// speed %.1f/%.1fmm/sec, Z hop %.2fmm", the reprime length being length + extraRestart
+    /// speed %.1f/%.1fmm/sec, Z hop %.2fmm", the reprime length being length + extraRestart.
+    /// Regression: m207-set-retract-parameters, whose bare M207 replies one such line per tool
     /// </remarks>
     [Category("KnownGap")]
     [Test]
