@@ -93,7 +93,7 @@ public sealed class MetaExpressionParser
     {
         if (SkipWhiteSpace() != '\0')
         {
-            ThrowParseException("Unexpected characters after expression");
+            ThrowParseException("unexpected characters after expression");
         }
     }
 
@@ -251,19 +251,33 @@ public sealed class MetaExpressionParser
             switch (val)
             {
                 case object?[] array:
-                    if (indexValue >= array.Length)
+                    if (indexValue < array.Length)
+                    {
+                        val = array[indexValue];
+                    }
+                    else if (evaluate)
                     {
                         ThrowParseException(ExpressionErrors.ArrayIndexOutOfRange);
                     }
-                    val = array[indexValue];
+                    else
+                    {
+                        val = null;
+                    }
                     break;
 
                 case string s:
-                    if (indexValue >= s.Length)
+                    if (indexValue < s.Length)
+                    {
+                        val = s[(int)indexValue];
+                    }
+                    else if (evaluate)
                     {
                         ThrowParseException(ExpressionErrors.ArrayIndexOutOfRange);
                     }
-                    val = s[(int)indexValue];
+                    else
+                    {
+                        val = null;
+                    }
                     break;
 
                 default:
@@ -535,6 +549,9 @@ public sealed class MetaExpressionParser
                             case string s:
                                 result = s == (string)val2!;
                                 break;
+                            case char c:
+                                result = c == (char)val2!;
+                                break;
                             default:
                                 if (evaluate)
                                 {
@@ -684,6 +701,10 @@ public sealed class MetaExpressionParser
         // Check for the names of constants
         if (TryGetNamedConstant(identifier, applyExists, out rslt))
         {
+            if (applyLengthOperator)
+            {
+                ApplyLengthOperator(ref rslt, evaluate);
+            }
             return;
         }
 
@@ -767,6 +788,11 @@ public sealed class MetaExpressionParser
                 _mustForward = true;
                 rslt = null;
             }
+            else if (rslt is double d)
+            {
+                // The firmware has no double type, so every operator and function here works on float
+                rslt = (float)d;
+            }
         }
         else
         {
@@ -839,7 +865,7 @@ public sealed class MetaExpressionParser
             default:
                 if (evaluate)
                 {
-                    ThrowParseException("expected object model value or string after '#");
+                    ThrowParseException("operand of # is not an array or string");
                 }
                 val = 0;
                 break;

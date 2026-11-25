@@ -218,6 +218,15 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void CharacterEquality()
+        {
+            Assert.That(Eval("'a' == 'a'"), Is.EqualTo(true));
+            Assert.That(Eval("'a' != 'b'"), Is.EqualTo(true));
+            Assert.That(Eval("\"abc\"[1] == 'b'"), Is.EqualTo(true));
+            Assert.That(Eval("\"abc\"[1] == 'c'"), Is.EqualTo(false));
+        }
+
+        [Test]
         public void Concatenation()
         {
             Assert.That(Eval("\"a\" ^ \"b\""), Is.EqualTo("ab"));
@@ -494,6 +503,19 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void DoubleIdentifierBehavesAsFloat()
+        {
+            TestContext context = new();
+            context.Identifiers["sbc.uptime"] = 90.5;
+            Assert.That(Eval("sbc.uptime", context), Is.TypeOf<float>());
+            Assert.That(Eval("sbc.uptime > 60", context), Is.EqualTo(true));
+            Assert.That(Eval("sbc.uptime + 1", context), Is.EqualTo(91.5f));
+            Assert.That(Eval("-sbc.uptime", context), Is.EqualTo(-90.5f));
+            Assert.That(Eval("floor(sbc.uptime)", context), Is.EqualTo(90));
+            Assert.That(Eval("sbc.uptime == 90.5", context), Is.EqualTo(true));
+        }
+
+        [Test]
         public void FunctionResolverReceivesEvaluatedArguments()
         {
             TestContext context = new();
@@ -553,6 +575,24 @@ namespace UnitTests.Machine
         {
             CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("[1, 2][5]"))!;
             Assert.That(ex.Message, Does.Contain("array index out of bounds"));
+        }
+
+        [Test]
+        public void IndexOutOfBoundsInNonEvaluatedBranchDoesNotThrow()
+        {
+            Assert.That(Eval("false && [1, 2][5] == 1"), Is.EqualTo(false));
+            Assert.That(Eval("false && \"abc\"[3] == 'x'"), Is.EqualTo(false));
+            Assert.That(Eval("true ? 1 : \"abc\"[7]"), Is.EqualTo(1));
+            Assert.Throws<CodeParserException>(() => Eval("\"abc\"[3]"));
+        }
+
+        [Test]
+        public void LengthOfNamedConstantThrows()
+        {
+            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("#true"))!;
+            Assert.That(ex.Message, Does.Contain("operand of # is not an array or string"));
+            Assert.Throws<CodeParserException>(() => Eval("#pi"));
+            Assert.That(Eval("false && #true == 1"), Is.EqualTo(false));
         }
         #endregion
 
