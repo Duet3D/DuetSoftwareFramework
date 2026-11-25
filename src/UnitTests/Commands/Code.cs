@@ -1188,6 +1188,19 @@ public class Code
         });
     }
 
+    [Test]
+    public async Task ParseAsyncReadsTheNextCodeOfALineFromWhereTheLastOneEnded()
+    {
+        const string content = "    G1 X1 G1 X2\n    G1 X3\n";
+        await using MemoryStream stream = new(Encoding.UTF8.GetBytes(content));
+        CodeParserBuffer buffer = new(128, true);
+        DuetAPI.Commands.Code code = new();
+
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        long end = code.FilePosition!.Value + code.Length!.Value;
+        Assert.That(end, Is.EqualTo(content.IndexOf("G1 X2")), "where the second code starts");
+    }
+
     /// <summary>Read a value the way <c>GetFloat</c> and its siblings do</summary>
     private delegate T Getter<T, TRefusal>(char letter, T? defaultValue, T? min, T? max,
                                           Func<TRefusal, string>? errorString = null) where T : struct;
