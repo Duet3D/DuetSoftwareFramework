@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace DuetControlServer.Codes.Meta.Parsing;
@@ -27,6 +28,16 @@ public sealed class MetaExpressionParser
     private const string Operators = "?^&|!=<>+-*/";
     private static readonly byte[] Priorities = [1, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6];
     private const byte UnaryPriority = 10;
+
+    /// <summary>
+    /// Maximum number of elements in an array, same as in the firmware
+    /// </summary>
+    public const int MaxArrayElements = 255;
+
+    /// <summary>
+    /// Maximum length of the string representation of a value. Nested arrays would otherwise expand without limit
+    /// </summary>
+    public const int MaxStringLength = 65535;
 
     private readonly string _text;
     private readonly IExpressionEvaluationContext _context;
@@ -101,6 +112,12 @@ public sealed class MetaExpressionParser
     // Evaluate an expression internally, stopping before any binary operator with priority 'priority' or lower
     private void ParseInternal(ref object? val, bool evaluate, byte priority)
     {
+        // A stack overflow cannot be caught and would terminate the process
+        if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+        {
+            ThrowParseException(ExpressionErrors.NestingTooDeep);
+        }
+
         // Start by looking for a unary operator or opening bracket
         char c = SkipWhiteSpace();
         switch (c)
@@ -844,6 +861,10 @@ public sealed class MetaExpressionParser
     {
         if (val is object?[] array1 && val2 is object?[] array2)
         {
+            if (array1.Length + array2.Length > MaxArrayElements)
+            {
+                throw new CodeParserException(ExpressionErrors.ArrayTooLarge);
+            }
             object?[] result = new object?[array1.Length + array2.Length];
             Array.Copy(array1, 0, result, 0, array1.Length);
             Array.Copy(array2, 0, result, array1.Length, array2.Length);
@@ -961,6 +982,10 @@ public sealed class MetaExpressionParser
                     if (a[0] is not int count || count < 0)
                     {
                         ThrowParseException(ExpressionErrors.ExpectedNonNegativeInt);
+                    }
+                    if ((int)a[0]! > MaxArrayElements)
+                    {
+                        ThrowParseException(ExpressionErrors.ArrayTooLarge);
                     }
                     object?[] vector = new object?[(int)a[0]!];
                     Array.Fill(vector, a[1]);
@@ -1339,6 +1364,10 @@ public sealed class MetaExpressionParser
                             sb.Append(',');
                         }
                         sb.Append(AppendAsString(array[i]));
+                        if (sb.Length > MaxStringLength)
+                        {
+                            throw new CodeParserException("string too long");
+                        }
                     }
                     sb.Append('}');
                     return sb.ToString();

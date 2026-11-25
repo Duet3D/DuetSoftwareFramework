@@ -20,4 +20,14 @@ internal static class ExpressionErrors
     /// A non-negative integer was required
     /// </summary>
     public const string ExpectedNonNegativeInt = "expected non-negative integer";
+
+    /// <summary>
+    /// An array would have more elements than the firmware can hold
+    /// </summary>
+    public const string ArrayTooLarge = "Array too large";
+
+    /// <summary>
+    /// Brackets, unary operators or function calls were nested too deeply
+    /// </summary>
+    public const string NestingTooDeep = "Expression nesting too deep";
 }

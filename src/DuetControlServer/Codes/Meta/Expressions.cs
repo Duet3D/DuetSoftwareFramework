@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -606,7 +607,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         }
         if (obj is object[] objectArray)
         {
-            return '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
+            string arrayString = '{' + string.Join(',', objectArray.Select(objectValue => ObjectToString(objectValue, false, encodeValues, code))) + (encodeValues && objectArray.Length == 1 ? ",}" : "}");
+            if (arrayString.Length > Parsing.MetaExpressionParser.MaxStringLength)
+            {
+                throw new CodeParserException("string too long", code);
+            }
+            return arrayString;
         }
         if (!wantsCount && obj is IList)
         {
@@ -865,6 +871,12 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
         async Task<string> eatExpression(char brace, bool raw = false)
         {
+            // A stack overflow cannot be caught and would terminate the process
+            if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+            {
+                throw new CodeParserException(Parsing.ExpressionErrors.NestingTooDeep, code);
+            }
+
             StringBuilder lastToken = new(), result = new();
             while (i < expression.Length)
             {

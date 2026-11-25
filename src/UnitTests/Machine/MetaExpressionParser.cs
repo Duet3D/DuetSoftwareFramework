@@ -558,6 +558,26 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void DeepNestingThrows()
+        {
+            Assert.That(Eval(new string('(', 50) + "1" + new string(')', 50)), Is.EqualTo(1));
+            Assert.Throws<CodeParserException>(() => Eval(new string('(', 1000000) + "1" + new string(')', 1000000)));
+            Assert.Throws<CodeParserException>(() => Eval(new string('-', 1000000) + "1"));
+        }
+
+        [Test]
+        public void OversizedArraysThrow()
+        {
+            Assert.That(Eval("#vector(255, 0)"), Is.EqualTo(255));
+            Assert.That(Eval("#vector(0, 0)"), Is.EqualTo(0));
+            Assert.Throws<CodeParserException>(() => Eval("vector(256, 0)"));
+            Assert.Throws<CodeParserException>(() => Eval("vector(2000000000, 0)"));
+            Assert.That(Eval("#(vector(200, 0) ^ vector(55, 0))"), Is.EqualTo(255));
+            Assert.Throws<CodeParserException>(() => Eval("vector(200, 0) ^ vector(56, 0)"));
+            Assert.Throws<CodeParserException>(() => Eval("vector(255, vector(255, vector(255, 0))) ^ \"\""));
+        }
+
+        [Test]
         public void TrailingCharactersThrow()
         {
             Assert.Throws<CodeParserException>(() => Eval("1 2"));
