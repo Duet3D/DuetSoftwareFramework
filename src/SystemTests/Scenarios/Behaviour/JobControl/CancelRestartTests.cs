@@ -242,6 +242,25 @@ public class CancelRestartTests : BenchFixture
         Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm).Within(1e-2f), "all of E2");
     }
 
+    /// <summary>A job does not start in the inverse time mode the job before it ended in (GCodes::StartPrinting)</summary>
+    [Test]
+    public async Task AJobStartsOutOfInverseTimeMode()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteGCode("job.gcode", "G93\n");
+            sd.WriteGCode("next.gcode", "G1 X20 F6000\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[DuetAPI.CodeChannel.File]!.InverseTimeMode), Is.True, "nothing resets it at the end");
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/next.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[DuetAPI.CodeChannel.File]!.InverseTimeMode), Is.False);
+    }
+
     /// <summary>A job started from the beginning of its file makes the first line whole and in its own modes</summary>
     /// <remarks>GCodes::StartPrinting clears restartMoveFractionDone if fromStart</remarks>
     [Test]

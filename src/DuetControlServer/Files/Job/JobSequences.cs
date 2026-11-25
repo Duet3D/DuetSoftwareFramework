@@ -148,7 +148,14 @@ internal sealed class JobSequences(
                 if (model.Inputs[stream.Channel] is InputChannel input)
                 {
                     input.CurrentFile = stream.Reader.File.FilePath.Virtual;
-                    if (!fromStart && model.Inputs[channel] is InputChannel starter)
+                    if (fromStart)
+                    {
+                        // RepRapFirmware's StartPrinting
+                        input.Volumetric = false;
+                        input.SelectedPlane = 0;
+                        input.InverseTimeMode = false;
+                    }
+                    else if (model.Inputs[channel] is InputChannel starter)
                     {
                         // The codes that set the modes of the file come before the offset, so whoever set it has set them
                         InterpreterStateStack.CopyState(starter, input);
