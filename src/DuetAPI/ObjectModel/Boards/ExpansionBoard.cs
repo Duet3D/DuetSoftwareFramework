@@ -6,6 +6,19 @@ namespace DuetAPI.ObjectModel;
 public partial class ExpansionBoard : Board
 {
     /// <summary>
+    /// Version of the bootloader or empty if unknown
+    /// </summary>
+    /// <remarks>
+    /// Boards report this only from firmware 3.7.1 on, main boards in expansion mode never report it
+    /// </remarks>
+    public string BootloaderVersion
+    {
+        get => _bootloaderVersion;
+        set => SetPropertyValue(ref _bootloaderVersion, value);
+    }
+    private string _bootloaderVersion = string.Empty;
+
+    /// <summary>
     /// Closed loop data of this board or null if unknown
     /// </summary>
     public BoardClosedLoop? ClosedLoop
@@ -24,6 +37,19 @@ public partial class ExpansionBoard : Board
         set => SetPropertyValue(ref _inductiveSensor, value);
     }
     private InductiveSensor? _inductiveSensor;
+
+    /// <summary>
+    /// Number of the CAN interface this board is connected to as printed on the main board, or null if it is not known
+    /// </summary>
+    /// <remarks>
+    /// This is null as long as the board address is in use on more than one CAN bus
+    /// </remarks>
+    public int? Interface
+    {
+        get => _interface;
+        set => SetPropertyValue(ref _interface, value);
+    }
+    private int? _interface;
 
     /// <summary>
     /// State of this board

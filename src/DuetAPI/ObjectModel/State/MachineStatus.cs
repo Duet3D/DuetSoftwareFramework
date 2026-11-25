@@ -33,7 +33,12 @@ public enum MachineStatus
     /// The machine has encountered an emergency stop and is ready to reset
     /// </summary>
     Halted,
-    
+
+    /// <summary>
+    /// A feed hold has stopped all motion and keeps the queued moves until M24 releases it
+    /// </summary>
+    Held,
+
     /// <summary>
     /// The machine is about to pause a file job
     /// </summary>
@@ -45,7 +50,7 @@ public enum MachineStatus
     Paused,
     
     /// <summary>
-    /// The machine is about to resume a paused file job
+    /// The machine is about to resume a paused file job or is moving back to the position where a feed hold stopped it
     /// </summary>
     Resuming,
 

@@ -240,7 +240,7 @@ public sealed class CodeInterception : IProcessor
                 }
 
                 int asteriskIndex = filter.IndexOf('*');
-                if (asteriskIndex >= 0 && filter[..asteriskIndex].Equals(shortCodeString[..asteriskIndex], StringComparison.InvariantCultureIgnoreCase))
+                if (asteriskIndex >= 0 && shortCodeString.AsSpan().StartsWith(filter.AsSpan(0, asteriskIndex), StringComparison.InvariantCultureIgnoreCase))
                 {
                     return true;
                 }
@@ -304,6 +304,7 @@ public sealed class CodeInterception : IProcessor
                         // Code is rewritten
                         if (_interceptionResult is Rewrite rewriteCommand)
                         {
+                            Commands.Code.CheckParserLimits(rewriteCommand.Code);
                             code.CopyFrom(rewriteCommand.Code);
                         }
 

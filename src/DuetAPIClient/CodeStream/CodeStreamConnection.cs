@@ -10,9 +10,10 @@ using DuetAPI.Connection.InitMessages;
 namespace DuetAPIClient;
 
 /// <summary>
-/// Base connection class for sending commands to the control server
+/// Connection class for streaming codes to the control server as text lines and for receiving their replies as text.
+/// The stream returned by <see cref="GetStream"/> carries both, and also the raw file content of an M559 or M560 upload.
 /// </summary>
-/// <seealso cref="ConnectionMode.Command"/>
+/// <seealso cref="ConnectionMode.CodeStream"/>
 public sealed class CodeStreamConnection : BaseConnection
 {
     /// <summary>

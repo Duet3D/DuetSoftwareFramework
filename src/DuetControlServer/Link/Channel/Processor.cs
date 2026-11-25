@@ -683,6 +683,16 @@ public sealed class Processor
 
         if (abortAll)
         {
+            // Mark the job aborted before its codes are cancelled: cancelling them wakes the job task, which would otherwise
+            // see the file end with neither flag set and report a finished job
+            if (Channel is CodeChannel.File or CodeChannel.File2)
+            {
+                using (_jobProcessor.Lock())
+                {
+                    _jobProcessor.Abort();
+                }
+            }
+
             // Cancel pending codes and requests
             InvalidateRegular();
         }
@@ -705,8 +715,8 @@ public sealed class Processor
             }
         }
 
-        // Abort the file print if necessary
-        if ((Channel is CodeChannel.File or CodeChannel.File2) && (abortAll || !macroAborted))
+        // Abort the file print if the aborted file was the job itself rather than a macro
+        if (!abortAll && !macroAborted && Channel is CodeChannel.File or CodeChannel.File2)
         {
             using (_jobProcessor.Lock())
             {

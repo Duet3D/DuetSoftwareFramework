@@ -372,17 +372,19 @@ public sealed partial class LinkInterface(
     /// Update the print file info in the firmware
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    /// <returns>Asynchronous task</returns>
+    /// <returns>Task that completes when the print file info has been sent</returns>
     /// <exception cref="InvalidOperationException">Not connected over SPI</exception>
-    public async Task SetPrintFileInfo(CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// The returned task must not be awaited while the job processor is locked, because the link task
+    /// needs that lock to abort or pause a job before it gets to send the print file info
+    /// </remarks>
+    public async Task<Task> SetPrintFileInfo(CancellationToken cancellationToken = default)
     {
-        Task task;
         using (await PrintStateLock.LockAsync(cancellationToken))
         {
             SetPrintInfoRequest ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = SetPrintInfoRequest.Task;
+            return SetPrintInfoRequest.Task.WaitAsync(cancellationToken);
         }
-        await task.WaitAsync(cancellationToken);
     }
 
     /// <summary>
@@ -550,6 +552,23 @@ public sealed partial class LinkInterface(
         using (await channels[channel].LockAsync(cancellationToken))
         {
             await channels[channel].AbortAllFilesAsync().WaitAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Resolve the pending and buffered codes of the job channels and leave their macros, as a pause notification does.
+    /// Used when a job is cancelled while a feed hold has stopped it, because no pause has cleaned up before
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async Task InvalidateJobChannelsAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (CodeChannel channel in new[] { CodeChannel.File, CodeChannel.File2 })
+        {
+            using (await channels[channel].LockAsync(cancellationToken))
+            {
+                channels[channel].PrintPaused();
+            }
         }
     }
 

@@ -47,6 +47,11 @@ public sealed class MacroFile : CodeFile, IDisposable
     public bool IsPausable { get; set; }
 
     /// <summary>
+    /// Macro files are never rewound, a pause either lets them finish or aborts them
+    /// </summary>
+    protected override bool IsRewindable => false;
+
+    /// <summary>
     /// Internal cancellation token source used for codes
     /// </summary>
     private readonly CancellationTokenSource _cts;

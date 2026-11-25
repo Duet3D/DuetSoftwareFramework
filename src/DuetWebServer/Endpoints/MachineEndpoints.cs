@@ -359,7 +359,15 @@ public class MachineEndpoints
         string resolvedPath = "n/a";
         try
         {
-            resolvedPath = await EndpointHelper.ResolvePathAsync(settings.SocketPath, filename);
+            using (CommandConnection connection = await EndpointHelper.BuildConnectionAsync(settings.SocketPath))
+            {
+                resolvedPath = await connection.ResolvePathAsync(filename);
+                if (await EndpointHelper.IsVolumeRootAsync(connection, filename, resolvedPath))
+                {
+                    EndpointHelper.LogWarning(logger, $"Refusing to delete volume root directory {filename} (resolved to {resolvedPath})");
+                    return Results.Text("Cannot delete the root directory of a volume", statusCode: StatusCodes.Status500InternalServerError);
+                }
+            }
 
             if (Directory.Exists(resolvedPath))
             {

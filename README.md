@@ -146,6 +146,7 @@ The following command-line arguments are available:
 
 This tool can be used to stream codes in order to execute multiple G/M/T-codes without waiting for a response first.
 When a code has finished, the corresponding result is written to the console.
+It sends text lines only, so it cannot be used for file uploads with `M559` or `M560`, which code stream connections support for clients that send the file content as raw bytes.
 
 #### Command-Line Options
 

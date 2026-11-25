@@ -33,7 +33,9 @@ public enum ConnectionMode
     Subscribe,
 
     /// <summary>
-    /// Code stream mode. This mode lets users send and receive code replies asynchronously using a single socket connection
+    /// Code stream mode. This mode lets users send and receive code replies asynchronously using a single socket connection.
+    /// Codes are sent as text lines and replies are received as text, like on a serial port of the machine.
+    /// Files can be uploaded with M559 and M560, whose file content follows the code as raw bytes.
     /// </summary>
     /// <seealso cref="InitMessages.CodeStreamInitMessage"/>
     CodeStream,

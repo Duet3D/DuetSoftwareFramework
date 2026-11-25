@@ -3,6 +3,7 @@ using DuetAPI.Utility;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace DuetControlServer.Codes.Meta.Parsing;
@@ -27,6 +28,16 @@ public sealed class MetaExpressionParser
     private const string Operators = "?^&|!=<>+-*/";
     private static readonly byte[] Priorities = [1, 2, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6];
     private const byte UnaryPriority = 10;
+
+    /// <summary>
+    /// Maximum number of elements in an array, same as in the firmware
+    /// </summary>
+    public const int MaxArrayElements = 255;
+
+    /// <summary>
+    /// Maximum length of the string representation of a value. Nested arrays would otherwise expand without limit
+    /// </summary>
+    public const int MaxStringLength = 65535;
 
     private readonly string _text;
     private readonly IExpressionEvaluationContext _context;
@@ -93,7 +104,7 @@ public sealed class MetaExpressionParser
     {
         if (SkipWhiteSpace() != '\0')
         {
-            ThrowParseException("Unexpected characters after expression");
+            ThrowParseException("unexpected characters after expression");
         }
     }
 
@@ -101,6 +112,12 @@ public sealed class MetaExpressionParser
     // Evaluate an expression internally, stopping before any binary operator with priority 'priority' or lower
     private void ParseInternal(ref object? val, bool evaluate, byte priority)
     {
+        // A stack overflow cannot be caught and would terminate the process
+        if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+        {
+            ThrowParseException(ExpressionErrors.NestingTooDeep);
+        }
+
         // Start by looking for a unary operator or opening bracket
         char c = SkipWhiteSpace();
         switch (c)
@@ -251,19 +268,33 @@ public sealed class MetaExpressionParser
             switch (val)
             {
                 case object?[] array:
-                    if (indexValue >= array.Length)
+                    if (indexValue < array.Length)
+                    {
+                        val = array[indexValue];
+                    }
+                    else if (evaluate)
                     {
                         ThrowParseException(ExpressionErrors.ArrayIndexOutOfRange);
                     }
-                    val = array[indexValue];
+                    else
+                    {
+                        val = null;
+                    }
                     break;
 
                 case string s:
-                    if (indexValue >= s.Length)
+                    if (indexValue < s.Length)
+                    {
+                        val = s[(int)indexValue];
+                    }
+                    else if (evaluate)
                     {
                         ThrowParseException(ExpressionErrors.ArrayIndexOutOfRange);
                     }
-                    val = s[(int)indexValue];
+                    else
+                    {
+                        val = null;
+                    }
                     break;
 
                 default:
@@ -535,6 +566,9 @@ public sealed class MetaExpressionParser
                             case string s:
                                 result = s == (string)val2!;
                                 break;
+                            case char c:
+                                result = c == (char)val2!;
+                                break;
                             default:
                                 if (evaluate)
                                 {
@@ -684,6 +718,10 @@ public sealed class MetaExpressionParser
         // Check for the names of constants
         if (TryGetNamedConstant(identifier, applyExists, out rslt))
         {
+            if (applyLengthOperator)
+            {
+                ApplyLengthOperator(ref rslt, evaluate);
+            }
             return;
         }
 
@@ -767,6 +805,11 @@ public sealed class MetaExpressionParser
                 _mustForward = true;
                 rslt = null;
             }
+            else if (rslt is double d)
+            {
+                // The firmware has no double type, so every operator and function here works on float
+                rslt = (float)d;
+            }
         }
         else
         {
@@ -818,6 +861,10 @@ public sealed class MetaExpressionParser
     {
         if (val is object?[] array1 && val2 is object?[] array2)
         {
+            if (array1.Length + array2.Length > MaxArrayElements)
+            {
+                throw new CodeParserException(ExpressionErrors.ArrayTooLarge);
+            }
             object?[] result = new object?[array1.Length + array2.Length];
             Array.Copy(array1, 0, result, 0, array1.Length);
             Array.Copy(array2, 0, result, array1.Length, array2.Length);
@@ -839,7 +886,7 @@ public sealed class MetaExpressionParser
             default:
                 if (evaluate)
                 {
-                    ThrowParseException("expected object model value or string after '#");
+                    ThrowParseException("operand of # is not an array or string");
                 }
                 val = 0;
                 break;
@@ -936,6 +983,10 @@ public sealed class MetaExpressionParser
                     {
                         ThrowParseException(ExpressionErrors.ExpectedNonNegativeInt);
                     }
+                    if ((int)a[0]! > MaxArrayElements)
+                    {
+                        ThrowParseException(ExpressionErrors.ArrayTooLarge);
+                    }
                     object?[] vector = new object?[(int)a[0]!];
                     Array.Fill(vector, a[1]);
                     result = vector;
@@ -981,14 +1032,16 @@ public sealed class MetaExpressionParser
         return (float)value!;
     }
 
-    private static object FloatToIntOrFloat(float f) => (f >= int.MinValue && f <= int.MaxValue) ? (object)(int)f : f;
+    // int.MaxValue converts to 2^31 as a float, which does not fit, hence the strict comparison
+    private static object FloatToIntOrFloat(float f) => (f >= int.MinValue && f < int.MaxValue) ? (object)(int)f : f;
 
     private object Abs(object? value)
     {
         switch (value)
         {
             case int i:
-                return Math.Abs(i);
+                // The firmware wraps int.MinValue around to itself instead of failing
+                return (i == int.MinValue) ? i : Math.Abs(i);
             case float f:
                 return MathF.Abs(f);
             default:
@@ -1006,7 +1059,8 @@ public sealed class MetaExpressionParser
             return fa % (float)b!;
         }
         int ib = (int)b!;
-        return (ib == 0) ? 0 : (int)a! % ib;
+        // int.MinValue % -1 overflows in .NET although the remainder is 0
+        return (ib == 0 || ib == -1) ? 0 : (int)a! % ib;
     }
 
     private object Pow(object?[] args)
@@ -1017,7 +1071,7 @@ public sealed class MetaExpressionParser
         ConvertToFloat(ref a, true);
         ConvertToFloat(ref b, true);
         float res = MathF.Pow((float)a!, (float)b!);
-        return (integerResult && MathF.Abs(res) <= int.MaxValue) ? (object)(int)MathF.Round(res, MidpointRounding.ToEven) : res;
+        return (integerResult && res >= int.MinValue && res < int.MaxValue) ? (object)(int)MathF.Round(res, MidpointRounding.ToEven) : res;
     }
 
     private object? MinMaxFunction(List<object?> args, bool isMax)
@@ -1313,6 +1367,10 @@ public sealed class MetaExpressionParser
                             sb.Append(',');
                         }
                         sb.Append(AppendAsString(array[i]));
+                        if (sb.Length > MaxStringLength)
+                        {
+                            throw new CodeParserException("string too long");
+                        }
                     }
                     sb.Append('}');
                     return sb.ToString();
@@ -1342,8 +1400,31 @@ public sealed class MetaExpressionParser
             {
                 ThrowParseException("expected hexadecimal digits");
             }
-            ulong hexValue = Convert.ToUInt64(_text[hexStart.._pos], 16);
+            if (!ulong.TryParse(_text.AsSpan(hexStart, _pos - hexStart), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out ulong hexValue))
+            {
+                ThrowParseException("hexadecimal number too large");
+            }
             return FitInteger(hexValue);
+        }
+
+        if (CurrentCharacter() == '0' && (PeekCharacter() == 'b' || PeekCharacter() == 'B'))
+        {
+            AdvancePointer();
+            AdvancePointer();
+            int binaryStart = _pos;
+            while (CurrentCharacter() == '0' || CurrentCharacter() == '1')
+            {
+                AdvancePointer();
+            }
+            if (_pos == binaryStart)
+            {
+                ThrowParseException("expected binary digits");
+            }
+            if (!ulong.TryParse(_text.AsSpan(binaryStart, _pos - binaryStart), NumberStyles.AllowBinarySpecifier, CultureInfo.InvariantCulture, out ulong binaryValue))
+            {
+                ThrowParseException("binary number too large");
+            }
+            return FitInteger(binaryValue);
         }
 
         while (IsDigit(CurrentCharacter()))
@@ -1366,6 +1447,10 @@ public sealed class MetaExpressionParser
             if (CurrentCharacter() == '+' || CurrentCharacter() == '-')
             {
                 AdvancePointer();
+            }
+            if (!IsDigit(CurrentCharacter()))
+            {
+                ThrowParseException("expected exponent digits");
             }
             while (IsDigit(CurrentCharacter()))
             {

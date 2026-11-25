@@ -1,3 +1,4 @@
+using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.Utility;
 using NUnit.Framework;
@@ -31,6 +32,37 @@ public class Parameter
 
         // A parameter without a value also equals null
         Assert.That(a == null, Is.True);
+    }
+
+    [Test]
+    public void OutOfRangeValueIsInvalidType()
+    {
+        CodeParameter huge = new('P', "1e20", false, false), negative = new('P', "-1", false, false), negativeFloat = new('P', "-1.5", false, false);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (int)huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (int?)huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (bool)huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (uint)huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (uint?)negative);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (uint)negativeFloat);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (long)huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (long?)huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (int[])huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (uint[])huge);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (long[])huge);
+
+        InvalidParameterTypeException ex = Assert.Throws<InvalidParameterTypeException>(() => _ = (int)huge)!;
+        Assert.That(ex.Message, Is.EqualTo("Cannot convert P parameter to Int32 (value 1e20)"));
+
+        CodeParameter hugeArray = new('P', "1:1e20", false, false);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (int[])hugeArray);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (uint[])hugeArray);
+        Assert.Throws<InvalidParameterTypeException>(() => _ = (long[])hugeArray);
+
+        // Values in range are unaffected
+        Assert.That((int)new CodeParameter('P', "1.6", false, false), Is.EqualTo(2));
+        Assert.That((uint)new CodeParameter('P', "3", false, false), Is.EqualTo(3u));
+        Assert.That((long)new CodeParameter('P', "1e10", false, false), Is.EqualTo(10000000000L));
+        Assert.That((uint[])new CodeParameter('P', "1.4:2", false, false), Is.EqualTo(new uint[] { 1, 2 }));
     }
 
     [Test]

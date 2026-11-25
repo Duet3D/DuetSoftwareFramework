@@ -107,9 +107,10 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
                     code.Flags |= CodeFlags.IsPrioritized | CodeFlags.IsFromFirmware;
                     priorityCodes.Add(code);
                 }
-                // M108, M112, M122, M292, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response
+                // M108, M112, M122, M292, M25.1, and M999 (B0) always go to an idle channel so we (hopefully) get a low-latency response.
+                // So does M24 while a feed hold is active, because the channel it arrives on may be the one whose macro the hold has stopped
                 else if (code.Type == CodeType.MCode &&
-                    (code.MajorNumber is 108 or 112 or 122 or 292 || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0)))
+                    (code.MajorNumber is 108 or 112 or 122 or 292 || (code.MajorNumber == 25 && code.MinorNumber == 1) || (code.MajorNumber == 999 && code.GetInt('B', 0) == 0) || (code.MajorNumber == 24 && await IsFeedHoldActiveAsync(cancellationToken))))
                 {
                     code.Flags |= CodeFlags.IsPrioritized;
                     priorityCodes.Add(code);
@@ -200,5 +201,18 @@ public sealed class SimpleCode(Codes.CodeFactory codeFactory, Model.ObjectModel 
             }
         }
         return result.ToString();
+    }
+
+    /// <summary>
+    /// Check if a feed hold is active
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Whether the machine status is held</returns>
+    private async Task<bool> IsFeedHoldActiveAsync(CancellationToken cancellationToken = default)
+    {
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            return model.State.Status == MachineStatus.Held;
+        }
     }
 }

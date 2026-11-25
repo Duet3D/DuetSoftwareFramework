@@ -209,7 +209,7 @@ internal static class UpdateFromJsonReader
                         "int" => new("newIntValue", "reader.GetInt32()"),
                         "string" => new("newStringValue", "reader.GetString()!"),
                         "char" => new("newCharValue", "reader.GetString()![0]"),
-                        "float" => new("newFloatValue", "reader.GetSingle()"),
+                        "float" => new("newFloatValue", "reader.GetFiniteSingle()"),
                         "float[]" => new("newFloatArrayValue", "ReadFloatArray(ref reader)"),
                         "int[]" => new("newIntArrayValue", "ReadIntArray(ref reader)"),
                         "DriverId" => new("newDriverIdValue", "new DriverId(reader.GetString()!)"),
@@ -232,7 +232,7 @@ internal static class UpdateFromJsonReader
                         writer.WriteLine("while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)");
                         writer.WriteLine("{");
                         writer.Indent++;
-                        writer.WriteLine($"values.Add(reader.{(genericPropType == "float[]" ? "GetSingle" : "GetInt32")}());");
+                        writer.WriteLine($"values.Add(reader.{(genericPropType == "float[]" ? "GetFiniteSingle" : "GetInt32")}());");
                         writer.Indent--;
                         writer.WriteLine("}");
                         writer.WriteLine("return values.ToArray();");
@@ -361,7 +361,7 @@ internal static class UpdateFromJsonReader
                             "int" => "GetInt32()",
                             "bool" => "TokenType == JsonTokenType.Number ? reader.GetInt32() != 0 : reader.GetBoolean()",
                             "double" => "GetDouble()",
-                            "float" => "GetSingle()",
+                            "float" => "GetFiniteSingle()",
                             "long" => "GetInt64()",
                             "ulong" => "GetUInt64()",
                             "uint" => "GetUInt32()",
@@ -435,7 +435,7 @@ internal static class UpdateFromJsonReader
                             writer.WriteLine("else");
                             writer.WriteLine("{");
                             writer.Indent++;
-                            writer.WriteLine($"{prop.Identifier.ValueText} = reader.GetSingle();");
+                            writer.WriteLine($"{prop.Identifier.ValueText} = reader.GetFiniteSingle();");
                             writer.Indent--;
                             writer.WriteLine("}");
                             writer.Indent--;

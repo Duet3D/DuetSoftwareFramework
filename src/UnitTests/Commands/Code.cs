@@ -5,7 +5,9 @@ using NUnit.Framework;
 
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -1148,6 +1150,24 @@ public class Code
         // The byte length must match between the sync and async parsers
         DuetAPI.Commands.Code[] codes = [.. Parse("G1 X10 Y20 ; some comment with Ümläute")];
         Assert.That(codes[1].Length, Is.EqualTo(codes[0].Length));
+    }
+
+    [Test]
+    public async Task IpcCodeLimits()
+    {
+        static DuetControlServer.Commands.Code makeCode(string? keywordArgument, int numParameters)
+        {
+            DuetControlServer.Commands.Code code = (DuetControlServer.Commands.Code)RuntimeHelpers.GetUninitializedObject(typeof(DuetControlServer.Commands.Code));
+            code.KeywordArgument = keywordArgument;
+            code.Parameters = [.. Enumerable.Repeat(new CodeParameter('P', "1", false, false), numParameters)];
+            return code;
+        }
+
+        CodeParserException ex = (await Assert.ThrowsAsync<CodeParserException>(() => makeCode(new string('a', 256), 0).InvokeAsync()))!;
+        Assert.That(ex.Message, Is.EqualTo("Keyword argument too long (> 255)"));
+
+        ex = (await Assert.ThrowsAsync<CodeParserException>(() => makeCode(null, 256).InvokeAsync()))!;
+        Assert.That(ex.Message, Is.EqualTo("Too many parameters (> 255)"));
     }
 
     public static IEnumerable<DuetAPI.Commands.Code> Parse(string code)

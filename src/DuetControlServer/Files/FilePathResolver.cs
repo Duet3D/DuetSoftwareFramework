@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using Microsoft.Extensions.Options;
 
 namespace DuetControlServer.Files;
@@ -43,7 +44,7 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
     /// Regex to obtain a drive number from a RRF-style path
     /// </summary>
     /// <returns></returns>
-    [GeneratedRegex(@"^(\d+):/*(.*)")]
+    [GeneratedRegex(@"^(\d+):/*(.*)", RegexOptions.Singleline)]
     private static partial Regex _generateDriveRegex();
 
     /// <summary>
@@ -245,6 +246,66 @@ public partial class FilePathResolver(Model.ObjectModel model, IOptions<Settings
         }
         return CombineContained(settings.Value.BaseDirectory, filePath);
     }
+
+    /// <summary>
+    /// Check if a physical path is the root directory of a volume
+    /// </summary>
+    /// <param name="physicalPath">Physical path to check</param>
+    /// <returns>Whether the path is the base directory or the root directory of a mounted volume</returns>
+    public bool IsVolumeRoot(string physicalPath)
+    {
+        physicalPath = NormalizePath(physicalPath);
+        if (physicalPath == NormalizePath(settings.Value.BaseDirectory))
+        {
+            return true;
+        }
+
+        using (model.AccessReadOnly())
+        {
+            foreach (Volume volume in model.Volumes)
+            {
+                if (volume.Path is not null && physicalPath == NormalizePath(volume.Path))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Check if a physical path is the root directory of a volume asynchronously
+    /// </summary>
+    /// <param name="physicalPath">Physical path to check</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Whether the path is the base directory or the root directory of a mounted volume</returns>
+    public async Task<bool> IsVolumeRootAsync(string physicalPath, CancellationToken cancellationToken = default)
+    {
+        physicalPath = NormalizePath(physicalPath);
+        if (physicalPath == NormalizePath(settings.Value.BaseDirectory))
+        {
+            return true;
+        }
+
+        using (await model.AccessReadOnlyAsync(cancellationToken))
+        {
+            foreach (Volume volume in model.Volumes)
+            {
+                if (volume.Path is not null && physicalPath == NormalizePath(volume.Path))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Resolve relative segments of a physical path and strip the trailing directory separator
+    /// </summary>
+    /// <param name="physicalPath">Physical path to normalize</param>
+    /// <returns>Normalized path</returns>
+    private static string NormalizePath(string physicalPath) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(physicalPath));
 
     /// <summary>
     /// Check if the given physical path is located inside the given volume directory and compute the relative path if so

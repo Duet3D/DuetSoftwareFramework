@@ -42,7 +42,6 @@ public record CodeBlock
         HasLocalVariables = original.HasLocalVariables;
         LocalVariables = [.. original.LocalVariables];
         EndPosition = original.EndPosition;
-        AllowVariableRedeclaration = original.AllowVariableRedeclaration;
     }
 
     /// <summary>
@@ -103,17 +102,12 @@ public record CodeBlock
     public bool HasLocalVariables { get; set; }
 
     /// <summary>
-    /// List of local variables
+    /// List of local variables together with the file positions of the codes that declared them
     /// </summary>
-    public List<string> LocalVariables { get; } = [];
+    public List<(string Name, long Position)> LocalVariables { get; } = [];
 
     /// <summary>
     /// File position where the block ended, set when the block is closed
     /// </summary>
     public long EndPosition { get; set; }
-
-    /// <summary>
-    /// Whether local variables of this block may be redeclared, set after a rewind because the declarations are read again
-    /// </summary>
-    public bool AllowVariableRedeclaration { get; set; }
 }

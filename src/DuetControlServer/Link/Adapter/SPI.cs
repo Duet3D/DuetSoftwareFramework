@@ -221,7 +221,8 @@ public class SPI : IDiagnostics, ILinkAdapter
     /// </summary>
     /// <param name="connecting">Whether this an initial connection is being established</param>
     /// <param name="cancellationToken">Cancellation token to cancel the transfer</param>
-    public void PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
+    /// <returns>Whether the pending packets have been sent. If not, they may have been discarded</returns>
+    public bool PerformFullTransfer(bool connecting = false, CancellationToken cancellationToken = default)
     {
         _packetsBeingResent.Clear();
         _lastTransferNumber = _rxHeader.SequenceNumber;
@@ -319,7 +320,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _txBuffer = _txBuffer.Next ?? _txBuffers.First!;
                 _rxPointer = _txPointer = 0;
                 _packetId = 0;
-                break;
+                return true;
             }
             catch (OperationCanceledException e)
             {
@@ -329,7 +330,10 @@ public class SPI : IDiagnostics, ILinkAdapter
                 }
 
                 _logger.LogDebug(e, "Lost connection to Duet");
+
+                // The TX header buffer may still hold a protocol version adopted from a bad header, so rewrite it as well
                 _txHeader.ProtocolVersion = Consts.ProtocolVersion;
+                WriteCRC();
                 _waitingForFirstTransfer = true;
 
                 // Without this the retry guard above keeps throwing without exchanging anything
@@ -344,6 +348,7 @@ public class SPI : IDiagnostics, ILinkAdapter
                 _connected = false;
             }
         }
+        return false;
     }
 
     /// <summary>
@@ -374,11 +379,12 @@ public class SPI : IDiagnostics, ILinkAdapter
             return null;
         }
 
-        // Header
-        _rxPointer += Protocol.Reader.ReadPacketHeader(_rxBuffer[_rxPointer..].Span, out _lastPacket);
+        // Header. Only the data of this transfer is valid, the rest of the buffer may hold data of an earlier one
+        ReadOnlyMemory<byte> transferData = _rxBuffer[.._rxHeader.DataLength];
+        _rxPointer += Protocol.Reader.ReadPacketHeader(transferData[_rxPointer..].Span, out _lastPacket);
 
         // Packet data
-        _packetData = _rxBuffer.Slice(_rxPointer, _lastPacket.Length);
+        _packetData = transferData.Slice(_rxPointer, _lastPacket.Length);
         int padding = 4 - (_lastPacket.Length % 4);
         _rxPointer += _lastPacket.Length + ((padding == 4) ? 0 : padding);
 
@@ -1832,11 +1838,13 @@ public class SPI : IDiagnostics, ILinkAdapter
                 {
                     _logger.LogWarning("Bad data CRC32 (expected 0x{ExpectedChecksum:x8}, got 0x{ActualChecksum:x8})", _rxHeader.ChecksumData32, crc32);
                     responseCode = ExchangeResponse(TransferResponse.BadDataChecksum);
+
+                    // RRF sends its data again when either side reports a bad data checksum, so exchange the data again whether RRF got ours or not
                     if (responseCode == TransferResponse.BadDataChecksum)
                     {
                         _logger.LogWarning("Note: RepRapFirmware didn't receive valid data either (code 0x{0:x8})", responseCode);
                     }
-                    else
+                    else if (responseCode != TransferResponse.Success)
                     {
                         if (responseCode == TransferResponse.BadResponse)
                         {

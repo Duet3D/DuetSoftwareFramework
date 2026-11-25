@@ -3334,8 +3334,10 @@
         </member>
         <member name="T:DuetAPI.Connection.InitMessages.CodeStreamInitMessage">
             <summary>
-            Enter code streaming connection mode
-            In this connection mode G/M/T-codes are processed asynchronously (up to <see cref="P:DuetAPI.Connection.InitMessages.CodeStreamInitMessage.BufferSize"/>)
+            Enter code streaming connection mode.
+            In this connection mode G/M/T-codes are sent as text lines and processed asynchronously (up to <see cref="P:DuetAPI.Connection.InitMessages.CodeStreamInitMessage.BufferSize"/>), and their replies are received as text.
+            To upload a file, send M559 or M560, wait for the "Writing to file" reply and then send the file content as raw bytes:
+            as many as the S parameter says, or up to the end-of-file string <c>&lt;!-- **EoF** --&gt;</c> if there is no S parameter.
             </summary>
         </member>
         <member name="P:DuetAPI.Connection.InitMessages.CodeStreamInitMessage.BufferSize">
@@ -3543,7 +3545,9 @@
         </member>
         <member name="F:DuetAPI.Connection.ConnectionMode.CodeStream">
             <summary>
-            Code stream mode. This mode lets users send and receive code replies asynchronously using a single socket connection
+            Code stream mode. This mode lets users send and receive code replies asynchronously using a single socket connection.
+            Codes are sent as text lines and replies are received as text, like on a serial port of the machine.
+            Files can be uploaded with M559 and M560, whose file content follows the code as raw bytes.
             </summary>
             <seealso cref="T:DuetAPI.Connection.InitMessages.CodeStreamInitMessage"/>
         </member>
@@ -5699,6 +5703,14 @@
             Information about an expansion board connected over CAN
             </summary>
         </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.BootloaderVersion">
+            <summary>
+            Version of the bootloader or empty if unknown
+            </summary>
+            <remarks>
+            Boards report this only from firmware 3.7.1 on, main boards in expansion mode never report it
+            </remarks>
+        </member>
         <member name="P:DuetAPI.ObjectModel.ExpansionBoard.ClosedLoop">
             <summary>
             Closed loop data of this board or null if unknown
@@ -5708,6 +5720,14 @@
             <summary>
             Information about an inductive sensor or null if not present
             </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ExpansionBoard.Interface">
+            <summary>
+            Number of the CAN interface this board is connected to as printed on the main board, or null if it is not known
+            </summary>
+            <remarks>
+            This is null as long as the board address is in use on more than one CAN bus
+            </remarks>
         </member>
         <member name="P:DuetAPI.ObjectModel.ExpansionBoard.State">
             <summary>
@@ -8405,7 +8425,8 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Axis.Current">
             <summary>
-            Motor current (in mA)
+            Configured motor current (in mA) as set by M906.
+            The actual current may be lower because the driver quantises it and caps it at its own maximum
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Axis.Drivers">
@@ -8468,7 +8489,8 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Axis.PercentStstCurrent">
             <summary>
-            Percentage applied to the motor current during standstill (0..100 or null if not supported)
+            Configured percentage applied to the motor current during standstill as set by M917 (0..100 or null if not supported).
+            The actual standstill current is subject to the same driver limits as the motor current
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Axis.PhaseStep">
@@ -8489,6 +8511,11 @@
         <member name="P:DuetAPI.ObjectModel.Axis.Speed">
             <summary>
             Maximum speed (in mm/min)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Axis.State">
+            <summary>
+            State of the drivers of this axis
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Axis.StepsPerMm">
@@ -8677,6 +8704,26 @@
             <exception cref="T:System.ArgumentOutOfRangeException">Property index is invalid</exception>
             <remarks>This method is auto-generated</remarks>
         </member>
+        <member name="T:DuetAPI.ObjectModel.DriverState">
+            <summary>
+            Enumeration of possible states of the drivers of an axis or extruder
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.DriverState.Disabled">
+            <summary>
+            Drivers are disabled
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.DriverState.Idle">
+            <summary>
+            Drivers are enabled at idle current
+            </summary>
+        </member>
+        <member name="F:DuetAPI.ObjectModel.DriverState.Enabled">
+            <summary>
+            Drivers are enabled
+            </summary>
+        </member>
         <member name="T:DuetAPI.ObjectModel.Extruder">
             <summary>
             Information about an extruder drive
@@ -8689,7 +8736,8 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.Current">
             <summary>
-            Motor current (in mA)
+            Configured motor current (in mA) as set by M906.
+            The actual current may be lower because the driver quantises it and caps it at its own maximum
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.Driver">
@@ -8739,7 +8787,8 @@
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.PercentStstCurrent">
             <summary>
-            Percentage applied to the motor current during standstill (0..100 or null if not supported)
+            Configured percentage applied to the motor current during standstill as set by M917 (0..100 or null if not supported).
+            The actual standstill current is subject to the same driver limits as the motor current
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.PhaseStep">
@@ -8770,6 +8819,11 @@
         <member name="P:DuetAPI.ObjectModel.Extruder.Speed">
             <summary>
             Maximum speed (in mm/min)
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.Extruder.State">
+            <summary>
+            State of the drivers of this extruder
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.Extruder.StepsPerMm">
@@ -12129,6 +12183,11 @@
             </summary>
         </member>
         <member name="P:DuetAPI.ObjectModel.ObjectModelContext.NullableDriverMode">
+            <summary>
+            Defines the source generated JSON serialization contract metadata for a given type.
+            </summary>
+        </member>
+        <member name="P:DuetAPI.ObjectModel.ObjectModelContext.DriverState">
             <summary>
             Defines the source generated JSON serialization contract metadata for a given type.
             </summary>
@@ -16544,6 +16603,11 @@
             The machine has encountered an emergency stop and is ready to reset
             </summary>
         </member>
+        <member name="F:DuetAPI.ObjectModel.MachineStatus.Held">
+            <summary>
+            A feed hold has stopped all motion and keeps the queued moves until M24 releases it
+            </summary>
+        </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Pausing">
             <summary>
             The machine is about to pause a file job
@@ -16556,7 +16620,7 @@
         </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Resuming">
             <summary>
-            The machine is about to resume a paused file job
+            The machine is about to resume a paused file job or is moving back to the position where a feed hold stopped it
             </summary>
         </member>
         <member name="F:DuetAPI.ObjectModel.MachineStatus.Cancelling">
@@ -17859,6 +17923,34 @@
             <summary>
             Constructor of this class
             </summary>
+        </member>
+        <member name="T:DuetAPI.Utility.JsonFloatExtensions">
+            <summary>
+            Extension methods to read single-precision floats that stay serializable.
+            RepRapFirmware reports large values with few significant digits, so a value just below the float maximum may be
+            rounded beyond it. Such a number is parsed as infinity, which cannot be written as JSON again.
+            </summary>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonFloatExtensions.GetFiniteSingle(System.Text.Json.Utf8JsonReader@)">
+            <summary>
+            Read a float from a JSON reader and clamp it to the finite float range
+            </summary>
+            <param name="reader">JSON reader</param>
+            <returns>Finite float value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonFloatExtensions.GetFiniteSingle(System.Text.Json.JsonElement)">
+            <summary>
+            Read a float from a JSON element and clamp it to the finite float range
+            </summary>
+            <param name="element">JSON element</param>
+            <returns>Finite float value</returns>
+        </member>
+        <member name="M:DuetAPI.Utility.JsonFloatExtensions.Clamp(System.Single)">
+            <summary>
+            Clamp an infinite value to the finite float range
+            </summary>
+            <param name="value">Value to clamp</param>
+            <returns>Finite float value or NaN</returns>
         </member>
         <member name="T:DuetAPI.Utility.JsonHelper">
             <summary>

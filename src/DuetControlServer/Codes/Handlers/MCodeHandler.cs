@@ -85,18 +85,37 @@ public class MCodeHandler(
                     // Attempt to cancel the print from any channel other than File2
                     if (code.Channel != CodeChannel.File2)
                     {
+                        bool fileSelected, jobPaused;
                         using (await jobProcessor.LockAsync(cancellationToken))
                         {
-                            if (jobProcessor.IsFileSelected)
+                            fileSelected = jobProcessor.IsFileSelected;
+                            jobPaused = jobProcessor.IsPaused;
+                        }
+
+                        if (fileSelected)
+                        {
+                            // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused or a feed hold has stopped it
+                            bool cancelledWhileHeld = false;
+                            if (!code.IsFromFileChannel && !jobPaused)
                             {
-                                // M0/M1/M2 is permitted from inside a job file, but only permitted from elsewhere if the job is already paused
-                                if (!code.IsFromFileChannel && !jobProcessor.IsPaused)
+                                await model.WaitForFullUpdateAsync(cancellationToken);
+                                using (await model.AccessReadOnlyAsync(cancellationToken))
                                 {
-                                    return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
+                                    if (model.State.Status != MachineStatus.Held)
+                                    {
+                                        return new Message(MessageType.Error, "Pause the print before attempting to cancel it");
+                                    }
                                 }
 
-                                // Invalidate the print file and make sure no more codes are read from it
-                                jobProcessor.Cancel(true);
+                                // A pause has already resolved what the job channels had in flight, a feed hold has not
+                                await linkInterface.InvalidateJobChannelsAsync(cancellationToken);
+                                cancelledWhileHeld = true;
+                            }
+
+                            // Invalidate the print file and make sure no more codes are read from it
+                            using (await jobProcessor.LockAsync(cancellationToken))
+                            {
+                                jobProcessor.Cancel(true, cancelledWhileHeld);
                             }
                         }
                     }
@@ -235,14 +254,16 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, $"Could not find file {fileName}");
                         }
 
+                        Task fileInfoSent;
                         using (await jobProcessor.LockAsync(cancellationToken))
                         {
                             if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPaused))
                             {
                                 return new Message(MessageType.Error, "Cannot set file to print, because a file is already being printed");
                             }
-                            await jobProcessor.SelectFileAsync(fileName, physicalFile, false, code.IsFromFileChannel, cancellationToken);
+                            fileInfoSent = await jobProcessor.SelectFileAsync(fileName, physicalFile, false, code.IsFromFileChannel, cancellationToken);
                         }
+                        await fileInfoSent;
 
                         // Reassign the code's cancellation token so the job that just selected the next file still gets this code's reply
                         if (code.IsFromFileChannel)
@@ -262,16 +283,27 @@ public class MCodeHandler(
                 {
                     if (code.Channel != CodeChannel.File2)
                     {
+                        bool fileSelected;
                         using (await jobProcessor.LockAsync(cancellationToken))
                         {
-                            if (!jobProcessor.IsFileSelected)
+                            fileSelected = jobProcessor.IsFileSelected;
+                        }
+
+                        if (!fileSelected)
+                        {
+                            // M24 also releases a feed hold, which needs no file. Wait for the object model so a hold requested a moment ago is visible
+                            await model.WaitForFullUpdateAsync(cancellationToken);
+                            using (await model.AccessReadOnlyAsync(cancellationToken))
                             {
-                                return new Message(MessageType.Error, "Cannot print, because no file is selected!");
+                                if (model.State.Status != MachineStatus.Held)
+                                {
+                                    return new Message(MessageType.Error, "Cannot print, because no file is selected!");
+                                }
                             }
                         }
                     }
 
-                    // Let RepRapFirmware process this request so it can invoke resume.g. When M24 completes, the file is resumed
+                    // Let RepRapFirmware process this request so it can invoke resume.g or release the feed hold. When M24 completes, the file is resumed
                     break;
                 }
                 throw new OperationCanceledException();
@@ -367,6 +399,7 @@ public class MCodeHandler(
                             FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, settings.Value.FileBufferSize);
                             StreamWriter writer = new(fileStream, new UTF8Encoding(false), settings.Value.FileBufferSize);
                             codeProcessor.FilesBeingWritten[numChannel] = writer;
+                            codeProcessor.FileWriterConnections[numChannel] = code.SourceConnection;
                             return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
                         }
                         catch (Exception e)
@@ -493,6 +526,7 @@ public class MCodeHandler(
                             return new Message(MessageType.Error, $"GCode file \"{fileName}\" not found");
                         }
 
+                        Task fileInfoSent;
                         using (await jobProcessor.LockAsync(cancellationToken))
                         {
                             if (!code.IsFromFileChannel && (jobProcessor.IsProcessing || jobProcessor.IsPaused))
@@ -500,11 +534,12 @@ public class MCodeHandler(
                                 return new Message(MessageType.Error, "Cannot set file to simulate, because a file is already being printed");
                             }
 
-                            await jobProcessor.SelectFileAsync(fileName, physicalFile, true, code.IsFromFileChannel, cancellationToken);
+                            fileInfoSent = await jobProcessor.SelectFileAsync(fileName, physicalFile, true, code.IsFromFileChannel, cancellationToken);
                             // F0 suppresses writing the simulated time back to the file; absent or F1 updates it, as in standalone mode
                             jobProcessor.UpdateSimulatedTime = code.GetInt('F', 1) == 1;
                             // Simulation is started when M37 has been processed by the firmware
                         }
+                        await fileInfoSent;
                     }
 
                     // Let RRF do everything else
@@ -704,16 +739,6 @@ public class MCodeHandler(
                 }
                 break;
 
-            // Send/receive data
-            case 260:
-            case 261:
-                // The firmware declares the result variable itself and rejects a name that still exists, so drop a leftover from a closed block first
-                if (code.File is not null && code.TryGetString('V', out string? varName))
-                {
-                    await code.File.DeleteStaleVariableAsync(varName, cancellationToken);
-                }
-                break;
-
             // Query object model
             case 409:
                 {
@@ -815,6 +840,11 @@ public class MCodeHandler(
                 if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
                 {
                     string path = code.GetString('P'), physicalPath = await filePathResolver.ToPhysicalAsync(path, cancellationToken: cancellationToken);
+                    if (await filePathResolver.IsVolumeRootAsync(physicalPath, cancellationToken))
+                    {
+                        return new Message(MessageType.Error, $"Cannot delete {path} because it is the root directory of a volume");
+                    }
+
                     try
                     {
                         if (Directory.Exists(physicalPath))
@@ -1021,6 +1051,15 @@ public class MCodeHandler(
                 }
                 throw new OperationCanceledException();
 
+            // Binary file uploads are taken by code streams before they get here, nothing else can carry the file data
+            case 559:
+            case 560:
+                if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
+                {
+                    return new Message(MessageType.Error, "file uploads via DSF need a code stream connection");
+                }
+                throw new OperationCanceledException();
+
             // Synchronise motion systems
             case 598:
                 // The file readers must rendezvous here like the firmware ones do, else read-ahead evaluates expressions and meta keywords out of order
@@ -1046,13 +1085,10 @@ public class MCodeHandler(
                         }
 
                         // Try to fork the file and report an error if anything went wrong
-                        using (await jobProcessor.LockAsync(cancellationToken))
+                        Message result = await jobProcessor.ForkAsync(cancellationToken);
+                        if (result.Type != MessageType.Success)
                         {
-                            Message result = await jobProcessor.ForkAsync(cancellationToken);
-                            if (result.Type != MessageType.Success)
-                            {
-                                return result;
-                            }
+                            return result;
                         }
                     }
 
@@ -1166,6 +1202,12 @@ public class MCodeHandler(
                             physicalFirmwareFile = fallbackFirmwareFile;
                         }
 
+                        // IAP erases the flash before it receives the firmware image, so an empty file would brick the board
+                        if (new FileInfo(physicalFirmwareFile).Length == 0)
+                        {
+                            return new Message(MessageType.Error, $"Firmware file {firmwareFile} is empty");
+                        }
+
                         // Stop all the plugins
                         Commands.StopPlugins stopCommand = commandFactory.Create<Commands.StopPlugins>();
                         await stopCommand.ExecuteAsync(cancellationToken);
@@ -1176,7 +1218,7 @@ public class MCodeHandler(
                         Message result = new();
                         try
                         {
-                            if (Path.GetExtension(firmwareFile) == ".uf2")
+                            if (Path.GetExtension(firmwareFile).Equals(".uf2", StringComparison.OrdinalIgnoreCase))
                             {
                                 await using MemoryStream unpackedFirmwareStream = await Firmware.UnpackUF2Async(firmwareStream);
                                 await linkInterface.UpdateFirmware(iapStream, unpackedFirmwareStream, lifetime.ApplicationStopped);
@@ -1336,7 +1378,7 @@ public class MCodeHandler(
 
             // Diagnostics
             case 122:
-                if (code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
+                if (code.GetParameter('B') is not { IsExpression: true } && code.GetParameter('P') is not { IsExpression: true } && code.GetInt('B', 0) == 0 && code.GetInt('P', 0) == 0 && code.GetUnprecedentedString() != "DSF" && !string.IsNullOrEmpty(code.Result.Content))
                 {
                     // Append our own diagnostics to RRF's M122 output
                     string diagnostics = await diagnosticsProvider.PrintAsync();

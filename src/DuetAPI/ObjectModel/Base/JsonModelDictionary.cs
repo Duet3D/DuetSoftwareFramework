@@ -381,7 +381,7 @@ public class JsonModelDictionaryConverter : JsonConverter<JsonModelDictionary>
             }
             else
             {
-                writer.WriteRawValue(kv.Value.Value.GetRawText());
+                kv.Value.Value.WriteTo(writer);
             }
         }
         writer.WriteEndObject();

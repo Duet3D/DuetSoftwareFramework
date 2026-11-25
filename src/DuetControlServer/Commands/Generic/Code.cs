@@ -111,6 +111,37 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     }
 
     /// <summary>
+    /// Run a code received from an IPC client after enforcing the structural limits of the G-code parser
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Result of the code</returns>
+    /// <exception cref="CodeParserException">Code exceeds the limits of the G-code parser</exception>
+    /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
+    public override async Task<object?> InvokeAsync(CancellationToken cancellationToken = default)
+    {
+        CheckParserLimits(this);
+        return await base.InvokeAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Enforce the structural limits of the G-code parser on a code supplied by an IPC client.
+    /// Codes deserialised from JSON never pass through the parser that normally enforces them
+    /// </summary>
+    /// <param name="code">Code to check</param>
+    /// <exception cref="CodeParserException">Code exceeds the limits of the G-code parser</exception>
+    public static void CheckParserLimits(DuetAPI.Commands.Code code)
+    {
+        if (code.KeywordArgument?.Length > 255)
+        {
+            throw new CodeParserException("Keyword argument too long (> 255)", code);
+        }
+        if (code.Parameters.Count > 255)
+        {
+            throw new CodeParserException("Too many parameters (> 255)", code);
+        }
+    }
+
+    /// <summary>
     /// Run an arbitrary G/M/T-code and wait for it to finish or to be enqueued if it is asynchronous
     /// </summary>
     /// <param name="cancellationToken">Optional cancellation token</param>
@@ -118,19 +149,15 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
     public override async Task<Message?> ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        // Assign a cancellation token when the execution starts.
+        // Assign a cancellation token when the execution starts unless the file running this code has assigned its own.
         // Prioritized codes use the application stopping token so they survive channel resets (e.g. emergency stop)
         if (cancellationToken != default)
         {
             CancellationToken = cancellationToken;
         }
-        else if (Flags.HasFlag(CodeFlags.IsPrioritized))
+        else if (CancellationToken == default)
         {
-            CancellationToken = _lifetime.ApplicationStopping;
-        }
-        else
-        {
-            CancellationToken = _codeProcessor.CancellationTokenSources[(int)Channel].Token;
+            CancellationToken = Flags.HasFlag(CodeFlags.IsPrioritized) ? _lifetime.ApplicationStopping : _codeProcessor.CancellationTokenSources[(int)Channel].Token;
         }
 
         // Send it to the code pipeline
@@ -341,6 +368,7 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     public override void Reset()
     {
         base.Reset();
+        CancellationToken = default;
         Connection = null;
         ReplyLogLevel = null;
         Stage = Codes.PipelineStage.Start;

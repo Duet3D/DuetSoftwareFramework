@@ -19,7 +19,8 @@ public partial class Extruder : ModelObject, IStaticModelObject
     private float _acceleration = 500F;
 
     /// <summary>
-    /// Motor current (in mA)
+    /// Configured motor current (in mA) as set by M906.
+    /// The actual current may be lower because the driver quantises it and caps it at its own maximum
     /// </summary>
     public int Current
     {
@@ -109,7 +110,8 @@ public partial class Extruder : ModelObject, IStaticModelObject
     private int _percentCurrent = 100;
 
     /// <summary>
-    /// Percentage applied to the motor current during standstill (0..100 or null if not supported)
+    /// Configured percentage applied to the motor current during standstill as set by M917 (0..100 or null if not supported).
+    /// The actual standstill current is subject to the same driver limits as the motor current
     /// </summary>
     public int? PercentStstCurrent
     {
@@ -175,6 +177,17 @@ public partial class Extruder : ModelObject, IStaticModelObject
         set => SetPropertyValue(ref _speed, value);
     }
     private float _speed = 100F;
+
+    /// <summary>
+    /// State of the drivers of this extruder
+    /// </summary>
+    [Live]
+    public DriverState State
+    {
+        get => _state;
+        set => SetPropertyValue(ref _state, value);
+    }
+    private DriverState _state;
 
     /// <summary>
     /// Number of microsteps per mm

@@ -285,7 +285,7 @@ public sealed class ChannelProcessor
     {
         foreach (Pipelines.PipelineBase pipeline in _pipelines.Value)
         {
-            if (code.Stage == PipelineStage.Executed || pipeline.Stage > code.Stage)
+            if (pipeline.Stage > code.Stage)
             {
                 //Logger.LogDebug("Flushing codes on stage {Stage} for {Code}", pipeline.Stage, code);
                 if (!await pipeline.FlushAsync(code, cancellationToken))
