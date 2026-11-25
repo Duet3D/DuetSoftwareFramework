@@ -5,7 +5,7 @@ namespace DuetAPI.Commands;
 /// <summary>
 /// Uninstall a system package
 /// </summary>
-[RequiredPermissions(SbcPermissions.SuperUser)]
+[RequiredPermissions(SbcPermissions.ServicePlugins)]
 public partial class UninstallSystemPackage : Command
 {
     /// <summary>
