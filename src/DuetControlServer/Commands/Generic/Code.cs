@@ -645,6 +645,10 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         Stage = Codes.PipelineStage.Start;
         File = null;
         FileState = default;
+        IsCurrentlyDeferred = false;
+        DeferredRing = 0;
+        DeferredAnchor = 0;
+        DeferredPredecessor = null;
         _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         BinarySize = 0;
         ErrorColumn = DuetAPI.Commands.CodeParameter.NoColumn;

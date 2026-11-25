@@ -162,4 +162,26 @@ public class CodeFileStateTests
             Assert.That(loop.Leave(continueLoop: false).Parent!.Leave(continueLoop: false).IsInsideActiveLoop, Is.False);
         });
     }
+
+    [Test]
+    public void ACodeThatIsUsedAgainHasNothingLeftOfItsLastUse()
+    {
+        Code code = NewCode();
+        code.FileState = CodeFileState.At(10);
+        code.IsCurrentlyDeferred = true;
+        code.DeferredRing = 1;
+        code.DeferredAnchor = 5;
+        code.DeferredPredecessor = Task.CompletedTask;
+
+        code.Reset();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.FileState, Is.EqualTo(default(CodeFileState)));
+            Assert.That(code.IsCurrentlyDeferred, Is.False);
+            Assert.That(code.DeferredRing, Is.Zero);
+            Assert.That(code.DeferredAnchor, Is.Zero);
+            Assert.That(code.DeferredPredecessor, Is.Null);
+        });
+    }
 }
