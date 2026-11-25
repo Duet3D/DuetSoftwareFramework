@@ -378,7 +378,7 @@ resume that fails settles back to `Paused` and reports the error rather than res
 
 Both are held until `M24`, because that is what starts printing, and they take exactly the route a resumed pause takes: `RestartMoveFractionDone` and `RestartGCommandNumber` become `MoveFractionToSkip` and the file's modal command, and the first move built afterwards is scaled by what is left, as in §4. An absolute target is therefore not scaled: whoever sets the fraction has to move the head to where the line was interrupted first.
 
-The codes above the offset are not read, so `M24` also gives the file the feed rate, distance and extrusion modes, units, plane, volumetric extrusion and inverse time mode of the channel that sends it. This is what a `resurrect.g` written after a power failure uses; writing that file is not implemented (§9).
+The codes above the offset are not read, so `M24` also gives the file the feed rate, distance and extrusion modes, units, plane, volumetric extrusion and inverse time mode of the channel that sends it. A job started from the beginning of its file ignores `P` and `C`. This is what a `resurrect.g` written after a power failure uses; writing that file is not implemented (§9).
 
 ---
 

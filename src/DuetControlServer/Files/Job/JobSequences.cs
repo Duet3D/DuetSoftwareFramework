@@ -82,9 +82,21 @@ internal sealed class JobSequences(
     {
         using (planner.Lock())
         {
+            ForgetRestartState();
+            planner.JobMoves.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Forget how the line the job starts on is to be read, and what the job before it was owed
+    /// </summary>
+    private void ForgetRestartState()
+    {
+        using (planner.Lock())
+        {
+            planner.State.MoveFractionToSkip = 0.0f;
             planner.State.RestartMoveFractionDone = 0.0f;
             planner.State.RestartGCommandNumber = -1;
-            planner.JobMoves.Clear();
         }
     }
 
@@ -146,9 +158,13 @@ internal sealed class JobSequences(
         }
         if (fromStart)
         {
+            ForgetRestartState();
             await macroRunner.TryRunAsync(CodeChannel.File, "start.g", cancellationToken: cancellationToken);
         }
-        await ApplyRestartStateAsync(state, cancellationToken);
+        else
+        {
+            await ApplyRestartStateAsync(state, cancellationToken);
+        }
         logger.LogInformation("Starting file print");
         return new SequenceOutcome(new Message(), Failed: false);
     }
@@ -159,22 +175,20 @@ internal sealed class JobSequences(
     /// <param name="state">What the controller holds</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
-    /// Only a job started from a file position has any of this to do: <c>resurrect.g</c> is the file
-    /// that writes it, and a job started from the beginning has nothing to put back. Applied here
-    /// rather than when M26 ran because <c>start.g</c> comes between the two and its own moves must
-    /// not spend the fraction. This is RepRapFirmware's M24, which copies
-    /// <c>restartMoveFractionDone</c> into <c>moveFractionToSkip</c> and puts the modal G command
-    /// back before <c>StartPrinting</c>
+    /// Only for a job started from a file position. Applied here rather than when M26 ran because the
+    /// moves <c>resurrect.g</c> makes between the two must not spend the fraction. This is
+    /// RepRapFirmware's M24, which copies <c>restartMoveFractionDone</c> into <c>moveFractionToSkip</c>
+    /// and puts the modal G command back
     /// </remarks>
     private async ValueTask ApplyRestartStateAsync(JobState state, CancellationToken cancellationToken)
     {
         int modalGCommand;
         using (planner.Lock())
         {
-            planner.State.MoveFractionToSkip = planner.State.RestartMoveFractionDone;
+            float fractionDone = planner.State.RestartMoveFractionDone;
             modalGCommand = planner.State.RestartGCommandNumber;
-            planner.State.RestartMoveFractionDone = 0.0f;
-            planner.State.RestartGCommandNumber = -1;
+            ForgetRestartState();
+            planner.State.MoveFractionToSkip = fractionDone;
         }
 
         if (modalGCommand >= 0 && state.Stream(0) is JobStream stream)

@@ -219,4 +219,49 @@ public class CancelRestartTests : BenchFixture
                         Is.EqualTo(4800.0f), "the file has the feed rate too");
         });
     }
+
+    /// <summary>What a job that made no move was owed is not taken from the next job</summary>
+    [Test]
+    public async Task RestartFractionThatWasNotUsedIsForgotten()
+    {
+        const string job = "G1 X10 F6000\nG4 P0\n";
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "M563 P0 D0", "T0", "M83", Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteGCode("job.gcode", job);
+            sd.WriteGCode("next.gcode", "M83\nG1 X20 E2 F6000\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
+        await bench.Host.ExecuteCodeAsync($"M26 S{job.IndexOf("G4")} P0.5");
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/next.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm).Within(1e-2f), "all of E2");
+    }
+
+    /// <summary>A job started from the beginning of its file makes the first line whole and in its own modes</summary>
+    /// <remarks>GCodes::StartPrinting clears restartMoveFractionDone if fromStart</remarks>
+    [Test]
+    public async Task RestartFractionIsIgnoredAtTheStartOfTheFile()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "M563 P0 D0", "T0", Machines.Xye.Homed)
+                                             .WithSd(sd => sd.WriteGCode("job.gcode", "G1 X20 E2 F6000\nG1 X30\n")).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
+        await bench.Host.ExecuteCodeAsync("M26 S0 P0.5");
+        await bench.Host.ExecuteCodeAsync("G91");
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("startRan"), Is.EqualTo(1), "start.g ran");
+            Assert.That(RoundedDistances(bench), Is.EqualTo(new[] { 20.0, 10.0 }), "X0 to X20, and X20 to X30");
+            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm).Within(1e-2f),
+                        "all of E2");
+        });
+    }
 }
