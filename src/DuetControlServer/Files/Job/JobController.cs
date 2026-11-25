@@ -126,6 +126,12 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private JobCommand? _sequenceRequest;
     private int _sequenceId;
 
+    /// <summary>
+    /// The M25 that asked for the pending pause, answered when the pause begins or is dropped
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>doingDeferredPause</c></remarks>
+    private JobCommand? _heldPause;
+
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -488,13 +494,21 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             {
                 // A filament change takes priority over an ordinary pause and replaces it; anything
                 // else is refused rather than stacked
-                command.Reply(new Message(MessageType.Warning, "Pausing is already pending"));
+                command.Reply(request.Synchronous ? new Message() : new Message(MessageType.Success, "Pausing is already pending"));
                 return;
             }
 
             await PublishAsync(state with { PendingPause = request });
             state.Stream(0)?.Reader.FreezeAtBoundary();
-            command.Reply(new Message());
+            if (request.Synchronous || request.Channel == CodeChannel.Autopause)
+            {
+                // The macro the pause has to wait for is running the code that asked, or events wait for the reply
+                command.Reply(new Message());
+            }
+            else
+            {
+                _heldPause = command;
+            }
             return;
         }
 
@@ -521,6 +535,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             stream.Reader.Freeze();
         }
         await PublishAsync(_state with { Phase = JobPhase.Pausing, PendingPause = null });
+        AnswerHeldPause();
 
         // A pause commanded from the job file itself is answered now rather than when the sequence
         // settles: the sequence has to wait for the code that asked to complete, and a reply held
@@ -691,8 +706,9 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         {
             // The macro was let finish, so the File channel is inside none by construction and
             // nothing was submitted past the last code's moves. The ring drains to rest at the
-            // boundary, so the pause makes no stop and rewinds to where the reader says it is
-            await BeginPauseAsync(null, request with { Synchronous = true });
+            // boundary, so the pause makes no stop and rewinds to where the reader says it is.
+            // RepRapFirmware runs the pause as an M226 of the file's own
+            await BeginPauseAsync(null, request with { Channel = CodeChannel.File, Synchronous = true });
         }
         command.Reply(new Message());
     }
@@ -1058,17 +1074,25 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <param name="state">State the run is ending from</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
-    /// The request itself was answered when it was taken, because a held pause is a promise rather
-    /// than an operation. The run ending breaks that promise, and the operator asked for a pause
-    /// rather than for the job to finish, so it is said out loud
+    /// The operator asked for a pause rather than for the job to finish, so it is said out loud
     /// </remarks>
     private async ValueTask DropPendingPauseAsync(JobState state)
     {
+        AnswerHeldPause();
         if (state.PendingPause is not null)
         {
             await _eventLogger.LogOutputAsync(MessageType.Warning,
                                               "Pause request dropped because the job ended before it could be actioned");
         }
+    }
+
+    /// <summary>
+    /// Answer the M25 that asked for the pending pause
+    /// </summary>
+    private void AnswerHeldPause()
+    {
+        _heldPause?.Reply(new Message());
+        _heldPause = null;
     }
 
     /// <summary>

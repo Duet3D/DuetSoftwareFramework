@@ -107,6 +107,8 @@ the macro is cancelled where it would have been started and the pause lands at t
 RepRapFirmware makes the same check in `StartNextGCode`, before it starts the next command from the
 file.
 
+The `M25` that asked is answered, with no text, when the macro has ended and the pause begins, or when the job ends first. Another `M25` in the meantime replies `Pausing is already pending`. The pause macro runs on the job's own channel, as for the `M226` RepRapFirmware runs in its place.
+
 A macro has ended for this purpose once its last code has run, which is before its last move has been made. How long before is bounded by the move queue: a move is accepted while the moves not yet committed, including those on their way to the motion thread, add up to less than 2 seconds, or to less than 0.5 seconds without the first of them.
 
 ---
