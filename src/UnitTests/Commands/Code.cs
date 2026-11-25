@@ -1168,6 +1168,26 @@ public class Code
         Assert.That(codes[1].Length, Is.EqualTo(codes[0].Length));
     }
 
+    [Test]
+    public void ParseSeveralCodesOfALineFromAReader()
+    {
+        using StringReader reader = new("G91 G1 X{1 + 2} Y3 M106 S1\n");
+        List<string> codes = [];
+        DuetAPI.Commands.Code code = new();
+        int length = 0;
+        while (DuetAPI.Commands.Code.Parse(reader, code))
+        {
+            codes.Add(code.ToString());
+            length += code.Length!.Value;
+            code.Reset();
+        }
+        Assert.Multiple(() =>
+        {
+            Assert.That(codes, Is.EqualTo(new[] { "G91", "G1 X{1 + 2} Y3", "M106 S1" }));
+            Assert.That(length, Is.EqualTo("G91 G1 X{1 + 2} Y3 M106 S1\n".Length), "every character belongs to one code");
+        });
+    }
+
     /// <summary>Read a value the way <c>GetFloat</c> and its siblings do</summary>
     private delegate T Getter<T, TRefusal>(char letter, T? defaultValue, T? min, T? max,
                                           Func<TRefusal, string>? errorString = null) where T : struct;
