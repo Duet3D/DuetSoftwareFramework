@@ -27,6 +27,7 @@ public sealed class Command : IProcessor
         SupportedCommand.For<Code>(),
         SupportedCommand.For<EvaluateExpression>(),
         SupportedCommand.For<Flush>(),
+        SupportedCommand.For<InvalidateChannel>(),
         SupportedCommand.For<SimpleCode>(),
         SupportedCommand.For<WriteMessage>(),
         SupportedCommand.For<AddHttpEndpoint>(),
