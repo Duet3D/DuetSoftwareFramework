@@ -438,7 +438,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             case JobPhase.Selected:
                 await PublishAsync(state with { Phase = JobPhase.Starting, StopReason = null });
                 _runTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
-                StartSequence(command, token => _sequences.StartAsync(_state, token));
+                StartSequence(command, token => _sequences.StartAsync(_state, command.Channel, token));
                 return;
 
             case JobPhase.Paused:

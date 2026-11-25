@@ -110,6 +110,7 @@ internal sealed class JobSequences(
     /// Start a job that was only selected
     /// </summary>
     /// <param name="state">What the controller holds</param>
+    /// <param name="channel">Channel that started it</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What the sequence did</returns>
     /// <remarks>
@@ -117,7 +118,7 @@ internal sealed class JobSequences(
     /// is about to read from it, and it is awaited so that it has finished before the first code of
     /// the job does
     /// </remarks>
-    public async Task<SequenceOutcome> StartAsync(JobState state, CancellationToken cancellationToken)
+    public async Task<SequenceOutcome> StartAsync(JobState state, CodeChannel channel, CancellationToken cancellationToken)
     {
         jobMonitor.Start();
         await jobMonitor.PublishAsync(cancellationToken);
@@ -135,6 +136,11 @@ internal sealed class JobSequences(
                 if (model.Inputs[stream.Channel] is InputChannel input)
                 {
                     input.CurrentFile = stream.Reader.File.FilePath.Virtual;
+                    if (!fromStart && model.Inputs[channel] is InputChannel starter)
+                    {
+                        // The codes that set the modes of the file come before the offset, so whoever set it has set them
+                        InterpreterStateStack.CopyState(starter, input);
+                    }
                 }
             }
         }

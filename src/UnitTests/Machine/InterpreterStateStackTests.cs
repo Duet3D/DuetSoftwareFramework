@@ -41,6 +41,32 @@ public class InterpreterStateStackTests
     }
 
     [Test]
+    public void CopyingTheStateOfAChannelLeavesTheCompatibilityAlone()
+    {
+        InputChannel from = NewInput(), to = NewInput();
+        from.FeedRate = 1200.0f;
+        from.AxesRelative = from.DrivesRelative = from.Volumetric = from.InverseTimeMode = true;
+        from.DistanceUnit = DistanceUnit.Inch;
+        from.SelectedPlane = 2;
+        from.Compatibility = Compatibility.Marlin;
+        to.Compatibility = Compatibility.NanoDLP;
+
+        InterpreterStateStack.CopyState(from, to);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(to.FeedRate, Is.EqualTo(1200.0f));
+            Assert.That(to.AxesRelative, Is.True);
+            Assert.That(to.DrivesRelative, Is.True);
+            Assert.That(to.Volumetric, Is.True);
+            Assert.That(to.InverseTimeMode, Is.True);
+            Assert.That(to.DistanceUnit, Is.EqualTo(DistanceUnit.Inch));
+            Assert.That(to.SelectedPlane, Is.EqualTo(2));
+            Assert.That(to.Compatibility, Is.EqualTo(Compatibility.NanoDLP), "not part of GCodeMachineState::CopyStateFrom");
+        });
+    }
+
+    [Test]
     public void APoppedStateIsTheOneThatWasPushed()
     {
         InterpreterStateStack stack = new();

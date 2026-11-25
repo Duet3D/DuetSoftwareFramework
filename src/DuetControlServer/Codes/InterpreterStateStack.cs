@@ -64,9 +64,9 @@ public sealed class InterpreterStateStack
         int SelectedPlane,
         Compatibility Compatibility)
     {
-        public static InterpreterState? Capture(InputChannel? input)
-            => input is null ? null : new(input.FeedRate, input.AxesRelative, input.DrivesRelative, input.Volumetric,
-                                          input.DistanceUnit, input.InverseTimeMode, input.SelectedPlane, input.Compatibility);
+        public static InterpreterState Capture(InputChannel input)
+            => new(input.FeedRate, input.AxesRelative, input.DrivesRelative, input.Volumetric,
+                   input.DistanceUnit, input.InverseTimeMode, input.SelectedPlane, input.Compatibility);
 
         public void Restore(InputChannel input)
         {
@@ -80,6 +80,15 @@ public sealed class InterpreterStateStack
             input.Compatibility = Compatibility;
         }
     }
+
+    /// <summary>
+    /// Put a channel into the interpreter state of another
+    /// </summary>
+    /// <param name="from">Channel to copy from</param>
+    /// <param name="to">Channel to copy to</param>
+    /// <remarks>RepRapFirmware's <c>GCodeMachineState::CopyStateFrom</c>, which leaves the compatibility alone</remarks>
+    public static void CopyState(InputChannel from, InputChannel to)
+        => (InterpreterState.Capture(from) with { Compatibility = to.Compatibility }).Restore(to);
 
     /// <summary>
     /// One level of a stack: what it saved of the level below, and the macro that owns it if it is a macro's level
@@ -136,7 +145,7 @@ public sealed class InterpreterStateStack
                 return false;
             }
 
-            stack.Levels.Add(new Level(InterpreterState.Capture(input), input?.CurrentFile, stack.InMacro, stack.MacroRestartable, macro));
+            stack.Levels.Add(new Level(input is null ? null : InterpreterState.Capture(input), input?.CurrentFile, stack.InMacro, stack.MacroRestartable, macro));
             if (macro is not null)
             {
                 stack.InMacro = true;
