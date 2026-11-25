@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
@@ -36,7 +37,7 @@ public class M207Tests : BenchFixture
     private const float SpeedTolerance = 1e-3f;
 
     /// <summary>A tool's retraction settings, read in one go</summary>
-    private readonly record struct Retraction(float Length, float ExtraRestart, float Speed, float UnretractSpeed, float ZHop);
+    public readonly record struct Retraction(float Length, float ExtraRestart, float Speed, float UnretractSpeed, float ZHop);
 
     private static Task<Retraction> ReadRetractionAsync(Bench bench, int tool)
         => bench.Host.ReadModelAsync(model =>
@@ -55,6 +56,12 @@ public class M207Tests : BenchFixture
     }
 
     private static readonly Retraction Defaults = new(DefaultLength, 0.0f, DefaultSpeed, DefaultSpeed, 0.0f);
+
+    /// <summary>Sets every field of tool 0 away from its default, so a field a later M207 omits can be seen to keep its value</summary>
+    private const string ConfigureTool0 = "M207 P0 S3 R0.5 F1800 T900 Z0.25";
+
+    /// <summary>What <see cref="ConfigureTool0"/> sets</summary>
+    private static readonly Retraction Configured = new(3.0f, 0.5f, 30.0f, 15.0f, 0.25f);
 
     /// <summary>The non-empty lines of a reply</summary>
     private static string[] Lines(string reply) => reply.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
@@ -141,10 +148,11 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
-        await bench.Host.ExecuteCodeAsync(code);
+        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
+            Assert.That(reply, Is.Empty, "setting succeeds silently");
             AssertRetraction(retraction, Defaults with { Speed = speed, UnretractSpeed = unretractSpeed }, "tools[0]");
             Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
         });
@@ -162,11 +170,12 @@ public class M207Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
         await bench.Host.ExecuteCodeAsync("G20");
-        await bench.Host.ExecuteCodeAsync("M207 S1 R0.5 F600 T300 Z0.1");
+        string set = (await bench.Host.ExecuteCodeAsync("M207 S1 R0.5 F600 T300 Z0.1")).Trim();
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
         Assert.Multiple(() =>
         {
+            Assert.That(set, Is.Empty, "setting succeeds silently");
             AssertRetraction(retraction, new Retraction(1.0f, 0.5f, 10.0f, 5.0f, 0.1f), "tools[0] in mm and mm/s");
             Assert.That(report, Is.EqualTo("Tool 0 retract/reprime: length 1.00/1.50mm, speed 10.0/5.0mm/sec, Z hop 0.10mm"), "the report is in mm too");
         });
@@ -249,8 +258,9 @@ public class M207Tests : BenchFixture
     /// <summary>A negative Z is an error, but what was set before it stays set</summary>
     /// <remarks>
     /// Tool::SetFirmwareRetraction sets S before GetNonNegativeFValue throws "value must be not less than zero"
-    /// for Z. Without P, Tool::SetAllToolsFirmwareRetraction stops at the first tool, so tool 0 keeps the new
-    /// length and tool 1 is never reached. Existing G-code may rely on this, so it is kept
+    /// for Z, quoting the column of Z's value. Without P, Tool::SetAllToolsFirmwareRetraction stops at the first
+    /// tool, so tool 0 keeps the new length and tool 1 is never reached. Existing G-code may rely on this, so it
+    /// is kept
     /// </remarks>
     [Category("KnownGap")]
     [Test]
@@ -262,10 +272,225 @@ public class M207Tests : BenchFixture
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.EndWith("value must be not less than zero"), "Z is refused");
+            Assert.That(reply, Is.EqualTo("Error: at column 10: M207: value must be not less than zero"), "Z is refused");
             AssertRetraction(first, Defaults with { Length = 5.0f }, "tools[0] keeps the S that came before Z");
             AssertRetraction(second, Defaults, "tools[1] is never reached");
             Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+        });
+    }
+
+    /// <summary>With P, a negative Z fails after setting what came before it on that tool only</summary>
+    /// <remarks>GCodes2.cpp case 207 hands the one tool to Tool::SetFirmwareRetraction</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207PNegativeZFailsAfterSettingWhatCameBefore()
+    {
+        await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M207 P1 S5 Z-1")).Trim();
+        Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.EqualTo("Error: at column 13: M207: value must be not less than zero"), "Z is refused");
+            AssertRetraction(second, Defaults with { Length = 5.0f }, "tools[1] keeps the S that came before Z");
+            AssertRetraction(first, Defaults, "tools[0] is untouched");
+            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+        });
+    }
+
+    /// <summary>The cases of <see cref="M207ChangesOnlyTheFieldsItNames"/>: one parameter each, from <see cref="Configured"/></summary>
+    private static IEnumerable<TestCaseData> OneParameterCases()
+    {
+        yield return new TestCaseData("M207 S4", Configured with { Length = 4.0f }).SetName("M207 S alone changes only the length");
+        yield return new TestCaseData("M207 R-0.2", Configured with { ExtraRestart = -0.2f }).SetName("M207 R alone changes only the extra restart");
+        yield return new TestCaseData("M207 F2400", Configured with { Speed = 40.0f, UnretractSpeed = 40.0f }).SetName("M207 F alone changes only the two speeds");
+        yield return new TestCaseData("M207 T600", Configured with { UnretractSpeed = 10.0f }).SetName("M207 T alone changes only the unretract speed");
+        yield return new TestCaseData("M207 Z0.6", Configured with { ZHop = 0.6f }).SetName("M207 Z alone changes only the Z hop");
+    }
+
+    /// <summary>A parameter M207 does not name keeps the value it had, and setting anything replies nothing</summary>
+    /// <remarks>Tool::SetFirmwareRetraction writes only the fields whose letters it has seen, and reports only when it has seen none</remarks>
+    [Category("KnownGap")]
+    [TestCaseSource(nameof(OneParameterCases))]
+    public async Task M207ChangesOnlyTheFieldsItNames(string code, Retraction expected)
+    {
+        await using Bench bench = await Bench.StartAsync(OneToolConfig, ConfigureTool0);
+
+        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        Retraction retraction = await ReadRetractionAsync(bench, 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.Empty, "setting succeeds silently, without a report");
+            AssertRetraction(retraction, expected, "tools[0]");
+            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+        });
+    }
+
+    /// <summary>F given after a separate T sets the unretract speed again</summary>
+    /// <remarks>Tool::SetFirmwareRetraction: F sets unRetractSpeed as well as retractSpeed</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207FAfterASeparateTOverwritesTheUnretractSpeed()
+    {
+        await using Bench bench = await Bench.StartAsync(OneToolConfig);
+
+        await bench.Host.ExecuteCodeAsync("M207 T600");
+        string reply = (await bench.Host.ExecuteCodeAsync("M207 F1200")).Trim();
+        Retraction retraction = await ReadRetractionAsync(bench, 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            AssertRetraction(retraction, Defaults with { Speed = 20.0f, UnretractSpeed = 20.0f }, "tools[0]: F replaced the earlier T");
+        });
+    }
+
+    /// <summary>M207 P0 sets tool 0 only: P0 names a tool, it does not mean "no P"</summary>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207P0SetsOnlyToolZero()
+    {
+        await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M207 P0 S3")).Trim();
+        Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            AssertRetraction(first, Defaults with { Length = 3.0f }, "tools[0]");
+            AssertRetraction(second, Defaults, "tools[1] is untouched");
+        });
+    }
+
+    /// <summary>Tools with gaps between their numbers are set and reported by number, in number order</summary>
+    /// <remarks>
+    /// Tool::AddTool keeps the tool list sorted by number, whatever order M563 created them in, and M207 walks
+    /// that list. The model's tools[] has empty entries for the numbers in between
+    /// </remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207FollowsToolNumbersWithGaps()
+    {
+        await using Bench bench = await Bench.StartAsync("""
+            M563 P3 S"Three"
+            M563 P1 S"One"
+            """);
+
+        string setOne = (await bench.Host.ExecuteCodeAsync("M207 P3 S3")).Trim();
+        Retraction one = await ReadRetractionAsync(bench, 1), three = await ReadRetractionAsync(bench, 3);
+        string report = await bench.Host.ExecuteCodeAsync("M207");
+        string setAll = (await bench.Host.ExecuteCodeAsync("M207 Z0.3")).Trim();
+        Retraction oneAfter = await ReadRetractionAsync(bench, 1), threeAfter = await ReadRetractionAsync(bench, 3);
+        Assert.Multiple(() =>
+        {
+            Assert.That(setOne, Is.Empty, "M207 P3 succeeds silently");
+            AssertRetraction(three, Defaults with { Length = 3.0f }, "M207 P3 sets tools[3]");
+            AssertRetraction(one, Defaults, "and leaves tools[1] untouched");
+            Assert.That(Lines(report), Is.EqualTo(new[]
+            {
+                "Tool 1 retract/reprime: length 2.00/2.00mm, speed 16.7/16.7mm/sec, Z hop 0.00mm",
+                "Tool 3 retract/reprime: length 3.00/3.00mm, speed 16.7/16.7mm/sec, Z hop 0.00mm"
+            }), "the report lists tool 1 before tool 3");
+            Assert.That(setAll, Is.Empty, "M207 without P succeeds silently");
+            AssertRetraction(oneAfter, Defaults with { ZHop = 0.3f }, "M207 without P sets tools[1]");
+            AssertRetraction(threeAfter, Defaults with { Length = 3.0f, ZHop = 0.3f }, "and tools[3]");
+        });
+    }
+
+    /// <summary>M207 P naming a tool that does not exist is an error when it reports, as when it sets</summary>
+    /// <remarks>GCodes2.cpp case 207 looks the tool up before SetFirmwareRetraction decides whether to report</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207PReportingAbsentToolFails()
+    {
+        await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M207 P5")).Trim();
+        Assert.That(reply, Is.EqualTo("Error: M207: Tool 5 does not exist"));
+    }
+
+    /// <summary>M207 has no upper limits: large values are stored as given</summary>
+    /// <remarks>Tool::SetFirmwareRetraction clamps only from below</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207StoresLargeValuesAsGiven()
+    {
+        await using Bench bench = await Bench.StartAsync(OneToolConfig);
+
+        string reply = (await bench.Host.ExecuteCodeAsync("M207 S50 R20 F30000 T30000 Z10")).Trim();
+        Retraction retraction = await ReadRetractionAsync(bench, 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            AssertRetraction(retraction, new Retraction(50.0f, 20.0f, 500.0f, 500.0f, 10.0f), "tools[0]");
+        });
+    }
+
+    /// <summary>A letter with no number after it is an error and changes nothing</summary>
+    /// <remarks>
+    /// StringParser::CheckNumberFound, reached from ReadFloatValue for S, R, F, T and Z and from ReadUIValue for P:
+    /// "expected number after '%c'", at the column after the letter
+    /// </remarks>
+    [Category("KnownGap")]
+    [TestCase('S')]
+    [TestCase('R')]
+    [TestCase('F')]
+    [TestCase('T')]
+    [TestCase('Z')]
+    [TestCase('P')]
+    public async Task M207RefusesALetterWithoutANumber(char letter)
+    {
+        await using Bench bench = await Bench.StartAsync(OneToolConfig);
+
+        string reply = (await bench.Host.ExecuteCodeAsync($"M207 {letter}")).Trim();
+        Retraction retraction = await ReadRetractionAsync(bench, 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.EqualTo($"Error: at column 7: M207: expected number after '{letter}'"));
+            AssertRetraction(retraction, Defaults, "tools[0] is untouched");
+        });
+    }
+
+    /// <summary>M207 in a file being simulated still sets the values, so the simulation sees the Z hop the print would</summary>
+    /// <remarks>GCodes2.cpp HandleMcode skips most M-codes while simulating, but not M207</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207RunsWhileSimulating()
+    {
+        await using Bench bench = await Bench.With(OneToolConfig)
+                                             .WithSd(sd => sd.WriteGCode("sim.gcode", "M207 S7.5 Z0.4\n"))
+                                             .StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M37 P\"0:/gcodes/sim.gcode\" F0");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle, timeoutMs: 60_000);
+        AssertRetraction(await ReadRetractionAsync(bench, 0), Defaults with { Length = 7.5f, ZHop = 0.4f }, "tools[0] after the simulation");
+    }
+
+    /// <summary>M207 does not wait for motion: it completes while a move queued before it is still in progress</summary>
+    /// <remarks>GCodes2.cpp case 207 takes no movement lock and does not wait for standstill</remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207DoesNotWaitForMotion()
+    {
+        using SteppedTimeline timeline = new();
+        await using Bench bench = await Bench.With(Machines.Xye, OneToolConfig, Machines.Xye.Homed)
+                                             .SteppedBy(timeline)
+                                             .StartAsync();
+
+        await timeline.WhileRunningAsync(() => bench.Host.ExecuteCodeAsync("G90"));
+        await bench.Host.ExecuteCodeAsync("G1 X20 F600");
+
+        Task<string> m207 = bench.Host.ExecuteCodeAsync("M207 S7.5");
+        bool completed = await Task.WhenAny(m207, Task.Delay(TimeSpan.FromSeconds(5))) == m207;
+        Retraction retraction = await ReadRetractionAsync(bench, 0);
+
+        // Let the move finish, which also releases an M207 that wrongly waits for it
+        await timeline.WhileRunningAsync(() => bench.Host.ExecuteCodeAsync("M400"));
+        string reply = (await m207).Trim();
+        Assert.Multiple(() =>
+        {
+            Assert.That(completed, Is.True, "M207 completes while the X move is held by the frozen timeline");
+            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            AssertRetraction(retraction, Defaults with { Length = 7.5f }, "tools[0] is set before the move finishes");
         });
     }
 }
