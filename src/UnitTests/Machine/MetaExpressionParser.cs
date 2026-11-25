@@ -336,6 +336,12 @@ namespace UnitTests.Machine
             Assert.That(Eval("pow(2, 10)"), Is.TypeOf<int>());
             Assert.That(Eval("pow(2, -1)"), Is.EqualTo(0.5f));
             Assert.That(Eval("pow(2.0, 3)"), Is.EqualTo(8.0f));
+            Assert.That(Eval("pow(2, 31)"), Is.EqualTo(2147483648f));
+            Assert.That(Eval("pow(2, 30)"), Is.EqualTo(1073741824));
+            Assert.That(Eval("pow(-2, 31)"), Is.EqualTo(int.MinValue));
+            Assert.That(Eval("floor(2147483648.0)"), Is.EqualTo(2147483648f));
+            Assert.That(Eval("floor(2147483520.0)"), Is.EqualTo(2147483520));
+            Assert.That(Eval("floor(-2147483648.0)"), Is.EqualTo(int.MinValue));
         }
 
         [Test]
