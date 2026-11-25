@@ -304,6 +304,7 @@ public sealed class CodeInterception : IProcessor
                         // Code is rewritten
                         if (_interceptionResult is Rewrite rewriteCommand)
                         {
+                            Commands.Code.CheckParserLimits(rewriteCommand.Code);
                             code.CopyFrom(rewriteCommand.Code);
                         }
 

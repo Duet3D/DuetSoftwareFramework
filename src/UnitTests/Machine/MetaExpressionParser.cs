@@ -345,6 +345,18 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void IntegerEdgeCasesDoNotOverflow()
+        {
+            Assert.That(Eval("abs(-2147483647-1)"), Is.EqualTo(int.MinValue));
+            Assert.That(Eval("abs(-2147483647)"), Is.EqualTo(int.MaxValue));
+            Assert.That(Eval("mod(-2147483647-1, -1)"), Is.EqualTo(0));
+            Assert.That(Eval("mod(-2147483647-1, -1)"), Is.TypeOf<int>());
+            Assert.That(Eval("mod(7, -1)"), Is.EqualTo(0));
+            Assert.That(Eval("mod(-7, -2)"), Is.EqualTo(-1));
+            Assert.That(Eval("mod(-2147483647-1, 3)"), Is.EqualTo(-2));
+        }
+
+        [Test]
         public void MinMaxFunctions()
         {
             Assert.That(Eval("max(3, 7, 5)"), Is.EqualTo(7));
@@ -587,6 +599,25 @@ namespace UnitTests.Machine
         public void TrailingCharactersThrow()
         {
             Assert.Throws<CodeParserException>(() => Eval("1 2"));
+        }
+
+        [Test]
+        public void OversizedHexLiteralThrows()
+        {
+            Assert.That(Eval("0xFFFFFFFFFFFFFFFF"), Is.TypeOf<float>());
+            Assert.That(Eval("0x0000000000000000001"), Is.EqualTo(1));
+            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("0x11111111111111111"))!;
+            Assert.That(ex.Message, Is.EqualTo("hexadecimal number too large (column 20)"));
+        }
+
+        [Test]
+        public void IncompleteExponentThrows()
+        {
+            CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("1e"))!;
+            Assert.That(ex.Message, Is.EqualTo("expected exponent digits (column 3)"));
+            Assert.Throws<CodeParserException>(() => Eval("1.5E+"));
+            Assert.Throws<CodeParserException>(() => Eval("2e-x"));
+            Assert.That(Eval("2e+1"), Is.EqualTo(20.0f));
         }
 
         [Test]

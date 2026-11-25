@@ -237,6 +237,12 @@ public class CodeParameter
     public bool IsNull { get => Type is null; }
 
     #region Explicit cast operators
+    // Whether a float can be converted to the given integer type. The upper bounds are the first values that do not fit,
+    // because the largest integers are not exactly representable as floats. Convert rounds, so -0.5 still converts to zero
+    private static bool FitsInt32(float value) => value >= int.MinValue && value < 2147483648F;
+    private static bool FitsUInt32(float value) => value >= -0.5F && value < 4294967296F;
+    private static bool FitsInt64(float value) => value >= long.MinValue && value < 9223372036854775808F;
+
     /// <summary>
     /// Explicit conversion operator to float
     /// </summary>
@@ -306,7 +312,7 @@ public class CodeParameter
             {
                 return intValue;
             }
-            if (codeParameter.ParsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue && FitsInt32(floatValue))
             {
                 return Convert.ToInt32(floatValue);
             }
@@ -331,7 +337,7 @@ public class CodeParameter
         {
             return intValue;
         }
-        if (codeParameter.ParsedValue is float floatValue)
+        if (codeParameter.ParsedValue is float floatValue && FitsInt32(floatValue))
         {
             return Convert.ToInt32(floatValue);
         }
@@ -357,11 +363,11 @@ public class CodeParameter
             {
                 return driverIdValue;
             }
-            if (codeParameter.ParsedValue is int intValue)
+            if (codeParameter.ParsedValue is int intValue && intValue >= 0)
             {
                 return Convert.ToUInt32(intValue);
             }
-            if (codeParameter.ParsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue && FitsUInt32(floatValue))
             {
                 return Convert.ToUInt32(floatValue);
             }
@@ -390,11 +396,11 @@ public class CodeParameter
         {
             return driverIdValue;
         }
-        if (codeParameter.ParsedValue is int intValue)
+        if (codeParameter.ParsedValue is int intValue && intValue >= 0)
         {
             return Convert.ToUInt32(intValue);
         }
-        if (codeParameter.ParsedValue is float floatValue)
+        if (codeParameter.ParsedValue is float floatValue && FitsUInt32(floatValue))
         {
             return Convert.ToUInt32(floatValue);
         }
@@ -424,7 +430,7 @@ public class CodeParameter
             {
                 return Convert.ToInt64(uintValue);
             }
-            if (codeParameter.ParsedValue is float floatValue)
+            if (codeParameter.ParsedValue is float floatValue && FitsInt64(floatValue))
             {
                 return Convert.ToInt64(floatValue);
             }
@@ -456,7 +462,7 @@ public class CodeParameter
         {
             return Convert.ToInt64(uintValue);
         }
-        if (codeParameter.ParsedValue is float floatValue)
+        if (codeParameter.ParsedValue is float floatValue && FitsInt64(floatValue))
         {
             return Convert.ToInt64(floatValue);
         }
@@ -605,11 +611,11 @@ public class CodeParameter
         {
             return [intValue];
         }
-        if (codeParameter.ParsedValue is float floatValue)
+        if (codeParameter.ParsedValue is float floatValue && FitsInt32(floatValue))
         {
             return [Convert.ToInt32(floatValue)];
         }
-        if (codeParameter.ParsedValue is float[] floatArray)
+        if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(FitsInt32))
         {
             return floatArray.Select(Convert.ToInt32).ToArray();
         }
@@ -654,11 +660,11 @@ public class CodeParameter
         {
             return intArray.Select(Convert.ToUInt32).ToArray();
         }
-        if (codeParameter.ParsedValue is float floatValue && floatValue >= 0F)
+        if (codeParameter.ParsedValue is float floatValue && floatValue >= 0F && FitsUInt32(floatValue))
         {
             return [Convert.ToUInt32(floatValue)];
         }
-        if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(value => value >= 0F))
+        if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(value => value >= 0F && FitsUInt32(value)))
         {
             return floatArray.Select(Convert.ToUInt32).ToArray();
         }
@@ -695,7 +701,7 @@ public class CodeParameter
         {
             return [Convert.ToInt64(uintValue)];
         }
-        if (codeParameter.ParsedValue is float floatValue)
+        if (codeParameter.ParsedValue is float floatValue && FitsInt64(floatValue))
         {
             return [Convert.ToInt64(floatValue)];
         }
@@ -707,7 +713,7 @@ public class CodeParameter
         {
             return uintArray.Select(Convert.ToInt64).ToArray();
         }
-        if (codeParameter.ParsedValue is float[] floatArray)
+        if (codeParameter.ParsedValue is float[] floatArray && floatArray.All(FitsInt64))
         {
             return floatArray.Select(Convert.ToInt64).ToArray();
         }

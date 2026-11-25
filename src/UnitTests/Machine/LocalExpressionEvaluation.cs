@@ -1,4 +1,5 @@
-﻿using DuetAPI.ObjectModel;
+﻿using DuetAPI.Commands;
+using DuetAPI.ObjectModel;
 using DuetControlServer;
 using DuetControlServer.Codes.Meta;
 using DuetControlServer.Codes.Meta.Parsing;
@@ -6,6 +7,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NUnit.Framework;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using DcsModel = DuetControlServer.Model.ObjectModel;
@@ -88,6 +91,31 @@ namespace UnitTests.Machine
         {
             _model.Network.Interfaces.Add(new NetworkInterface { Type = NetworkInterfaceType.Ethernet });
             Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, "network.interfaces[0].type", true, false), Is.EqualTo("\"ethernet\""));
+        }
+
+        [Test]
+        public async Task IndexedSbcFieldIsSubstituted()
+        {
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, "volumes[0].freeSpace", true, false), Is.EqualTo("12345"));
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, "1 + volumes[ 0 ].freeSpace", true, false), Is.EqualTo("1 +12345"));
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, "{[1] volumes[ 0 ].freeSpace}", true, false), Is.EqualTo("{[1] volumes[ 0 ].freeSpace}"));
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, "move.axes[ 0 ][1].foo", true, false), Is.EqualTo("move.axes[ 0 ][1].foo"));
+        }
+
+        [Test]
+        public async Task LongTokensAreProcessedInLinearTime()
+        {
+            string longFunction = new string('a', 300000) + "(1)";
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, longFunction, true, false), Is.EqualTo(longFunction));
+
+            string longIndexChain = "x" + string.Concat(Enumerable.Repeat("[1]", 100000));
+            Assert.That(await _expressions.EvaluateExpressionToStringAsync(null!, longIndexChain, true, false), Is.EqualTo(longIndexChain));
+
+            DuetControlServer.Commands.Code code = (DuetControlServer.Commands.Code)RuntimeHelpers.GetUninitializedObject(typeof(DuetControlServer.Commands.Code));
+            code.Keyword = KeywordType.Set;
+            string longString = '"' + new string('a', 300000) + '"';
+            code.KeywordArgument = "global.foo = " + longString;
+            Assert.That(await _expressions.EvaluateAsync(code, false), Is.EqualTo(longString));
         }
 
         [Test]

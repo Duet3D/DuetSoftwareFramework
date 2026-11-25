@@ -51,7 +51,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
     private bool TryGetCustomFunction(string lastExpression, out string lastFunction, out bool wantsCount, [NotNullWhen(true)] out CustomAsyncFunctionResolver? fn)
     {
         // Read the last valid function
-        lastFunction = string.Empty;
+        int functionStart = lastExpression.Length;
         wantsCount = false;
         bool fnComplete = false;
         for (int i = lastExpression.Length - 1; i >= 0; i--)
@@ -63,7 +63,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 {
                     break;
                 }
-                lastFunction = c + lastFunction;
+                functionStart = i;
             }
             else if (c == '#')
             {
@@ -81,6 +81,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
         }
 
         // Try to get the corresponding function
+        lastFunction = lastExpression[functionStart..];
         return CustomFunctions.TryGetValue(lastFunction, out fn);
     }
 
@@ -431,19 +432,8 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             if (code.Keyword == KeywordType.Global || code.Keyword == KeywordType.Var || code.Keyword == KeywordType.Set)
             {
                 // Get the actual expression
-                keywordExpression = string.Empty;
-                bool inExpression = false;
-                foreach (char c in code.KeywordArgument)
-                {
-                    if (inExpression)
-                    {
-                        keywordExpression += c;
-                    }
-                    else if (c == '=')
-                    {
-                        inExpression = true;
-                    }
-                }
+                int equalsIndex = code.KeywordArgument.IndexOf('=');
+                keywordExpression = (equalsIndex >= 0) ? code.KeywordArgument[(equalsIndex + 1)..] : string.Empty;
             }
             else
             {
@@ -878,6 +868,20 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
             }
 
             StringBuilder lastToken = new(), result = new();
+
+            // Trimmed lastToken without its bracketed parts, extended as the token grows so that long index chains stay linear
+            StringBuilder strippedToken = new();
+            int strippedLength = 0, strippedDepth = 0;
+            bool strippedStarted = false;
+            void clearToken()
+            {
+                lastToken.Clear();
+                strippedToken.Clear();
+                strippedLength = 0;
+                strippedDepth = 0;
+                strippedStarted = false;
+            }
+
             while (i < expression.Length)
             {
                 char c = expression[i++];
@@ -885,13 +889,13 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 {
                     result.Append(lastToken);
                     eatChar(result);
-                    lastToken.Clear();
+                    clearToken();
                 }
                 else if (c == '"')
                 {
                     result.Append(lastToken);
                     eatString(result);
-                    lastToken.Clear();
+                    clearToken();
                 }
                 else if (c == '(')
                 {
@@ -924,14 +928,41 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                         result.Append(subExpression);
                         result.Append(')');
                     }
-                    lastToken.Clear();
+                    clearToken();
                 }
                 else if (c == '[')
                 {
                     lastToken.Append('[');
+                    foreach (char tokenChar in lastToken.ToString(strippedLength, lastToken.Length - strippedLength))
+                    {
+                        if (!strippedStarted && char.IsWhiteSpace(tokenChar))
+                        {
+                            continue;
+                        }
+                        strippedStarted = true;
+
+                        if (tokenChar == '[')
+                        {
+                            strippedDepth++;
+                        }
+                        else if (tokenChar == ']')
+                        {
+                            if (strippedDepth > 0)
+                            {
+                                strippedDepth--;
+                            }
+                        }
+                        else if (strippedDepth == 0)
+                        {
+                            strippedToken.Append(tokenChar);
+                        }
+                    }
+                    strippedLength = lastToken.Length;
 
                     string subExpression = await eatExpression(c);
-                    if (IsSbcExpression(lastToken.ToString().Trim(), false))
+
+                    // The token always ends in '[', which also rules out the special variables
+                    if (IsSbcExpression(strippedToken.ToString() + '[', false))
                     {
                         object? evaluatedSubExpression = await getExpressionValue(subExpression);
                         if (evaluatedSubExpression is int intValue)
@@ -956,7 +987,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                     result.Append('{');
                     result.Append(await eatExpression(c));
                     result.Append('}');
-                    lastToken.Clear();
+                    clearToken();
                 }
                 else if (c == ')' || c == ']' || c == '}')
                 {
@@ -990,6 +1021,7 @@ public sealed class Expressions(Model.Filter filter, Model.ObjectModel model, Li
                 else
                 {
                     await appendToken(result, lastToken);
+                    clearToken();
                     result.Append(c);
                 }
             }
