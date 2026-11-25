@@ -1407,6 +1407,26 @@ public sealed class MetaExpressionParser
             return FitInteger(hexValue);
         }
 
+        if (CurrentCharacter() == '0' && (PeekCharacter() == 'b' || PeekCharacter() == 'B'))
+        {
+            AdvancePointer();
+            AdvancePointer();
+            int binaryStart = _pos;
+            while (CurrentCharacter() == '0' || CurrentCharacter() == '1')
+            {
+                AdvancePointer();
+            }
+            if (_pos == binaryStart)
+            {
+                ThrowParseException("expected binary digits");
+            }
+            if (!ulong.TryParse(_text.AsSpan(binaryStart, _pos - binaryStart), NumberStyles.AllowBinarySpecifier, CultureInfo.InvariantCulture, out ulong binaryValue))
+            {
+                ThrowParseException("binary number too large");
+            }
+            return FitInteger(binaryValue);
+        }
+
         while (IsDigit(CurrentCharacter()))
         {
             AdvancePointer();

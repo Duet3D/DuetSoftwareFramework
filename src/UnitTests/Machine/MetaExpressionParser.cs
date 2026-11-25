@@ -611,6 +611,18 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public void BinaryLiterals()
+        {
+            Assert.That(Eval("0b1011"), Is.EqualTo(11));
+            Assert.That(Eval("0B1011"), Is.EqualTo(11));
+            Assert.That(Eval("0b0"), Is.EqualTo(0));
+            Assert.That(Eval("0b1011 + 0x10 + 1"), Is.EqualTo(28));
+            Assert.That(Eval("0b11111111111111111111111111111111"), Is.EqualTo(4294967295L));
+            Assert.Throws<CodeParserException>(() => Eval("0b"));
+            Assert.Throws<CodeParserException>(() => Eval("0b102"));
+        }
+
+        [Test]
         public void IncompleteExponentThrows()
         {
             CodeParserException ex = Assert.Throws<CodeParserException>(() => Eval("1e"))!;
