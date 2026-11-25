@@ -109,7 +109,6 @@ public class CodeFile(
                 _fileStream.Seek(value, SeekOrigin.Begin);
                 _parserBuffer.Invalidate();
                 _parserBuffer.LineNumber = (value == 0) ? 1 : null;
-                NextFilePosition = value;
             }
         }
     }
@@ -145,11 +144,6 @@ public class CodeFile(
             Variables.Restore(state.Variables ?? ImmutableDictionary<string, LocalVariable>.Empty);
         }
     }
-
-    /// <summary>
-    /// File position of the next code to actually run
-    /// </summary>
-    public long NextFilePosition { get; set; }
 
     /// <summary>
     /// Whether this file is on its first command since a restart
@@ -223,38 +217,6 @@ public class CodeFile(
     /// Close this file
     /// </summary>
     public void Close() => _isClosed = true;
-
-    /// <summary>
-    /// Copy constructor
-    /// </summary>
-    /// <param name="copyFrom">File to copy from</param>
-    /// <param name="channel">Channel where the file is executed</param>
-    /// <param name="codeFactory">Factory to create new codes</param>
-    /// <param name="codeProcessor">Code processor to process the codes</param>
-    /// <param name="expressions">Expressions to evaluate the codes</param>
-    /// <param name="model">Object model to access the machine state</param>
-    /// <param name="loggerFactory">Logger factory</param>
-    /// <param name="settings">Settings to use</param>
-    public CodeFile(CodeFile copyFrom,
-        CodeChannel channel,
-        CodeFactory codeFactory,
-        CodeProcessor codeProcessor,
-        Expressions expressions,
-        Model.ObjectModel model,
-        ILoggerFactory loggerFactory,
-        IOptions<Settings> settings) : this(copyFrom.FilePath, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
-    {
-        // Copy conditional states
-        _codeBlock = copyFrom._codeBlock;
-        _lastCodeBlock = copyFrom._lastCodeBlock;
-
-        // Seek to the next code's file position and shallow-copy the parser state
-        Position = copyFrom.NextFilePosition;
-        FirstCommandAfterRestart = copyFrom.FirstCommandAfterRestart;
-
-        _parserBuffer.LineNumber = copyFrom._parserBuffer.LineNumber;
-        _parserBuffer.LastGCode = copyFrom._parserBuffer.LastGCode;
-    }
 
     /// <summary>
     /// Finalizer of a base file

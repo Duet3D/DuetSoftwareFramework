@@ -211,12 +211,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         if (syncFileStreams && code.IsFromFileChannel)
         {
             // Wait for both file streams to reach the same position
-            if (await DoSyncAsync(code, cancellationToken))
-            {
-                await code.UpdateNextFilePositionAsync(cancellationToken);
-                return true;
-            }
-            return false;
+            return await DoSyncAsync(code, cancellationToken);
         }
         else if (ifExecuting && model.MultipleMotionSystemsConfigured)
         {
@@ -233,7 +228,6 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         }
 
         // Done
-        await code.UpdateNextFilePositionAsync(cancellationToken);
         return true;
     }
 

@@ -255,10 +255,11 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <summary>
     /// Fork the job onto the second file channel
     /// </summary>
+    /// <param name="state">State of the job code that the second stream reads on after</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The message to report</returns>
-    public ValueTask<Message> ForkAsync(CancellationToken cancellationToken)
-        => PostAsync(new JobCommand.Fork(), cancellationToken);
+    public ValueTask<Message> ForkAsync(CodeFileState state, CancellationToken cancellationToken)
+        => PostAsync(new JobCommand.Fork(state), cancellationToken);
 
     /// <summary>
     /// Set where in the file a stream starts or carries on from
@@ -671,8 +672,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         CodeFile forked;
         using (await first.Reader.File.LockAsync(_lifetime.ApplicationStopping))
         {
-            // The copy constructor reads NextFilePosition
-            forked = _fileFactory.Create(first.Reader.File, CodeChannel.File2);
+            forked = _fileFactory.Fork(first.Reader.File, command.State, CodeChannel.File2);
         }
 
         JobStream stream = NewStream(1, forked);

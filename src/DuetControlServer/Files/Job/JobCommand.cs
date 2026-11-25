@@ -140,7 +140,7 @@ internal abstract record JobCommand
     public sealed record SetFilePosition(int Stream, long Position) : JobCommand;
 
     /// <summary>Fork the job onto the second file channel (M606 S1)</summary>
-    public sealed record Fork : JobCommand;
+    public sealed record Fork(CodeFileState State) : JobCommand;
 
     /// <summary>A stream has stopped where it was told to stop</summary>
     public sealed record ReaderStopped(int Stream) : JobCommand;

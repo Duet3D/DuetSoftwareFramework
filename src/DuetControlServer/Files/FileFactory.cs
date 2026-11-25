@@ -27,14 +27,18 @@ public class FileFactory(ILogger<FileFactory> logger, IServiceProvider servicePr
     }
 
     /// <summary>
-    /// Create a code file copy for execution on the given channel
+    /// Create a copy of a code file that reads on after one of its codes
     /// </summary>
     /// <param name="copyFrom">Code file to copy</param>
+    /// <param name="state">State of the code to read on after</param>
     /// <param name="channel">Code channel</param>
     /// <returns>Code file instance</returns>
-    public CodeFile Create(CodeFile copyFrom, CodeChannel channel)
+    internal CodeFile Fork(CodeFile copyFrom, CodeFileState state, CodeChannel channel)
     {
-        return ActivatorUtilities.CreateInstance<CodeFile>(serviceProvider, copyFrom, channel);
+        CodeFile forked = Create(copyFrom.FilePath.Virtual, copyFrom.FilePath.Physical, channel);
+        forked.FirstCommandAfterRestart = copyFrom.FirstCommandAfterRestart;
+        forked.Rewind(state, atEnd: true);
+        return forked;
     }
 
     /// <summary>
@@ -82,13 +86,4 @@ public class FileFactory(ILogger<FileFactory> logger, IServiceProvider servicePr
         }
         return null;
     }
-
-    /// <summary>
-    /// Create a macro file for execution on the given channel from an existing macro file
-    /// </summary>
-    /// <param name="copyFrom">Macro file to copy from</param>
-    /// <param name="channel">Code channel requesting the macro</param>
-    /// <returns>Macro file or null if it could not be opened</returns>
-
-    public MacroFile CreateMacro(MacroFile copyFrom, CodeChannel channel) => ActivatorUtilities.CreateInstance<MacroFile>(serviceProvider, copyFrom, channel);
 }

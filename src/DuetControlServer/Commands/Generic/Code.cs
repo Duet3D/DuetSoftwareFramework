@@ -296,44 +296,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal Codes.CodeClass? ClassifyInternally() => InternalHandler?.Classify(this);
 
     /// <summary>
-    /// Update the next file position in case we need to fork this file
-    /// </summary>
-    internal void UpdateNextFilePosition()
-    {
-        if (File is not null && FilePosition is not null)
-        {
-            using (File.Lock(CancellationToken))
-            {
-                long nextFilePosition = FilePosition.Value + (Length ?? 0L);
-                if (File.NextFilePosition < nextFilePosition)
-                {
-                    File.NextFilePosition = nextFilePosition;
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Update the next file position in case we need to fork this file
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    internal async ValueTask UpdateNextFilePositionAsync(CancellationToken cancellationToken)
-    {
-        if (File is not null && FilePosition is not null)
-        {
-            using (await File.LockAsync(cancellationToken))
-            {
-                long nextFilePosition = FilePosition.Value + (Length ?? 0L);
-                if (File.NextFilePosition < nextFilePosition)
-                {
-                    File.NextFilePosition = nextFilePosition;
-                }
-            }
-        }
-    }
-
-    /// <summary>
     /// Indicates if this is a comment or empty code that is not interpreted by RepRapFirmware
     /// </summary>
     /// <remarks>

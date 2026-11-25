@@ -210,43 +210,6 @@ public sealed class MacroFile : CodeFile, IDisposable
     }
 
     /// <summary>
-    /// Copy constructor
-    /// </summary>
-    /// <param name="copyFrom">File to copy from</param>
-    /// <param name="channel">Code channel to assign</param>
-    /// <param name="codeFactory">Code factory</param>
-    /// <param name="codeProcessor">Code processor</param>
-    /// <param name="expressions">Expression evaluator</param>
-    /// <param name="model">Object model</param>
-    /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="loggerFactory">Logger factory</param>
-    /// <param name="settings">Settings</param>
-    public MacroFile(MacroFile copyFrom, CodeChannel channel,
-        CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, Model.ObjectModel model,
-        IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
-        : base(copyFrom, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
-    {
-        SourceConnection = copyFrom.SourceConnection;
-        InvokingJobCode = copyFrom.InvokingJobCode;
-        IsNested = copyFrom.IsNested;
-        IsSystemMacro = copyFrom.IsSystemMacro;
-        IsConfig = copyFrom.IsConfig;
-        IsConfigOverride = copyFrom.IsConfigOverride;
-        IsDsfConfig = copyFrom.IsDsfConfig;
-        IsRunningConfig = copyFrom.IsRunningConfig;
-        IsLoadingConfigOverride = copyFrom.IsLoadingConfigOverride;
-        IsAborted = copyFrom.IsAborted;
-
-        _codeProcessor = copyFrom._codeProcessor;
-        _eventLogger = copyFrom._eventLogger;
-        _model = copyFrom._model;
-        _settings = copyFrom._settings;
-        _lifetime = copyFrom._lifetime;
-        _logger = loggerFactory.CreateLogger<MacroFile>();
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
-    }
-
-    /// <summary>
     /// Start executing this macro file in the background
     /// </summary>
     public void Start(bool notifyFirmware = true)
