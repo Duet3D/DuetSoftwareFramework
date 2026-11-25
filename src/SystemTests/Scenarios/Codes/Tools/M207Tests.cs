@@ -218,8 +218,11 @@ public class M207Tests : BenchFixture
         Assert.That(Lines(reply), Is.EqualTo(new[] { "Tool 1 retract/reprime: length 3.00/3.50mm, speed 30.0/15.0mm/sec, Z hop 0.25mm" }), "only tool 1 is reported");
     }
 
-    /// <summary>With no tools, M207 succeeds and has nothing to report</summary>
-    /// <remarks>Tool::SetAllToolsFirmwareRetraction loops over an empty tool list and returns ok</remarks>
+    /// <summary>With no tools, M207 succeeds, has nothing to report and reads none of its parameters</summary>
+    /// <remarks>
+    /// Tool::SetAllToolsFirmwareRetraction loops over an empty tool list and returns ok. The parameters are only read
+    /// inside that loop, so with no tools even a bad value is never looked at
+    /// </remarks>
     [Category("KnownGap")]
     [Test]
     public async Task M207WithNoToolsReportsNothing()
@@ -228,10 +231,14 @@ public class M207Tests : BenchFixture
 
         string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
         string set = (await bench.Host.ExecuteCodeAsync("M207 S3")).Trim();
+        string negativeZ = (await bench.Host.ExecuteCodeAsync("M207 Z-1")).Trim();
+        string bareLetter = (await bench.Host.ExecuteCodeAsync("M207 S")).Trim();
         Assert.Multiple(() =>
         {
             Assert.That(report, Is.Empty, "the report is empty");
             Assert.That(set, Is.Empty, "setting with no tools succeeds silently");
+            Assert.That(negativeZ, Is.Empty, "a negative Z is never read");
+            Assert.That(bareLetter, Is.Empty, "a letter without a number is never read");
             Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
         });
     }
@@ -406,6 +413,52 @@ public class M207Tests : BenchFixture
 
         string reply = (await bench.Host.ExecuteCodeAsync("M207 P5")).Trim();
         Assert.That(reply, Is.EqualTo("Error: M207: Tool 5 does not exist"));
+    }
+
+    /// <summary>P is read as an unsigned integer: a fraction is cut at the point, and an expression is evaluated</summary>
+    /// <remarks>
+    /// GCodeBuffer::GetUIValue: StringParser::ReadUIValue uses StrToU32, whose NumericConverter takes only unsigned
+    /// decimal digits and stops at the '.', and CheckNumberFound only checks that a number was found. A braced value
+    /// goes to ExpressionParser::ParseUnsigned
+    /// </remarks>
+    [Category("KnownGap")]
+    [TestCase("M207 P1.5 S3", TestName = "M207 P1.5 names tool 1")]
+    [TestCase("M207 P{1} S3", TestName = "M207 P with an expression names the tool it evaluates to")]
+    public async Task M207PIsReadAsAnUnsignedInteger(string code)
+    {
+        await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
+
+        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            AssertRetraction(second, Defaults with { Length = 3.0f }, "tools[1]");
+            AssertRetraction(first, Defaults, "tools[0] is untouched");
+        });
+    }
+
+    /// <summary>A negative P is not a number M207 accepts, so it is refused before any tool is looked up</summary>
+    /// <remarks>
+    /// StrToU32's NumericConverter refuses a leading '-', so CheckNumberFound throws "expected number after 'P'".
+    /// In an expression, ExpressionParser::ConvertToUnsigned throws "expected non-negative integer"
+    /// </remarks>
+    [Category("KnownGap")]
+    [Test]
+    public async Task M207RefusesANegativeP()
+    {
+        await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
+
+        string literal = (await bench.Host.ExecuteCodeAsync("M207 P-1 S3")).Trim();
+        string expression = (await bench.Host.ExecuteCodeAsync("M207 P{-1} S3")).Trim();
+        Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
+        Assert.Multiple(() =>
+        {
+            Assert.That(literal, Is.EqualTo("Error: at column 7: M207: expected number after 'P'"), "P-1");
+            Assert.That(expression, Does.StartWith("Error: at column ").And.EndWith(": M207: expected non-negative integer"), "P{-1}");
+            AssertRetraction(first, Defaults, "tools[0] is untouched");
+            AssertRetraction(second, Defaults, "tools[1] is untouched");
+        });
     }
 
     /// <summary>M207 has no upper limits: large values are stored as given</summary>
