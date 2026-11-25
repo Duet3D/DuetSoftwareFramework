@@ -236,6 +236,14 @@ internal sealed class JobMonitor(
     }
 
     /// <summary>
+    /// Write what the job has done and how long is left, without waiting for the next poll
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public ValueTask PublishAsync(CancellationToken cancellationToken)
+        => PublishAsync(_clock.Elapsed, Controller.GetFilePosition(0), cancellationToken);
+
+    /// <summary>
     /// Write what the job has done and how long is left
     /// </summary>
     private async ValueTask PublishAsync(TimeSpan now, long filePosition, CancellationToken cancellationToken)

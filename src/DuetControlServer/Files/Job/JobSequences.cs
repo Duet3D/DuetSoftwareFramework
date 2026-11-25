@@ -120,6 +120,7 @@ internal sealed class JobSequences(
     public async Task<SequenceOutcome> StartAsync(JobState state, CancellationToken cancellationToken)
     {
         jobMonitor.Start();
+        await jobMonitor.PublishAsync(cancellationToken);
 
         // RepRapFirmware's StartPrinting(fromStart): a fresh print runs start.g, but a restart from
         // a file offset - M26 set a position, which is what resurrect.g does - does not, because
@@ -269,6 +270,7 @@ internal sealed class JobSequences(
             logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}",
                                   stream.Channel, position, request.Reason);
         }
+        await jobMonitor.PublishAsync(cancellationToken);
 
         // Through the code processor rather than the planner: the machine is not stopped while owed
         // deferred codes are still delivering their effects
