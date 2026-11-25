@@ -544,6 +544,7 @@ internal sealed class MovePlanner(
 
             State.CommitCoords(move);
             _lastSubmittedMoveId[move.RingNumber] = move.MoveId;
+            model.IsMoving = true;
             PublishCommittedPosition();
             return MoveSubmitResult.Queued;
         }

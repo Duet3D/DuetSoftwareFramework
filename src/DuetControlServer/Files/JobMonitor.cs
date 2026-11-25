@@ -23,9 +23,8 @@ namespace DuetControlServer.Files;
 /// So warm-up and pause time are accumulated separately and taken back off.
 /// </para>
 /// <para>
-/// A single writer, like <see cref="Model.MachineStatusService"/> and for the same reason: these are
-/// derived values, and deriving them in the several places that change a condition is what makes
-/// writers race. <see cref="Job.JobController"/> holds the conditions; this is the projection.
+/// A single writer, because these are derived values, and deriving them in the several places that
+/// change a condition is what makes writers race. <see cref="Job.JobController"/> holds the conditions; this is the projection.
 /// </para>
 /// <para>
 /// When a job starts and ends it is told, by the sequences that start and end it, rather than left

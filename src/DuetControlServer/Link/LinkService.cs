@@ -393,7 +393,10 @@ internal sealed class LinkService(
             // Starting ends when the startup files have been run, whether or not they were found:
             // the machine is as configured as it is going to get, so reporting it as still starting
             // would leave a machine with no config.g looking permanently mid-boot
-            model.IsStarting = false;
+            using (await model.AccessReadWriteAsync(CancellationToken.None))
+            {
+                model.IsStarting = false;
+            }
         }
     }
 

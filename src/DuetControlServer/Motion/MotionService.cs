@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -31,6 +32,7 @@ internal sealed class MotionService(
     // EventLogger eventLogger,
     LinkInterface linkInterface,
     MovePlanner planner,
+    MotionTracker tracker,
     Model.ObjectModel model,
     // IHostApplicationLifetime lifetime,
     ILogger<MotionService> logger,
@@ -194,8 +196,15 @@ internal sealed class MotionService(
                 // this loop does drive is the reported position: the object model's machinePosition
                 // is the live one, which means it has to be read back from the engine rather than
                 // written by whoever queued the last move
-                PublishLivePosition(stoppingToken);
-                Thread.Sleep(LivePositionInterval);
+                PublishMotion(stoppingToken);
+
+                // The end of the motion is reported as soon as it happens
+                long published = Stopwatch.GetTimestamp();
+                TimeSpan remaining = LivePositionInterval;
+                while (remaining > TimeSpan.Zero && (!tracker.MoveEnded.WaitOne(remaining) || planner.IsMoving))
+                {
+                    remaining = LivePositionInterval - Stopwatch.GetElapsedTime(published);
+                }
             }
         }
         finally
@@ -205,7 +214,7 @@ internal sealed class MotionService(
     }
 
     /// <summary>
-    /// Report where the machine actually is
+    /// Report where the machine actually is, and whether it is moving
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
@@ -221,24 +230,27 @@ internal sealed class MotionService(
     /// and one of them would be wrong
     /// </para>
     /// </remarks>
-    private void PublishLivePosition(CancellationToken cancellationToken)
+    private void PublishMotion(CancellationToken cancellationToken)
     {
-        MotionParameters parameters;
-        int numAxes;
-        using (planner.Lock())
-        {
-            if (linkInterface.Native.GetLivePositions(_liveEndPoints, out _) <= 0)
-            {
-                return;
-            }
-            parameters = planner.Parameters;
-            numAxes = parameters.NumAxes;
-            parameters.Geometry.MotorStepsToCartesian(
-                _liveEndPoints, parameters.StepsPerMm, numAxes, numAxes, _livePosition);
-        }
-
         using (model.AccessReadWriteAsync(cancellationToken).AsTask().GetAwaiter().GetResult())
         {
+            // Read before the position, so that the position is the final one when the machine has stopped. Moves are queued
+            // under this lock
+            model.IsMoving = planner.IsMoving;
+
+            int numAxes;
+            using (planner.Lock())
+            {
+                if (linkInterface.Native.GetLivePositions(_liveEndPoints, out _) <= 0)
+                {
+                    return;
+                }
+                MotionParameters parameters = planner.Parameters;
+                numAxes = parameters.NumAxes;
+                parameters.Geometry.MotorStepsToCartesian(
+                    _liveEndPoints, parameters.StepsPerMm, numAxes, numAxes, _livePosition);
+            }
+
             int count = Math.Min(numAxes, model.Move.Axes.Count);
             for (int axis = 0; axis < count; axis++)
             {

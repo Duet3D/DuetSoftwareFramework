@@ -162,15 +162,10 @@ public class AsyncPauseTests : BenchFixture
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
 
         // The machine has stopped and nothing has moved it since, so this is the position the
-        // restore point is meant to hold
-        double restX = await bench.Host.MachinePositionAsync(0);
-        double restY = await bench.Host.MachinePositionAsync(1);
+        // restore point is meant to hold. The live position is read from the engine every so often
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
-        Assert.Multiple(() =>
-        {
-            Assert.That(pausedX, Is.EqualTo(restX).Within(0.05), "the restore point holds the X the head stopped at");
-            Assert.That(pausedY, Is.EqualTo(restY).Within(0.05), "and the Y");
-        });
+        await bench.WaitForMachinePositionAsync(0, pausedX);
+        await bench.WaitForMachinePositionAsync(1, pausedY);
 
         // And the interpreter agrees, so what the resume schedules is measured from the same place:
         // a planner that believed the head were elsewhere would make the rest of the job travel the

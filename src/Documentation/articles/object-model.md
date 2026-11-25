@@ -101,11 +101,12 @@ and shuts the app down if a lock is held too long, to surface deadlocks rather t
 
 ### Who writes what
 
-There are five writers, and no polling of another program's model among them:
+There are six writers, and no polling of another program's model among them:
 
 | Writer | Writes |
 | --- | --- |
 | **Code handlers** (`Codes/Handlers/`) | Everything a code configures: `move.*`, `heat.*`, `fans[]`, `tools[]`, `sensors.*`, `boards[].drivers[]`, `state.*`. Under the write lock, as part of executing the code |
+| **`Model/ObjectModel.cs`** | `state.status`, derived from the conditions of the machine each time the write lock is released (`UpdateStatus`), so it never lags behind them |
 | **`Link/Expansion/ExpansionBoardManager.cs`** | What the boards report: announcements into `boards[]`, temperatures into `sensors.analog[]`, heater state, fan RPM, driver status, input changes into `sensors.endstops[]` / `sensors.gpIn[]`. A bounded queue with the oldest entry dropped when full, because these are periodic reports where the newest is worth more than a backlog |
 | **`Heat/SensorManager.cs`** | The timeout of a sensor whose readings stop: after 2 s without one, `sensors.analog[].state` becomes `timeout` and `.lastReading` 2000, as RepRapFirmware's heat task does when it polls a sensor. The readings themselves reach it from `ExpansionBoardManager`, and the main board's MCU temperature sensor is fed from `boards[0].mcuTemp` |
 | **`Motion/MotionService.cs`** | The live position - `move.axes[].machinePosition` from the engine's snapshot, so the field means where the machine *is* rather than where the last move was planned to end |
