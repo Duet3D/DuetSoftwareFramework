@@ -228,7 +228,7 @@ flowchart TD
   | M104/M109/M140/M307/M308 | Heaters and sensors, configured here and driven over CAN |
   | M302 | The cold extrusion interlock: each segment of a move is queued without the extruders whose tool's heaters are below the minimum or faulty, and a warning names the tool |
   | M106/M950 | Fans and the I/O ports everything else is built from |
-  | M563/M567/M568 | Tool definition, mixing and settings |
+  | M207/M563/M567/M568 | Tool firmware retraction, definition, mixing and settings |
   | M558/M574/M119 | Probes and endstops ([Endstops](endstops.md)) |
   | M500/M501/M503 | `config-override.g` - what the machine discovered about itself |
   | M111 P-1 / M122 / M929 | DCS log level, diagnostics, event logging |

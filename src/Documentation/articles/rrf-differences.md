@@ -124,6 +124,8 @@ DSF accepts one thing RepRapFirmware does not: `M584 X` with no driver releases 
 ### 6.1 Error handling
 
 - `M140` and `M141` change nothing when `H` is refused. RepRapFirmware goes on to apply `S` and `R`.
+- A refused `M207` changes nothing. RepRapFirmware keeps the values read before the refused one, and stops at the first tool.
+- `M207` checks its parameters when there are no tools. RepRapFirmware reads them only per tool.
 - `M140`, `M141`, `M190` and `M191` report every heater of the slot, where RepRapFirmware reports the last.
 - `M557` refuses fewer than 2 points along an axis and a third axis range.
 - A refused `M557` leaves the grid as it was. RepRapFirmware keeps a grid its check rejected.

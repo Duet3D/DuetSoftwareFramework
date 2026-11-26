@@ -69,7 +69,6 @@ public class M207Tests : BenchFixture
     /// InverseConvertSpeedToMmPerSec). The other tool keeps the defaults from Tool::Create.
     /// Regression: m207-set-retract-parameters, where M207 P1 changes only tools[1].retraction
     /// </remarks>
-    [Category("KnownGap")]
     [TestCase(0, TestName = "M207 P0 sets only tool 0")]
     [TestCase(1, TestName = "M207 P1 sets only tool 1")]
     public async Task M207PSetsOnlyThatTool(int tool)
@@ -93,7 +92,6 @@ public class M207Tests : BenchFixture
     /// Tool::SetAllToolsFirmwareRetraction calls SetFirmwareRetraction on each tool in turn.
     /// Regression: m207-set-retract-parameters, where M207 without P sets both tools
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207WithoutPSetsEveryTool()
     {
@@ -116,7 +114,6 @@ public class M207Tests : BenchFixture
     /// Tool::SetFirmwareRetraction: S is max(S, 0); R, read after S whatever the order on the line, is
     /// max(R, -length); F and T are at least MinRetractSpeed
     /// </remarks>
-    [Category("KnownGap")]
     [TestCase("M207 S-1", 0.0f, 0.0f, DefaultSpeed, DefaultSpeed, TestName = "M207 S below zero is clamped to zero")]
     [TestCase("M207 S1 R-5", 1.0f, -1.0f, DefaultSpeed, DefaultSpeed, TestName = "M207 R is clamped to minus the length the same line sets")]
     [TestCase("M207 R-5 S1", 1.0f, -1.0f, DefaultSpeed, DefaultSpeed, TestName = "M207 R is clamped against S even when R comes first")]
@@ -139,7 +136,6 @@ public class M207Tests : BenchFixture
 
     /// <summary>F sets both speeds and T then overrides the unretract speed, whatever their order on the line</summary>
     /// <remarks>Tool::SetFirmwareRetraction reads F before T</remarks>
-    [Category("KnownGap")]
     [TestCase("M207 F1200", 20.0f, 20.0f, TestName = "M207 F alone sets both speeds")]
     [TestCase("M207 F1200 T600", 20.0f, 10.0f, TestName = "M207 T after F sets the unretract speed")]
     [TestCase("M207 T600 F1200", 20.0f, 10.0f, TestName = "M207 T before F still sets the unretract speed")]
@@ -162,7 +158,6 @@ public class M207Tests : BenchFixture
     /// Tool::SetFirmwareRetraction reads S and R with GetFValue, Z with GetNonNegativeFValue and F and T with
     /// GetSpeedFromMm, none of which applies the distance scale (GCodeBuffer.cpp)
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207IgnoresInches()
     {
@@ -171,7 +166,7 @@ public class M207Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G20");
         string set = await bench.Host.ExecuteCodeAsync("M207 S1 R0.5 F600 T300 Z0.1");
         Retraction retraction = await ReadRetractionAsync(bench, 0);
-        string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
+        string report = await bench.Host.ExecuteCodeAsync("M207");
         Assert.Multiple(() =>
         {
             Assert.That(set, Reply.IsEmpty, "setting succeeds silently");
@@ -186,7 +181,6 @@ public class M207Tests : BenchFixture
     /// speed %.1f/%.1fmm/sec, Z hop %.2fmm", the reprime length being length + extraRestart.
     /// Regression: m207-set-retract-parameters, whose bare M207 replies one such line per tool
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207ReportsEveryTool()
     {
@@ -206,7 +200,6 @@ public class M207Tests : BenchFixture
     }
 
     /// <summary>M207 P with no parameter to set reports only that tool</summary>
-    [Category("KnownGap")]
     [Test]
     public async Task M207PReportsOneTool()
     {
@@ -219,14 +212,13 @@ public class M207Tests : BenchFixture
 
     /// <summary>With no tools, M207 succeeds and has nothing to report</summary>
     /// <remarks>Tool::SetAllToolsFirmwareRetraction loops over an empty tool list and returns ok</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207WithNoToolsReportsNothing()
     {
         await using Bench bench = await Bench.StartAsync();
 
-        string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
-        string set = (await bench.Host.ExecuteCodeAsync("M207 S3")).Trim();
+        string report = await bench.Host.ExecuteCodeAsync("M207");
+        string set = await bench.Host.ExecuteCodeAsync("M207 S3");
         Assert.Multiple(() =>
         {
             Assert.That(report, Reply.IsEmpty, "the report is empty");
@@ -237,7 +229,6 @@ public class M207Tests : BenchFixture
 
     /// <summary>M207 P naming a tool that does not exist is an error and changes nothing</summary>
     /// <remarks>GCodes2.cpp case 207: "Tool %u does not exist", before any parameter is read</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207PNamingAbsentToolFails()
     {
@@ -247,13 +238,12 @@ public class M207Tests : BenchFixture
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Reply.IsError());
+            Assert.That(reply, Reply.IsError("Tool 5 does not exist"));
             AssertRetraction(first, Defaults, "tools[0] is untouched");
             AssertRetraction(second, Defaults, "tools[1] is untouched");
             Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
-
 
     /// <summary>The cases of <see cref="M207ChangesOnlyTheFieldsItNames"/>: one parameter each, from <see cref="Configured"/></summary>
     private static IEnumerable<TestCaseData> OneParameterCases()
@@ -267,7 +257,6 @@ public class M207Tests : BenchFixture
 
     /// <summary>A parameter M207 does not name keeps the value it had, and setting anything replies nothing</summary>
     /// <remarks>Tool::SetFirmwareRetraction writes only the fields whose letters it has seen, and reports only when it has seen none</remarks>
-    [Category("KnownGap")]
     [TestCaseSource(nameof(OneParameterCases))]
     public async Task M207ChangesOnlyTheFieldsItNames(string code, Retraction expected)
     {
@@ -285,7 +274,6 @@ public class M207Tests : BenchFixture
 
     /// <summary>F given after a separate T sets the unretract speed again</summary>
     /// <remarks>Tool::SetFirmwareRetraction: F sets unRetractSpeed as well as retractSpeed</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207FAfterASeparateTOverwritesTheUnretractSpeed()
     {
@@ -306,7 +294,6 @@ public class M207Tests : BenchFixture
     /// Tool::AddTool keeps the tool list sorted by number, whatever order M563 created them in, and M207 walks
     /// that list. The model's tools[] has empty entries for the numbers in between
     /// </remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207FollowsToolNumbersWithGaps()
     {
@@ -338,25 +325,23 @@ public class M207Tests : BenchFixture
 
     /// <summary>M207 P naming a tool that does not exist is an error when it reports, as when it sets</summary>
     /// <remarks>GCodes2.cpp case 207 looks the tool up before SetFirmwareRetraction decides whether to report</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207PReportingAbsentToolFails()
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
         string reply = await bench.Host.ExecuteCodeAsync("M207 P5");
-        Assert.That(reply, Reply.IsError());
+        Assert.That(reply, Reply.IsError("Tool 5 does not exist"));
     }
 
     /// <summary>A negative P is not a number M207 accepts, so it is refused before any tool is looked up</summary>
     /// <remarks>StrToU32's NumericConverter refuses a leading '-', so CheckNumberFound throws "expected number after 'P'"</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207RefusesANegativeP()
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M207 P-1 S3")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M207 P-1 S3");
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Assert.Multiple(() =>
         {
@@ -368,7 +353,6 @@ public class M207Tests : BenchFixture
 
     /// <summary>M207 has no upper limits: large values are stored as given</summary>
     /// <remarks>Tool::SetFirmwareRetraction clamps only from below</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207StoresLargeValuesAsGiven()
     {
@@ -388,7 +372,6 @@ public class M207Tests : BenchFixture
     /// StringParser::CheckNumberFound, reached from ReadFloatValue for S, R, F, T and Z and from ReadUIValue for P:
     /// "expected number after '%c'", at the column after the letter
     /// </remarks>
-    [Category("KnownGap")]
     [TestCase('S')]
     [TestCase('R')]
     [TestCase('F')]
@@ -403,14 +386,13 @@ public class M207Tests : BenchFixture
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Reply.IsError());
+            Assert.That(reply, Reply.IsError(CodeErrors.ExpectedNumber(letter)));
             AssertRetraction(retraction, Defaults, "tools[0] is untouched");
         });
     }
 
     /// <summary>M207 in a file being simulated still sets the values, so the simulation sees the Z hop the print would</summary>
     /// <remarks>GCodes2.cpp HandleMcode skips most M-codes while simulating, but not M207</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207RunsWhileSimulating()
     {
@@ -425,7 +407,6 @@ public class M207Tests : BenchFixture
 
     /// <summary>M207 does not wait for motion: it completes while a move queued before it is still in progress</summary>
     /// <remarks>GCodes2.cpp case 207 takes no movement lock and does not wait for standstill</remarks>
-    [Category("KnownGap")]
     [Test]
     public async Task M207DoesNotWaitForMotion()
     {

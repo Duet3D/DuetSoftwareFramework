@@ -30,6 +30,92 @@ internal partial class MCodeHandler
     internal const string ToolDefinitionLetters = "SDHXYZFR";
 
     /// <summary>
+    /// M207: set or report the firmware retraction settings of the tool P names, or of every tool
+    /// </summary>
+    /// <param name="code">The code</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The result</returns>
+    /// <remarks>
+    /// RepRapFirmware's <c>Tool::SetFirmwareRetraction</c>. Every parameter is read before any tool changes, so a refused
+    /// M207 changes nothing. None of them follows G20
+    /// </remarks>
+    private async ValueTask<Message> HandleFirmwareRetractionAsync(Commands.Code code, CancellationToken cancellationToken)
+    {
+        using (await model.AccessReadWriteAsync(cancellationToken))
+        {
+            List<Tool> tools;
+            if (code.TryGetUInt('P', out uint? toolNumber))
+            {
+                if (toolManager.Find((int)Math.Min(toolNumber.Value, int.MaxValue)) is not Tool tool)
+                {
+                    return new Message(MessageType.Error, $"Tool {toolNumber} does not exist");
+                }
+                tools = [tool];
+            }
+            else
+            {
+                tools = [.. model.Tools.OfType<Tool>()];
+            }
+
+            bool seen = code.TryGetFloat('S', out float? length);
+            seen |= code.TryGetFloat('R', out float? extraRestart);
+            seen |= code.TryGetFloat('F', out float? speed);
+            seen |= code.TryGetFloat('T', out float? unretractSpeed);
+            seen |= code.TryGetFloat('Z', out float? zHop, min: 0.0f);
+            if (!seen)
+            {
+                return ReportFirmwareRetraction(tools);
+            }
+
+            foreach (Tool tool in tools)
+            {
+                ToolRetraction retraction = tool.Retraction;
+                if (length is float newLength)
+                {
+                    retraction.Length = Math.Max(newLength, 0.0f);
+                }
+                if (extraRestart is float newExtraRestart)
+                {
+                    // Against the length as it stands after S
+                    retraction.ExtraRestart = Math.Max(newExtraRestart, -retraction.Length);
+                }
+                if (speed is float newSpeed)
+                {
+                    retraction.Speed = retraction.UnretractSpeed = Math.Max(newSpeed / SecondsPerMinute, ToolManager.MinRetractSpeed);
+                }
+                if (unretractSpeed is float newUnretractSpeed)
+                {
+                    retraction.UnretractSpeed = Math.Max(newUnretractSpeed / SecondsPerMinute, ToolManager.MinRetractSpeed);
+                }
+                if (zHop is float newZHop)
+                {
+                    retraction.ZHop = newZHop;
+                }
+            }
+        }
+        return new Message();
+    }
+
+    /// <summary>
+    /// Report the firmware retraction settings of some tools, one line each, as M207 with nothing to set does
+    /// </summary>
+    private static Message ReportFirmwareRetraction(IEnumerable<Tool> tools)
+    {
+        StringBuilder builder = new();
+        foreach (Tool tool in tools)
+        {
+            ToolRetraction retraction = tool.Retraction;
+            if (builder.Length > 0)
+            {
+                builder.Append('\n');
+            }
+            builder.Append(CultureInfo.InvariantCulture,
+                $"Tool {tool.Number} retract/reprime: length {retraction.Length:F2}/{retraction.Length + retraction.ExtraRestart:F2}mm, speed {retraction.Speed:F1}/{retraction.UnretractSpeed:F1}mm/sec, Z hop {retraction.ZHop:F2}mm");
+        }
+        return new Message(MessageType.Success, builder.ToString());
+    }
+
+    /// <summary>
     /// M563: define, delete or report a tool
     /// </summary>
     /// <param name="code">The code</param>

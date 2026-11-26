@@ -146,12 +146,13 @@ internal partial class MCodeHandler(
     /// <returns>True if the code does nothing</returns>
     /// <remarks>
     /// The codes that end the job still run, and so do the ones that run macros and keep the machine state stack,
-    /// without which the simulation would follow a different path through the file
+    /// without which the simulation would follow a different path through the file. M207 runs so that the simulated
+    /// retractions are the ones the print would make
     /// </remarks>
     private bool IsSkippedWhileSimulating(DuetAPI.Commands.Code code)
         // TODO RRF skips M-codes while simulating on every channel, and still runs M20-M37, M82/M83, M111, M112, M200,
-        // M204, M205, M207, M572, M593, M997 and M999 (GCodes2.cpp HandleMcode)
-        => code.IsFromFileChannel && jobController.State.IsSimulating && code.MajorNumber is not (0 or 1 or 2 or 98 or 99 or 120 or 121);
+        // M204, M205, M572, M593, M997 and M999 (GCodes2.cpp HandleMcode)
+        => code.IsFromFileChannel && jobController.State.IsSimulating && code.MajorNumber is not (0 or 1 or 2 or 98 or 99 or 120 or 121 or 207);
 
     /// <summary>
     /// Whether a drive-configuration code names a drive to change rather than only asking for a
@@ -272,6 +273,8 @@ internal partial class MCodeHandler(
         { 204, CodeClass.Immediate, (h, c, ct) => h.HandleMoveAccelerationsAsync(c, ct) },
         // Set jerk, in mm/sec (M205) or mm/min (M566)
         { [205, 566], CodeClass.Immediate, (h, c, ct) => h.HandleJerkAsync(c, ct) },
+        // Set or report firmware retraction; a later G10 reads it when it is planned, not when an earlier move ends
+        { 207, CodeClass.Flush, (h, c, ct) => h.HandleFirmwareRetractionAsync(c, ct) },
         // Set axis limits
         { 208, CodeClass.Immediate, (h, c, ct) => h.HandleAxisLimitsAsync(c, ct) },
         // Set the speed factor
