@@ -784,11 +784,7 @@ public sealed class Processor
             }
         }
 
-        // Cancel pending codes and requests
-        _allFilesAborted = _linkAdapter.ProtocolVersion >= 3;
-        InvalidateRegular();
-
-        // Abort the job files if necessary
+        // Cancelling the codes wakes the job task, which must see the job aborted
         if (Channel is CodeChannel.File or CodeChannel.File2)
         {
             using (await _jobProcessor.LockAsync())
@@ -796,6 +792,10 @@ public sealed class Processor
                 _jobProcessor.Abort();
             }
         }
+
+        // Cancel pending codes and requests
+        _allFilesAborted = _linkAdapter.ProtocolVersion >= 3;
+        InvalidateRegular();
     }
 
     /// <summary>
