@@ -1,7 +1,7 @@
 //
 // The boards' output pins over time: every change of what an output pin drives (low, high, PWM at a
-// duty and frequency, a peripheral function, or nothing because it is an input) on every machine, written to one file as
-// JSON lines in emulated time. The GPIO models compute each pin's output and record it here; the bench
+// duty and frequency, a peripheral function, or nothing because it is an input) on every machine, and
+// every change a GPIO model's script makes to an input, written to one file as JSON lines in emulated time. The GPIO models compute each pin's output and record it here; the bench
 // (DuetEmulation's IoTrace) reads the file and names the pins by the firmware's pin table.
 //
 //     emulation LogIoToFile "/path/to/io.jsonl"
@@ -65,6 +65,26 @@ namespace Antmicro.Renode.Duet
                 line.Append(",\"mode\":\"").Append(mode.ToString().ToLowerInvariant()).Append('"');
                 line.Append(",\"duty\":").Append(duty.ToString("R", CultureInfo.InvariantCulture));
                 line.Append(",\"freq\":").Append(frequency.ToString("R", CultureInfo.InvariantCulture)).Append('}');
+                writer.WriteLine(line.ToString());
+            }
+        }
+
+        // An input changed by a script in a GPIO model rather than by a monitor command: what drives it now
+        public static void RecordInput(IMachine machine, string pin, string value)
+        {
+            lock(Sync)
+            {
+                if(writer == null)
+                {
+                    return;
+                }
+                var microseconds = machine.ClockSource.CurrentValue.TotalMicroseconds;
+                var machineName = EmulationManager.Instance.CurrentEmulation.TryGetMachineName(machine, out var name) ? name : "?";
+                var line = new StringBuilder();
+                line.Append("{\"t\":").Append(microseconds.ToString("F3", CultureInfo.InvariantCulture));
+                line.Append(",\"machine\":\"").Append(machineName).Append('"');
+                line.Append(",\"pin\":\"").Append(pin).Append('"');
+                line.Append(",\"input\":\"").Append(value).Append("\"}");
                 writer.WriteLine(line.ToString());
             }
         }

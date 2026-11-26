@@ -1,0 +1,15 @@
+# A move on an expansion board's driver: the CAN messages each stack sends to plan and run it, and
+# the object model as the move goes from queued to done
+name: expansion move
+boards:
+  1: EXP3HC
+config: |
+  M564 H0 S0
+  M584 X1.0
+  M92 X80
+steps:
+  - code: M569 P1.0 S0
+  - code: G91
+  - code: G1 X10 F600
+  - code: M400
+  - code: M114

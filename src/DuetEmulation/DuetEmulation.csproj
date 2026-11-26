@@ -22,6 +22,10 @@
 	<Import Project="..\DuetRealtimeCore\dotnet\HostLibrary.targets" />
 
 	<ItemGroup>
+		<PackageReference Include="YamlDotNet" Version="16.3.0" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\DuetAPI\DuetAPI.csproj" />
 		<ProjectReference Include="..\DuetControlServer\DuetControlServer.csproj" />
 	</ItemGroup>

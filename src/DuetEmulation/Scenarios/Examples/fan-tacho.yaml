@@ -1,0 +1,15 @@
+# A fan whose tacho turns with its PWM: the fan speed messages, the PWM on the board's pin, and the
+# RPM the board reports back into the object model
+name: fan tacho
+boards:
+  1: EXP3HC
+config: |
+  M950 F0 C"1.out3+out3.tach" Q250
+steps:
+  - tacho: { board: 1, port: out3.tach, fan: out3, maxRpm: 6000 }
+  - code: M106 P0 S0.5
+  - wait: 2s
+  - code: M106 P0 S1
+  - wait: 2s
+  - code: M106 P0 S0
+  - wait: 2s

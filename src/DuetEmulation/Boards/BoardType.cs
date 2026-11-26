@@ -127,6 +127,9 @@ public sealed partial class BoardType
         _ => ($"pio{(char)('a' + pin.Port)}", pin.Number)
     };
 
+    /// <summary>The GPIO peripherals of the board's machine that have scripted inputs</summary>
+    public IReadOnlyList<string> GpioPeripherals => Mcu == McuFamily.Same5x ? ["port"] : [];
+
     /// <summary>The ADC peripheral and channel of an analogue input as the pin table names it (<c>adc1_9</c>)</summary>
     /// <exception cref="FormatException">It is not an ADC input name</exception>
     public (string Peripheral, int Channel) Adc(string adcInput)

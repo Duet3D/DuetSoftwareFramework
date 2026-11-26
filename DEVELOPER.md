@@ -298,7 +298,18 @@ scripts/test.py emulation --build            # build the firmware images, then r
 scripts/test.py emulation --stack dsf        # only on DuetControlServer
 ```
 
-A run takes several minutes, most of it booting the emulated boards. [src/DuetEmulation/README.md](src/DuetEmulation/README.md) describes the bench, how to write tests for it and what it does not model yet.
+A run takes several minutes, most of it booting the emulated boards.
+
+`scripts/emulate.py` runs the bench by hand: a scenario file (the boards, `config.g` and the steps, including inputs that change by themselves, such as an endstop that triggers after so many steps) runs on both stacks and is captured, every code, reply, CAN frame, object model change and pin change in emulated time, and the two captures are compared. `scripts/emulate.py serve` keeps a bench booted for an interactive session, a step at a time on both stacks side by side:
+
+```bash
+scripts/emulate.py run homing.yaml            # capture a scenario on RepRapFirmware and DSF, and compare them
+scripts/emulate.py serve &                    # or explore: boot once, then send codes and drive inputs
+scripts/emulate.py start session.yaml
+scripts/emulate.py send 'G28 X'
+```
+
+[src/DuetEmulation/README.md](src/DuetEmulation/README.md) describes the bench, the scenario and capture formats, how to write tests for it and what it does not model yet.
 
 ## Deploy to a Remote DuetPi/SBC
 

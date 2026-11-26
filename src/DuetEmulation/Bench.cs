@@ -133,6 +133,13 @@ public abstract class Bench : IAsyncDisposable
     /// <summary>The object model at <paramref name="key"/>, or the whole of it for an empty key</summary>
     public abstract Task<JsonNode?> GetObjectModelAsync(string key = "", CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The whole object model as a capture compares it: every key in full. A stack may answer this
+    /// from what it read last time, refreshing only the keys that have changed since
+    /// </summary>
+    public virtual Task<JsonNode?> GetObjectModelSnapshotAsync(CancellationToken cancellationToken = default) =>
+        GetObjectModelAsync(string.Empty, cancellationToken);
+
     /// <summary>Let <paramref name="time"/> of emulated time pass</summary>
     public abstract Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default);
 

@@ -165,6 +165,8 @@ Three references describe RRF's behaviour. Check all that are available:
 - The regression suite references, where a case covers the code (see the regression suite section above).
 - The G-code documentation in the Duet wiki source, https://github.com/Duet3D/wiki-content.
 
+To see exactly what RRF does for a scenario, capture it on the emulation bench: `scripts/emulate.py run <scenario.yaml>` records every reply, CAN frame, object model change and pin change on RRF and on DSF and compares them, and `scripts/emulate.py serve` with `start`/`send`/`drive` explores a step at a time (`src/DuetEmulation/README.md`). The captures are what system scenarios should pin.
+
 If these disagree with each other, one of them probably has a bug. Report the disagreement to the user rather than choosing one silently.
 
 A behaviour change is acceptable where RRF's behaviour is inconsistent with the way RRF handles similar cases (for example, one unknown G-code returning an error where the rest return a warning), or where RRF's implementation has a bug. Follow the convention, not the outlier, record the deviation in `src/Documentation/articles/rrf-differences.md`, and point it out when reporting the work. Any other departure from RRF needs approval first: say what RRF does, what does not fit, and what the options are.

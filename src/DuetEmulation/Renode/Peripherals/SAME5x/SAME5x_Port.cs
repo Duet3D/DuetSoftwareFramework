@@ -18,6 +18,12 @@
 // pin is on (MapExtInt), from the firmware's pin table; the level of a pin with a line is reported to
 // the EIC, which interrupts when the pin is muxed to it (function A).
 //
+// Inputs can also be scripted to change by themselves, in emulated time, as the machine around the
+// board would change them: once a pin has had so many more rising edges (an endstop or a probe that
+// triggers when a driver has stepped so far: DriveAfterEdges), as a square wave (a fan's tacho:
+// Pulses), or as a square wave whose frequency follows the duty of an output (a fan whose tacho runs
+// with its PWM: TachoFollows). Each change a script makes is recorded in the I/O trace as an input.
+//
 //     port: GPIOPort.SAME5x_Port @ sysbus 0x41008000
 //         groups: 4
 //         eic: eic
@@ -34,6 +40,8 @@ using Antmicro.Renode.Exceptions;
 using Antmicro.Renode.Logging;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.Miscellaneous;
+using Antmicro.Renode.Peripherals.Timers;
+using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.GPIOPort
 {
@@ -339,6 +347,101 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
 
         public void ClearEdgeCounts() => Array.Clear(risingEdges, 0, risingEdges.Length);
 
+        // --- Scripted inputs ---
+
+        // Drive `inputPin` to `level` once `edgePin` has had `edges` more rising edges than it has now
+        public void DriveAfterEdges(int edgePin, ulong edges, int inputPin, bool level)
+        {
+            edgeTriggers.Add(new EdgeTrigger { EdgePin = edgePin, At = risingEdges[edgePin] + edges, InputPin = inputPin, Level = level });
+            CheckEdgeTriggers(edgePin);
+        }
+
+        public void DriveAfterEdges(string edgePin, ulong edges, string inputPin, bool level) =>
+            DriveAfterEdges(PinNumber(edgePin), edges, PinNumber(inputPin), level);
+
+        // Forget the edge triggers that have not fired
+        public void ClearEdgeTriggers() => edgeTriggers.Clear();
+
+        // Drive `pin` as a square wave at `frequency` Hz, starting high; 0 stops it and releases the pin
+        public void Pulses(int pin, double frequency)
+        {
+            StopPulses(pin);
+            if(frequency <= 0)
+            {
+                Release(pin);
+                DuetIoTrace.RecordInput(machine, PinName(pin), "released");
+                return;
+            }
+            var halfPeriod = (ulong)Math.Max(1, Math.Round(500000.0 / frequency));
+            var level = true;
+            var timer = new LimitTimer(machine.ClockSource, 1000000, this, $"pulses{pin}", halfPeriod, Direction.Ascending, false, WorkMode.Periodic, true, true);
+            timer.LimitReached += () =>
+            {
+                level = !level;
+                Drive(pin, level);
+            };
+            pulseTimers[pin] = timer;
+            Drive(pin, true);
+            DuetIoTrace.RecordInput(machine, PinName(pin), string.Format(System.Globalization.CultureInfo.InvariantCulture, "pulses {0:0.###}Hz", frequency));
+            timer.Enabled = true;
+        }
+
+        public void Pulses(string pin, double frequency) => Pulses(PinNumber(pin), frequency);
+
+        // Pulse `tachoPin` at the rate a fan driven by `fanPin` would turn: its duty times `maxRpm`,
+        // `pulsesPerRev` times a revolution. With `inverted`, the fan runs when the pin is low.
+        public void TachoFollows(int fanPin, int tachoPin, double maxRpm, double pulsesPerRev = 2, bool inverted = false)
+        {
+            tachoFollowers[fanPin] = new Tacho { Pin = tachoPin, MaxRpm = maxRpm, PulsesPerRev = pulsesPerRev, Inverted = inverted };
+            UpdateTacho(fanPin, outputs[fanPin]);
+        }
+
+        public void TachoFollows(string fanPin, string tachoPin, double maxRpm, double pulsesPerRev = 2, bool inverted = false) =>
+            TachoFollows(PinNumber(fanPin), PinNumber(tachoPin), maxRpm, pulsesPerRev, inverted);
+
+        private void UpdateTacho(int fanPin, PinOutput output)
+        {
+            if(!tachoFollowers.TryGetValue(fanPin, out var tacho))
+            {
+                return;
+            }
+            var duty = output.Mode == DuetPinMode.Pwm ? output.Duty : output.Mode == DuetPinMode.High ? 1.0 : 0.0;
+            if(tacho.Inverted)
+            {
+                duty = 1.0 - duty;
+            }
+            var frequency = duty * tacho.MaxRpm / 60.0 * tacho.PulsesPerRev;
+            if(Math.Abs(frequency - tacho.Frequency) < 1e-9)
+            {
+                return;
+            }
+            tacho.Frequency = frequency;
+            Pulses(tacho.Pin, frequency);
+        }
+
+        private void StopPulses(int pin)
+        {
+            if(pulseTimers.TryGetValue(pin, out var timer))
+            {
+                timer.Enabled = false;
+                pulseTimers.Remove(pin);
+            }
+        }
+
+        private void CheckEdgeTriggers(int edgePin)
+        {
+            for(var i = 0; i < edgeTriggers.Count; i++)
+            {
+                var trigger = edgeTriggers[i];
+                if(trigger.EdgePin == edgePin && risingEdges[edgePin] >= trigger.At)
+                {
+                    edgeTriggers.RemoveAt(i--);
+                    Drive(trigger.InputPin, trigger.Level);
+                    DuetIoTrace.RecordInput(machine, PinName(trigger.InputPin), trigger.Level ? "high" : "low");
+                }
+            }
+        }
+
         public static int PinNumber(string name)
         {
             name = name.Trim().ToUpperInvariant();
@@ -437,6 +540,7 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                         DuetIoTrace.Record(machine, PinName(number), output.Mode, output.Duty, output.Frequency);
                     }
                     OutputChanged?.Invoke(number, output.Mode, output.Duty, output.Frequency);
+                    UpdateTacho(number, output);
                 }
             }
         }
@@ -497,6 +601,10 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
                     if((rising & bit & g.Dir) != 0)
                     {
                         risingEdges[number]++;
+                        if(edgeTriggers.Count != 0)
+                        {
+                            CheckEdgeTriggers(number);
+                        }
                     }
                     Connections[number].Set((value & bit) != 0);
                 }
@@ -547,6 +655,26 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         private readonly bool[] connectedToEic;
         private readonly Dictionary<int, PwmMap> pwmMaps = new Dictionary<int, PwmMap>();
         private readonly HashSet<IDuetPwmSource> subscribedSources = new HashSet<IDuetPwmSource>();
+        private readonly List<EdgeTrigger> edgeTriggers = new List<EdgeTrigger>();
+        private readonly Dictionary<int, LimitTimer> pulseTimers = new Dictionary<int, LimitTimer>();
+        private readonly Dictionary<int, Tacho> tachoFollowers = new Dictionary<int, Tacho>();
+
+        private sealed class EdgeTrigger
+        {
+            public int EdgePin;
+            public ulong At;
+            public int InputPin;
+            public bool Level;
+        }
+
+        private sealed class Tacho
+        {
+            public int Pin;
+            public double MaxRpm;
+            public double PulsesPerRev;
+            public bool Inverted;
+            public double Frequency;
+        }
 
         private const int PinsPerGroup = 32;
         private const long GroupSize = 0x80;

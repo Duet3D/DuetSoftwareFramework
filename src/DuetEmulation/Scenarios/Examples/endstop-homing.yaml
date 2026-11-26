@@ -1,0 +1,19 @@
+# A homing move stopped by an endstop that triggers once the axis has moved 25mm, as a switch on the
+# machine would: arming the endstop, the board's report, stopping and reverting the drives, and homed
+name: endstop homing
+boards:
+  1: EXP3HC
+config: |
+  M564 H0 S0
+  M584 X1.0
+  M92 X80
+  M574 X1 S1 P"1.io0.in"
+steps:
+  - code: G91
+  - drive: { board: 1, port: io0.in, level: low }
+  - drive: { board: 1, port: io0.in, level: high, afterSteps: { driver: 0, steps: 2000 } }
+  - code: G1 H1 X-100 F3000
+    timeout: 20s
+  - code: M400
+  - code: M114
+  - release: { board: 1, port: io0.in }

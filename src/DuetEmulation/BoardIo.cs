@@ -99,15 +99,76 @@ public sealed class BoardIo(EmulatedSystem system)
         return double.Parse(await system.ExecuteAsync(board, $"{gpio} ThermalModelTemperature {number}", cancellationToken), CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Drive a digital input to a level once a driver on the same board has had <paramref name="steps"/>
+    /// more step pulses, as an endstop or a probe triggers when the axis has moved so far
+    /// </summary>
+    public Task DriveAfterStepsAsync(int address, int driver, ulong steps, string port, bool level, CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        (string gpio, int stepPin) = board.Type.Gpio(StepPin(board, driver));
+        (string inputGpio, int inputPin) = board.Type.Gpio(board.Type.PinTable[port].Pin);
+        if (gpio != inputGpio)
+        {
+            throw new ArgumentException($"A trigger needs the STEP pin and {port} on the same GPIO peripheral", nameof(port));
+        }
+        return system.ExecuteAsync(board, $"{gpio} DriveAfterEdges {stepPin} {steps} {inputPin} {MonitorSyntax.Bool(level)}", cancellationToken);
+    }
+
+    /// <summary>Forget a board's step triggers that have not fired</summary>
+    public async Task ClearStepTriggersAsync(int address, CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        foreach (string gpio in board.Type.GpioPeripherals)
+        {
+            await system.ExecuteAsync(board, $"{gpio} ClearEdgeTriggers", cancellationToken);
+        }
+    }
+
+    /// <summary>Drive a digital input as a square wave at <paramref name="frequency"/> Hz, or stop and release it with 0</summary>
+    public Task PulsesAsync(int address, string port, double frequency, CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        (string gpio, int number) = board.Type.Gpio(board.Type.PinTable[port].Pin);
+        return system.ExecuteAsync(board, $"{gpio} Pulses {number} {MonitorSyntax.Decimal(frequency)}", cancellationToken);
+    }
+
+    /// <summary>
+    /// Pulse a tacho input as a fan driven by an output would turn: the output's duty times
+    /// <paramref name="maxRpm"/>, <paramref name="pulsesPerRev"/> pulses a revolution
+    /// </summary>
+    /// <param name="address">The board's CAN address</param>
+    /// <param name="fanPort">The fan's output, such as out3</param>
+    /// <param name="tachoPort">The tacho input, such as out3.tach</param>
+    /// <param name="maxRpm">The fan's speed at full duty</param>
+    /// <param name="pulsesPerRev">Tacho pulses a revolution</param>
+    /// <param name="inverted">Whether the fan runs when the output is low</param>
+    /// <param name="cancellationToken">Cancels the command</param>
+    public Task TachoFollowsAsync(int address, string fanPort, string tachoPort, double maxRpm, double pulsesPerRev = 2, bool inverted = false,
+                                  CancellationToken cancellationToken = default)
+    {
+        EmulatedBoard board = system.Board(address);
+        (string gpio, int fan) = board.Type.Gpio(board.Type.PinTable[fanPort].Pin);
+        (string tachoGpio, int tacho) = board.Type.Gpio(board.Type.PinTable[tachoPort].Pin);
+        if (gpio != tachoGpio)
+        {
+            throw new ArgumentException($"{fanPort} and {tachoPort} are on different GPIO peripherals", nameof(tachoPort));
+        }
+        return system.ExecuteAsync(board,
+            $"{gpio} TachoFollows {fan} {tacho} {MonitorSyntax.Decimal(maxRpm)} {MonitorSyntax.Decimal(pulsesPerRev)} {MonitorSyntax.Bool(inverted)}",
+            cancellationToken);
+    }
+
+    private static McuPin StepPin(EmulatedBoard board, int driver) =>
+        driver >= 0 && driver < board.Type.StepPins.Count
+            ? board.Type.StepPins[driver]
+            : throw new ArgumentOutOfRangeException(nameof(driver), $"A {board.Type.Name} has {board.Type.StepPins.Count} drivers");
+
     /// <summary>How many step pulses a driver has been sent: the rising edges on its STEP pin since the machine started</summary>
     public async Task<ulong> StepCountAsync(int address, int driver, CancellationToken cancellationToken = default)
     {
         EmulatedBoard board = system.Board(address);
-        if (driver < 0 || driver >= board.Type.StepPins.Count)
-        {
-            throw new ArgumentOutOfRangeException(nameof(driver), $"A {board.Type.Name} has {board.Type.StepPins.Count} drivers");
-        }
-        (string gpio, int number) = board.Type.Gpio(board.Type.StepPins[driver]);
+        (string gpio, int number) = board.Type.Gpio(StepPin(board, driver));
         return await system.Renode.ExecuteForNumberAsync($"{gpio} RisingEdges {number}", board.Machine, cancellationToken);
     }
 }

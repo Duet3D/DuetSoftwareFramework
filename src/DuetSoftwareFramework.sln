@@ -52,6 +52,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DuetEmulation", "DuetEmulat
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EmulationTests", "EmulationTests\EmulationTests.csproj", "{CE3F6A4A-1511-4859-A140-8B84747BD1EA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DuetEmulator", "DuetEmulator\DuetEmulator.csproj", "{919DD118-316C-445A-9710-57B64F3EFCA1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -313,6 +315,18 @@ Global
 		{CE3F6A4A-1511-4859-A140-8B84747BD1EA}.Release|x64.Build.0 = Release|Any CPU
 		{CE3F6A4A-1511-4859-A140-8B84747BD1EA}.Release|x86.ActiveCfg = Release|Any CPU
 		{CE3F6A4A-1511-4859-A140-8B84747BD1EA}.Release|x86.Build.0 = Release|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Debug|x64.Build.0 = Debug|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Debug|x86.Build.0 = Debug|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Release|x64.ActiveCfg = Release|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Release|x64.Build.0 = Release|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Release|x86.ActiveCfg = Release|Any CPU
+		{919DD118-316C-445A-9710-57B64F3EFCA1}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
