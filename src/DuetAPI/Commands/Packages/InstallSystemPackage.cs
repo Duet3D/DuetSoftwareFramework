@@ -5,7 +5,7 @@ namespace DuetAPI.Commands
     /// <summary>
     /// Install or upgrade a system package
     /// </summary>
-    [RequiredPermissions(SbcPermissions.SuperUser)]
+    [RequiredPermissions(SbcPermissions.ServicePlugins)]
     public class InstallSystemPackage : Command
     {
         /// <summary>

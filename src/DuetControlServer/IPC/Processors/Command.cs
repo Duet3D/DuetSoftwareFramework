@@ -21,6 +21,7 @@ namespace DuetControlServer.IPC.Processors
             typeof(Code),
             typeof(EvaluateExpression),
             typeof(Flush),
+            typeof(InvalidateChannel),
             typeof(SimpleCode),
             typeof(WriteMessage),
             typeof(AddHttpEndpoint),

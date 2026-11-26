@@ -136,6 +136,36 @@ namespace DuetControlServer.Commands
         }
 
         /// <summary>
+        /// Run a code received from an IPC client
+        /// </summary>
+        /// <returns>Result of the code</returns>
+        /// <exception cref="CodeParserException">Code exceeds the limits of the G-code parser</exception>
+        /// <exception cref="OperationCanceledException">Code has been cancelled</exception>
+        public override async Task<object?> Invoke()
+        {
+            CheckParserLimits(this);
+            return await base.Invoke();
+        }
+
+        /// <summary>
+        /// Enforce the structural limits of the G-code parser on a code supplied by an IPC client.
+        /// Codes deserialised from JSON never pass through the parser that normally enforces them
+        /// </summary>
+        /// <param name="code">Code to check</param>
+        /// <exception cref="CodeParserException">Code exceeds the limits of the G-code parser</exception>
+        public static void CheckParserLimits(DuetAPI.Commands.Code code)
+        {
+            if (code.KeywordArgument?.Length > 255)
+            {
+                throw new CodeParserException("Keyword argument too long (> 255)", code);
+            }
+            if (code.Parameters.Count > 255)
+            {
+                throw new CodeParserException("Too many parameters (> 255)", code);
+            }
+        }
+
+        /// <summary>
         /// Run an arbitrary G/M/T-code and wait for it to finish or to be enqueued if it is asynchronous
         /// </summary>
         /// <returns>Result of the code</returns>

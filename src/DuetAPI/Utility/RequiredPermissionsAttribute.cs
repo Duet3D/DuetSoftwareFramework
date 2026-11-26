@@ -22,16 +22,6 @@ namespace DuetAPI.Utility
         /// </summary>
         /// <param name="permissions">Permissions to check</param>
         /// <returns>True if permission is granted</returns>
-        public bool Check(SbcPermissions permissions)
-        {
-            foreach (Enum value in Enum.GetValues(typeof(SbcPermissions)))
-            {
-                if (_requiredPermissions.HasFlag(value) && permissions.HasFlag(value))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
+        public bool Check(SbcPermissions permissions) => (_requiredPermissions & permissions) != SbcPermissions.None;
     }
 }
