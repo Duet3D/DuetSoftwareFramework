@@ -125,8 +125,8 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <param name="channel">Code channel</param>
     /// <returns>True if no macro on the channel refuses to be interrupted</returns>
     /// <remarks>
-    /// A pause abandons the macros it unwinds, so one that cannot be restarted must not be interrupted part-way - the
-    /// pause waits until the channel is back out of it instead. <c>M98 R1</c> is what marks one restartable
+    /// A pause that stops the machine part-way through a move abandons the macros it unwinds, so one that cannot be
+    /// restarted must not be interrupted like that. <c>M98 R1</c> is what marks one restartable
     /// </remarks>
     public bool CanRestartMacros(CodeChannel channel) => stateStack.CanRestartMacros(channel);
 
@@ -158,13 +158,20 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public bool IsMacroRestarted(CodeChannel channel) => Processors.Value[(int)channel].IsMacroRestarted;
 
     /// <summary>
-    /// Abandon the macros a pause interrupts on a channel, leaving its job file in place
+    /// Abandon the macros of the job on a channel, leaving its job file in place
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether any macro was abandoned</returns>
-    public Task<bool> AbandonMacrosForPauseAsync(CodeChannel channel, CancellationToken cancellationToken = default)
-        => Processors.Value[(int)channel].AbandonMacrosForPauseAsync(cancellationToken);
+    public Task<bool> AbandonMacrosAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+        => Processors.Value[(int)channel].AbandonMacrosAsync(cancellationToken);
+
+    /// <summary>
+    /// Hold on the macros the job has called on a channel
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <returns>The hold</returns>
+    public JobMacroHold GetMacroHold(CodeChannel channel) => Processors.Value[(int)channel].MacroHold;
 
     /// <summary>
     /// Assign the job file to the given channel. Only used by the job tasks!

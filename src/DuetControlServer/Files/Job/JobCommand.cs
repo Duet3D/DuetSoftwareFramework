@@ -47,26 +47,12 @@ public enum PauseMacro
 /// the file has already reached the point it stops at, so everything queued ahead of it must run
 /// </param>
 /// <param name="ReportPosition">Whether to announce where the job paused</param>
+/// <param name="InAnyMacro">
+/// Whether the pause stops the job inside a macro that cannot be restarted and carries on in it, rather than waiting
+/// for the macro to end
+/// </param>
 internal sealed record PauseRequest(CodeChannel Channel, PrintPausedReason Reason, PauseMacro Macro,
-                                    bool Synchronous, bool ReportPosition);
-
-/// <summary>
-/// How far a reader is allowed to get before it stops
-/// </summary>
-internal enum FreezeAt
-{
-    /// <summary>
-    /// Now: the generation is cancelled, so nothing more is read and the codes read ahead are
-    /// dropped before they are dispatched
-    /// </summary>
-    Now,
-
-    /// <summary>
-    /// At the end of the code the reader is on, and of any macro that code is running. The
-    /// read-ahead is held at the dispatch barrier instead of being cancelled
-    /// </summary>
-    AfterCurrentCode
-}
+                                    bool Synchronous, bool ReportPosition, bool InAnyMacro);
 
 /// <summary>
 /// Where one stream carries on from, as a pause worked it out

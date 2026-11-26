@@ -694,9 +694,9 @@ internal partial class MCodeHandler(
     /// between <c>DoSynchronousPause</c> and <c>DoAsynchronousPause</c>.
     /// </para>
     /// <para>
-    /// A pause asked for while the job is inside a macro that cannot be restarted is held until the
+    /// A pause from anywhere else while the job is inside a macro that cannot be restarted is held until the
     /// job is back out of it, which the transition table decides rather than this handler:
-    /// RepRapFirmware's <c>deferredPauseCommandPending</c>
+    /// RepRapFirmware's <c>deferredPauseCommandPending</c>. One from the macro itself stops it where it is
     /// </para>
     /// </remarks>
     private async ValueTask<Message> HandlePausePrintAsync(Commands.Code code, CancellationToken cancellationToken)
@@ -708,6 +708,7 @@ internal partial class MCodeHandler(
 
         if (code.Channel == CodeChannel.File2)
         {
+            // TODO M606: the second stream may start its next codes before the pause of the first has begun
             return new Message();
         }
 
@@ -724,7 +725,8 @@ internal partial class MCodeHandler(
         {
             return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, PrintPausedReason.User, Files.Job.PauseMacro.Pause,
                                                                    Synchronous: code.IsFromFileChannel,
-                                                                   ReportPosition: true),
+                                                                   ReportPosition: true,
+                                                                   InAnyMacro: code.IsFromFileChannel),
                                                   cancellationToken);
         }
         finally
@@ -771,7 +773,8 @@ internal partial class MCodeHandler(
             cancellationToken = code.DetachFromChannelCancellation();
 
             return await jobController.PauseAsync(new Files.Job.PauseRequest(code.Channel, reason, macro,
-                                                                   Synchronous: true, ReportPosition: true),
+                                                                   Synchronous: true, ReportPosition: true,
+                                                                   InAnyMacro: false),
                                                   cancellationToken);
         }
         throw new OperationCanceledException();

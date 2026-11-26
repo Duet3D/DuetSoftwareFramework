@@ -29,6 +29,11 @@ public sealed class ChannelProcessor
     public readonly ILogger<ChannelProcessor> Logger;
 
     /// <summary>
+    /// Hold on the macros the job has called on this channel
+    /// </summary>
+    public readonly JobMacroHold MacroHold;
+
+    /// <summary>
     /// Pipelines for code flow
     /// </summary>
     private readonly Lazy<Pipelines.PipelineBase[]> _pipelines;
@@ -54,6 +59,7 @@ public sealed class ChannelProcessor
     {
         Channel = channel;
         Logger = logger;
+        MacroHold = new JobMacroHold(channel, serviceProvider.GetRequiredService<Motion.MovementLock>());
 
         _pipelines = new Lazy<Pipelines.PipelineBase[]>(() => [
             ActivatorUtilities.CreateInstance<Pipelines.Start>(serviceProvider, this),
@@ -194,20 +200,21 @@ public sealed class ChannelProcessor
     }
 
     /// <summary>
-    /// Abandon the macros a pause interrupts, leaving the job file itself in place
+    /// Abandon the macros of the job, leaving the job file itself in place
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether any macro was abandoned</returns>
     /// <remarks>
-    /// The macro half of RepRapFirmware's pause: the machine is stopping somewhere the macro did not
-    /// expect, so whatever it had left to do is no longer meaningful and its codes are cancelled with
-    /// it. Only macros are popped - the job file underneath them is what the resume will read from
-    /// again, and it stays. This is deliberately not <see cref="AbortAllFilesAsync"/>, which unwinds
-    /// everything regardless: that is right for an abort and wrong for a pause. The return value is
+    /// The macro half of RepRapFirmware's asynchronous pause: the machine is stopping somewhere the macro
+    /// did not expect, so whatever it had left to do is no longer meaningful and its codes are cancelled
+    /// with it. A macro the job was paused in is abandoned when the job is cancelled or moved. Only macros
+    /// are popped - the job file underneath them is what the resume will read from again, and it stays.
+    /// This is deliberately not <see cref="AbortAllFilesAsync"/>, which unwinds everything regardless:
+    /// that is right for an abort and wrong for a pause. The return value is
     /// RepRapFirmware's <c>pausedInMacro</c>, set there in the same loop that pops the machine
     /// states: the resume reads it to mark the job file's replayed command as a restart
     /// </remarks>
-    public async Task<bool> AbandonMacrosForPauseAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> AbandonMacrosAsync(CancellationToken cancellationToken = default)
     {
         // Deferred codes the purge did not claim are owed and fire as the machine decelerates; the
         // codes the purge did claim were cancelled before this runs. Draining them first means no
@@ -263,7 +270,7 @@ public sealed class ChannelProcessor
                 macro.Abort();
             }
 
-            // As in AbandonMacrosForPauseAsync: the aborted macro's runner races this loop for the
+            // As in AbandonMacrosAsync: the aborted macro's runner races this loop for the
             // level, and exactly one of them pops it
             PopIfCurrent(macro);
         }

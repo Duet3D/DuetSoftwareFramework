@@ -101,6 +101,11 @@ public sealed class PipelineStackItem
             // Process it
             try
             {
+                if (pipeline.Stage == PipelineStage.ProcessInternally && File is not null)
+                {
+                    await File.WaitWhileHeldAsync();
+                }
+
                 if (pipeline.Stage != PipelineStage.Executed &&
                     (code.CancellationToken.IsCancellationRequested || File?.HoldAtNextCode == true ||
                      (pipeline.Stage <= PipelineStage.ProcessInternally && File is MacroFile { IsAborted: true })))

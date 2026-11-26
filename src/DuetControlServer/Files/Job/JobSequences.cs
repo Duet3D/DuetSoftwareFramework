@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -243,6 +244,7 @@ internal sealed class JobSequences(
         // A synchronous pause asks for none: the job file has reached the pause point, so everything
         // queued ahead of it is what has to run and there is nothing to purge
         MovePlanner.FeedholdOutcome held = default;
+        bool abandonedMacros = false;
         if (!request.Synchronous)
         {
             held = await planner.StopEarlyAsync(plannedDeceleration: true, moveInterpreter, cancellationToken);
@@ -257,16 +259,29 @@ internal sealed class JobSequences(
             }
         }
 
-        // The machine is stopping somewhere the macros the job was inside did not expect, so what
-        // they had left to do is no longer meaningful. The job file itself stays, because the resume
-        // reads from it again. Whether anything was abandoned is RepRapFirmware's pausedInMacro
-        bool abandonedMacros = await codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
+        if (state.Stream(0)?.Reader.IsHeldInMacro != true)
+        {
+            // The machine is stopping somewhere the macros the job was inside did not expect, so what
+            // they had left to do is no longer meaningful. The job file itself stays, because the resume
+            // reads from it again. Whether anything was abandoned is RepRapFirmware's pausedInMacro
+            abandonedMacros = await codeProcessor.AbandonMacrosAsync(CodeChannel.File, cancellationToken);
+        }
 
-        // Every code the streams started has now either completed or been cancelled, so where each
-        // reader says it is describes a boundary the machine has really reached
+        // Every code the streams started has then either completed or been cancelled, so where each
+        // reader says it is describes a boundary the machine has really reached. A stream held in a
+        // macro carries on in it, so nothing of it is dropped, and other inputs may move meanwhile, as
+        // RepRapFirmware releases the locks of a paused file in StartNextGCode
         foreach (JobStream stream in state.Streams)
         {
-            await stream.Reader.DrainAsync();
+            if (stream.Reader.IsHeldInMacro)
+            {
+                await stream.Reader.WaitUntilHeldAsync(cancellationToken);
+                stream.Reader.MacroHold.SuspendMovement();
+            }
+            else
+            {
+                await stream.Reader.DrainAsync();
+            }
         }
 
         // Where each stream carries on from. Only a pause that asked the engine to stop has anything
@@ -275,6 +290,12 @@ internal sealed class JobSequences(
         List<StreamRewind> rewinds = [];
         foreach (JobStream stream in state.Streams)
         {
+            if (stream.Reader.IsHeldInMacro)
+            {
+                logger.LogInformation("Job on {Channel} has been paused in a macro, reason {PauseReason}", stream.Channel, request.Reason);
+                continue;
+            }
+
             JobResumePoint? point = null;
             bool restartMacro = abandonedMacros;
             if (stream.Index == 0 && !request.Synchronous)
@@ -442,12 +463,33 @@ internal sealed class JobSequences(
     /// <remarks>RepRapFirmware's <c>resuming1</c> to <c>resuming3</c></remarks>
     public async Task<SequenceOutcome> ResumeAsync(JobState state, bool runMacro, CancellationToken cancellationToken)
     {
+        foreach (JobStream stream in state.Streams)
+        {
+            await stream.Reader.ApplyPositionAsync(cancellationToken);
+        }
+
         if (runMacro && await AllAxesHomedAsync(cancellationToken))
         {
             await macroRunner.TryRunAsync(CodeChannel.File, "resume.g", cancellationToken: cancellationToken);
         }
 
-        await MoveBackToRestorePointAsync(cancellationToken);
+        try
+        {
+            // Before the head moves back, so that no other input moves it before the macro carries on. The move back
+            // is made on the channel of the first stream, so the lock of a second one is left until after it
+            await RestoreMovementAsync(state.Streams[..1], cancellationToken);
+            await MoveBackToRestorePointAsync(cancellationToken);
+            await RestoreMovementAsync(state.Streams[1..], cancellationToken);
+        }
+        catch
+        {
+            // The job stays paused
+            foreach (JobStream stream in state.Streams)
+            {
+                stream.Reader.MacroHold.SuspendMovement();
+            }
+            throw;
+        }
         await RestoreInterpreterStateAsync(cancellationToken);
 
         // What a line the machine is already part-way through is owed, spent by the first move the
@@ -460,6 +502,20 @@ internal sealed class JobSequences(
         logger.LogInformation("Printing resumed");
         await eventLogger.LogOutputAsync(MessageType.Warning, "Printing resumed");
         return new SequenceOutcome(new Message(), Failed: false);
+    }
+
+    /// <summary>
+    /// Take back the movement lock that the streams held in a macro gave up
+    /// </summary>
+    /// <param name="streams">Streams that may be held</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private static async ValueTask RestoreMovementAsync(ImmutableArray<JobStream> streams, CancellationToken cancellationToken)
+    {
+        foreach (JobStream stream in streams)
+        {
+            await stream.Reader.MacroHold.RestoreMovementAsync(cancellationToken);
+        }
     }
 
     /// <summary>

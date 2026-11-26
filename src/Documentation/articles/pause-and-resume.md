@@ -91,12 +91,22 @@ run, or what has to be dropped.
 | `M600` | synchronous | none | `filament-change.g`, falling back to `pause.g` |
 | `heater_fault`, `filament_error` default action | asynchronous | feedhold | `pause.g` |
 | `driver_error` default action | asynchronous | feedhold | none, a driver in error is not asked to move |
-| Any of the above during a macro that cannot restart | deferred | whichever it becomes when it runs | as asked for |
+
+While the job is in a macro, whether the macro can be restarted decides how the pause is made:
+
+| Entry point | Macro that can be restarted | Macro that cannot |
+|---|---|---|
+| `M25` in the macro | held at the `M25` | held at the `M25` |
+| `M226`, `M600`, `M601` in the macro | held at the code | deferred to the end of the macro |
+| `M25` from a console or interface | feedhold, and the resume runs the macro again | deferred to the end of the macro |
+| An event's default action | feedhold, and the resume runs the macro again | deferred to the end of the macro |
 
 `M226`, `M600` and `M601` are refused outside a job file with "use M226/600/601 only within a file
 being printed". `M25` on the second file channel returns without doing anything: the restore point
 and the interpreter state belong to the first channel, so a fork of the job neither pauses itself nor
 records anything.
+
+**A pause that holds the macro** leaves it on the stack with the codes it has read, and the resume carries on at the next of them (`JobMacroHold`). Nothing is dropped, rewound or run again: the moves queued so far are made, and the job file is stopped at the end of the code that called the macro, however the macro ends. The resume reads the codes behind it again. The macros that the pause and the resume run on the job's channel are not held. While the job is paused, the movement lock of the codes that called the macro is suspended, so that other inputs can move. `M0` drops the macro, and so does `M26` when the job is resumed.
 
 **A deferred pause** waits for the job to leave a macro that has not declared itself pausable
 (`M98 R1` from inside the macro, and `InterpreterStateStack.CanRestartMacros`, which walks every
@@ -106,6 +116,8 @@ and the reader arms a barrier on the job file's own stack level, so the code tha
 the macro is cancelled where it would have been started and the pause lands at that boundary.
 RepRapFirmware makes the same check in `StartNextGCode`, before it starts the next command from the
 file.
+
+One pause serves every request made before it begins. If the job is held in the macro while an `M600` is deferred, the `M600` still pauses the job at the end of the macro, unless `M26` moves the job out of it.
 
 The `M25` that asked suspends any movement lock its channel holds, because the macro has to move, and is answered, with no text, when the macro has ended and the pause begins, or when the job ends first. Another `M25` in the meantime replies `Pausing is already pending`. The pause macro runs on the job's own channel, as for the `M226` RepRapFirmware runs in its place.
 
@@ -150,7 +162,7 @@ sequenceDiagram
     PL->>PL: ResyncFromEngine, SyncInterpreterToMachine, SegmentsLeft = 0<br/>MotionTracker.FailAfter, last submitted id rolled back
     PL-->>P: FeedholdOutcome
     S->>S: the purge generation moved on, throw OperationCanceledException
-    P->>P: AbandonMacrosForPauseAsync on File
+    P->>P: AbandonMacrosAsync on File
     P->>J: Drain: every code the stream started has ended
     P->>PL: JobRewindPointFor, from the surviving move
     PL-->>P: JobResumePoint, or nothing
@@ -285,7 +297,7 @@ the head, and neither is meaningful on a machine that does not know where it is.
 macro made have run, the job is paused and the reply is `Printing paused at X... Y... Z...`, taken
 from the restore point.
 
-The job task, meanwhile, has stopped reading, drained what it had read ahead, seeked to the pause position, put back the code blocks and local variables that go with it (§4), and is waiting.
+The job task, unless the job is held in a macro, has meanwhile stopped reading, drained what it had read ahead, seeked to the pause position, put back the code blocks and local variables that go with it (§4), and is waiting.
 
 ---
 
@@ -305,15 +317,22 @@ sequenceDiagram
     M->>L: StartOrResumeAsync, runMacro unless M24 P0
     L->>L: Paused -> Resuming, publish
     L->>R: start the sequence
+    R->>J: ApplyPositionAsync, if M26 moved a job that is held in a macro
     R->>MR: resume.g, only when every axis is homed
+    R->>R: JobMacroHold.RestoreMovementAsync, if the job is held in a macro
     R->>PL: wait for standstill, then MoveBackToRestorePointAsync
     R->>PL: RestoreInterpreterStateAsync, the restore point's F and distance modes
     R->>PL: MoveFractionToSkip = rp.ProportionDone
     R->>L: SequenceCompleted
     L->>L: Resuming -> Running, publish
-    L->>J: RunAsync with the stream's rewind point
-    J->>J: ModalGCommand = rp.GCommandNumber, FirstCommandAfterRestart
-    J->>S: read the code at the rewound position again
+    alt held in a macro
+        L->>J: JobMacroHold.Release
+        J->>S: the macro carries on, and the file is read again behind the code that called it
+    else
+        L->>J: RunAsync with the stream's rewind point
+        J->>J: ModalGCommand = rp.GCommandNumber, FirstCommandAfterRestart if the pause abandoned a macro
+        J->>S: read the code at the rewound position again
+    end
     S->>PL: BuildRawMove scales relative words and extrusion by 1 minus the fraction
     S->>PL: MoveFractionToSkip = 0, spent by this one move
 ```
@@ -408,6 +427,7 @@ one restore point and one interpreter state.
 | `Files/Job/JobController.cs` | the transition table: what each of M0, M23, M24, M25, M26, M32, M37, M226 and M606 does from the phase the job is in |
 | `Files/Job/JobSequences.cs` | `PauseAsync`, `ResumeAsync`, `StopAsync`, `SaveRestorePointAsync`, `MoveBackToRestorePointAsync` |
 | `Files/Job/JobReader.cs` | the read-ahead loop, the freeze, the rewind, the published file position |
+| `Codes/JobMacroHold.cs` | what holds the macros of the job while it is paused in one |
 | `Files/CodeFileState.cs` | the open code blocks, local variables and place in the line that a rewind puts back |
 | `Codes/Handlers/MCodeHandler.cs` | `M25`, `M226`/`M600`/`M601`, `M24`, `M26` |
 | `Motion/MovePlanner.cs` | `StopEarlyAsync`, `JobRewindPointFor`, `FeedholdOutcome` |

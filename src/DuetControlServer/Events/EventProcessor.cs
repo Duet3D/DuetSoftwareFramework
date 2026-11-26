@@ -173,7 +173,8 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
         // to decide, which is RepRapFirmware's test in the processingEvent state made in one place
         PauseMacro macro = type == EventType.DriverError ? PauseMacro.None : PauseMacro.Pause;
         Message result = await jobController.PauseAsync(new PauseRequest(CodeChannel.Autopause, reason, macro,
-                                                                         Synchronous: false, ReportPosition: false),
+                                                                         Synchronous: false, ReportPosition: false,
+                                                                         InAnyMacro: false),
                                                         cancellationToken);
         if (result.Type == MessageType.Error)
         {

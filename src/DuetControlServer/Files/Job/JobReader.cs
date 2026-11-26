@@ -106,8 +106,13 @@ internal sealed class JobReader
     /// <see cref="JobMonitor"/>: it is a fact about the file rather than a question for the
     /// controller, so asking for it costs no command and no lock
     /// </remarks>
-    public long Position => _position.Value;
+    public long Position => (_moveTo ?? _position).Value;
     private volatile ReaderPosition _position;
+
+    /// <summary>
+    /// Position M26 set while the stream is paused inside a macro, applied when the job resumes
+    /// </summary>
+    private volatile ReaderPosition? _moveTo;
 
     /// <summary>
     /// Cancels the codes of the stretch of reading between a <c>Run</c> and the next freeze
@@ -134,6 +139,55 @@ internal sealed class JobReader
     private volatile bool _frozenAtBoundary;
 
     /// <summary>
+    /// Whether the stream has stopped at the boundary and has not been told where to carry on from since
+    /// </summary>
+    public bool IsStoppedAtBoundary => _isStoppedAtBoundary;
+    private volatile bool _isStoppedAtBoundary;
+
+    /// <summary>
+    /// Hold on the macros of this stream
+    /// </summary>
+    public JobMacroHold MacroHold => _codeProcessor.GetMacroHold(Channel);
+
+    /// <summary>
+    /// Whether the stream is paused inside a macro, which keeps its codes and those read ahead of the job
+    /// </summary>
+    /// <remarks>Of a stream that is not paused, whether it is going to stop inside a macro</remarks>
+    public bool IsHeldInMacro => MacroHold.IsRequested;
+
+    /// <summary>
+    /// Hold the macro this stream is in before its next code
+    /// </summary>
+    /// <remarks>The job file stops at the end of the code that called the macro, however the macro ends</remarks>
+    public void HoldMacro()
+    {
+        FreezeAtBoundary();
+        MacroHold.Request(evenIfLocked: true);
+    }
+
+    /// <summary>
+    /// Wait until the macro this stream is in has come to rest, or has ended and the stream with it
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async ValueTask WaitUntilHeldAsync(CancellationToken cancellationToken)
+        => await Task.WhenAny(MacroHold.WaitUntilReachedAsync(), _readTask ?? Task.CompletedTask).WaitAsync(cancellationToken);
+
+    /// <summary>
+    /// Abandon the macro this stream is held in, so that the code that called it ends
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private async ValueTask AbandonHeldMacroAsync(CancellationToken cancellationToken)
+    {
+        if (IsHeldInMacro)
+        {
+            await _codeProcessor.AbandonMacrosAsync(Channel, cancellationToken);
+            MacroHold.Release();
+        }
+    }
+
+    /// <summary>
     /// Start reading from where the file stands
     /// </summary>
     /// <param name="restartMacro">
@@ -154,7 +208,8 @@ internal sealed class JobReader
         // file as the reader drained. It reads from the same file again
         _codeProcessor.SetJobFile(Channel, File);
 
-        _frozen = _frozenAtBoundary = false;
+        MacroHold.Release();
+        _frozen = _frozenAtBoundary = _isStoppedAtBoundary = false;
 
         // The source of the stretch before this one is spent - its codes were drained before the
         // resume - and disposing it releases its registration on the run token, which would
@@ -265,9 +320,39 @@ internal sealed class JobReader
     /// <param name="position">Byte offset to read from next</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
-    /// <remarks>M26, which only ever names a position for a job that is selected or paused</remarks>
+    /// <remarks>
+    /// M26, which only ever names a position for a job that is selected or paused. A stream that is paused inside a
+    /// macro has to leave it first, which takes as long as the code that called the macro takes to end, so that is
+    /// left to <see cref="ApplyPositionAsync"/>
+    /// </remarks>
     public async ValueTask SetPositionAsync(long position, CancellationToken cancellationToken)
-        => await ReadFromAsync(new ReaderPosition(CodeFileState.At(position), AtEnd: true), cancellationToken);
+    {
+        ReaderPosition target = new(CodeFileState.At(position), AtEnd: true);
+        if (IsHeldInMacro)
+        {
+            _moveTo = target;
+        }
+        else
+        {
+            await ReadFromAsync(target, cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Leave the macro the stream is paused in if M26 has moved the job away from it
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    public async ValueTask ApplyPositionAsync(CancellationToken cancellationToken)
+    {
+        if (_moveTo is ReaderPosition target)
+        {
+            Freeze();
+            await AbandonHeldMacroAsync(cancellationToken);
+            await DrainAsync().AsTask().WaitAsync(cancellationToken);
+            await ReadFromAsync(target, cancellationToken);
+        }
+    }
 
     /// <summary>
     /// Set where the stream reads from next
@@ -281,7 +366,9 @@ internal sealed class JobReader
         {
             File.Rewind(position.State, position.AtEnd);
             _position = position;
+            _moveTo = null;
         }
+        _isStoppedAtBoundary = false;
         _codeProcessor.ResolveSyncRequestsAfter(position.Value);
     }
 
@@ -292,6 +379,7 @@ internal sealed class JobReader
     public async ValueTask CloseAsync()
     {
         StopReading();
+        await AbandonHeldMacroAsync(CancellationToken.None);
         await DrainAsync();
 
         _generation?.Dispose();
@@ -453,6 +541,7 @@ internal sealed class JobReader
         {
             // The boundary the pause was waiting for: the end of the job code that was running, and
             // of the macro it was inside. Reported whether or not the file also ran out
+            _isStoppedAtBoundary = true;
             await Post(new JobCommand.ReaderStopped(Index));
             return;
         }
