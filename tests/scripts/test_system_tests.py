@@ -1,13 +1,16 @@
 # pyright: strict
-"""The filter test.py system composes from --filter, --code and the category skips."""
+"""The filter test.py system composes from --filter, --code and the category skips, and the declarations it
+resolves a result's name to."""
 
 from __future__ import annotations
 
 import io
+import tempfile
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest import TestCase
 
-from common.system_tests import Options, test_filter
+from common.system_tests import Declaration, Options, declarations, test_filter
 
 
 def options(filter: str | None = None, code: list[str] | None = None, skip_known_gaps: bool | None = None,
@@ -43,3 +46,48 @@ class SystemTestFilterTest(TestCase):
         with redirect_stdout(io.StringIO()):
             self.assertIsNone(test_filter(options(tag_known_gaps=True)))
             self.assertEqual(test_filter(options(code=['M116'], tag_known_gaps=True)), 'TestCategory=M116')
+
+
+class DeclarationsTest(TestCase):
+    def test_a_named_case_resolves_to_the_test_declaring_it(self) -> None:
+        source = '''namespace Scenarios;
+
+public class M1Tests
+{
+    [Category("KnownGap")]
+    [TestCase(1, TestName = "M1 named by its attribute")]
+    [TestCase(2)]
+    public async Task Attributed(int value) { }
+
+    [Category("KnownGap")]
+    [TestCaseSource(nameof(Cases))]
+    public async Task FromNameof(int value) { }
+
+    [TestCaseSource("Later")]
+    public async Task FromString(int value) { }
+
+    private static IEnumerable<TestCaseData> Cases()
+    {
+        yield return new TestCaseData(1).SetName("M1 named by SetName");
+        yield return new TestCaseData(2)
+            .SetName("M1 named on the next line");
+        yield return new TestCaseData(3);
+    }
+
+    private static TestCaseData[] Later => [new TestCaseData(1).SetName("M1 from a property declared later")];
+}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'Tests').mkdir()
+            (root / 'Tests' / 'M1Tests.cs').write_text(source)
+            found = declarations(root / 'Tests', root)
+        attributed = Declaration('Tests/M1Tests.cs', 8, ('KnownGap',))
+        from_nameof = Declaration('Tests/M1Tests.cs', 12, ('KnownGap',))
+        from_string = Declaration('Tests/M1Tests.cs', 15, ())
+        for name, expected in [('Attributed', attributed), ('M1 named by its attribute', attributed),
+                               ('FromNameof', from_nameof), ('M1 named by SetName', from_nameof),
+                               ('M1 named on the next line', from_nameof),
+                               ('FromString', from_string), ('M1 from a property declared later', from_string)]:
+            with self.subTest(name=name):
+                self.assertEqual(found.get(f'Scenarios.M1Tests.{name}'), expected)

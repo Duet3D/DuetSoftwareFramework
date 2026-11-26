@@ -211,51 +211,73 @@ CLASS = re.compile(r'^\s*(?:(?:public|internal|private|protected|abstract|sealed
                    r'(?:class|record|struct)\s+([A-Za-z_]\w*)')
 CATEGORY = re.compile(r'Category\("([^"]*)"\)')
 TEST_NAME = re.compile(r'TestName\s*=\s*"([^"]*)"')
+# A TestCaseSource in the same class, named by nameof or by a string, and the names its cases give themselves
+CASE_SOURCE = re.compile(r'TestCaseSource\(\s*(?:nameof\(\s*(?:\w+\.)*(\w+)\s*\)|"(\w+)")\s*\)')
+SET_NAME = re.compile(r'\.SetName\(\s*"([^"]*)"')
 MEMBER = re.compile(r'^\s*(?:public|protected|internal|private)\s')
 MEMBER_NAME = re.compile(r'([A-Za-z_]\w*)\s*$')
 
 
-def declarations() -> dict[str, Declaration]:
+def declarations(sources: Path = SOURCES, root: Path = ROOT) -> dict[str, Declaration]:
     """The tests in the sources, by fully qualified name. Neither the TRX nor the runner records where a
     test is written or which categories it carries, so both are resolved from the sources: the
     namespace and class enclosing a declaration make up the name the TRX reports, the line is the
     method carrying it, and the categories are the attributes standing over it."""
     found: dict[str, Declaration] = {}
-    for path in sorted(SOURCES.rglob('*.cs')):
-        relative = path.relative_to(SOURCES).parts
+    # The names TestCaseData.SetName gives, by the class and member that build them, and the declarations
+    # drawing their cases from a member; matched once every file is read, as a source may come after its test
+    set_names: dict[str, list[str]] = {}
+    drawing: list[tuple[str, Declaration]] = []
+    for path in sorted(sources.rglob('*.cs')):
+        relative = path.relative_to(sources).parts
         if 'obj' in relative or 'bin' in relative:
             continue
-        file = str(path.relative_to(ROOT))
-        namespace = cls = ''
+        file = str(path.relative_to(root))
+        namespace = cls = member = ''
         categories: list[str] = []
         test_names: list[str] = []
+        case_sources: list[str] = []
         for number, line in enumerate(path.read_text(errors='replace').splitlines(), 1):
             if match := NAMESPACE.match(line):
                 namespace = match[1]
                 continue
             if match := CLASS.match(line):
-                cls = match[1]
-                categories, test_names = [], []
+                cls, member = match[1], ''
+                categories, test_names, case_sources = [], [], []
                 continue
+            prefix = f'{namespace}.{cls}' if namespace else cls
+            # A member names itself just before its parameter list, its body or its initialiser
+            is_member = bool(MEMBER.match(line)) and bool(cls)
+            if is_member and (match := MEMBER_NAME.search(re.split(r'\(|=>|=|\{|;', line, maxsplit=1)[0])):
+                member = match[1]
             # Attributes stand between the documentation and the declaration they belong to, so what has
             # been seen since the last declaration is what the next one carries. A TestCase naming itself
-            # takes over the name the TRX reports for that case.
+            # takes over the name the TRX reports for that case, and so does a case a TestCaseSource
+            # builds with SetName.
             if line.lstrip().startswith('['):
                 categories += CATEGORY.findall(line)
                 test_names += TEST_NAME.findall(line)
-            # A member declaration opens with an access modifier and names itself just before its
-            # parameter list. That also catches constructors and helpers, which cost an unused entry.
-            if not MEMBER.match(line) or '(' not in line or not cls:
+                case_sources += [by_nameof or by_string for by_nameof, by_string in CASE_SOURCE.findall(line)]
+            elif member and (names := SET_NAME.findall(line)):
+                set_names.setdefault(f'{prefix}.{member}', []).extend(names)
+            if not is_member:
+                continue
+            # A test is a method, so it has a parameter list; an assignment before it means a field or a
+            # property. That also catches constructors and helpers, which cost an unused entry.
+            if '(' not in line:
                 continue
             head = line[:line.index('(')]
-            # An assignment before the parenthesis means a field or a property, not a member
             if '=' in head or not (match := MEMBER_NAME.search(head)):
                 continue
-            prefix = f'{namespace}.{cls}' if namespace else cls
             declaration = Declaration(file, number, tuple(categories))
             for name in [match[1], *test_names]:
                 found.setdefault(f'{prefix}.{name}', declaration)
-            categories, test_names = [], []
+            drawing += [(f'{prefix}.{source}', declaration) for source in case_sources]
+            categories, test_names, case_sources = [], [], []
+    for source, declaration in drawing:
+        prefix = source.rsplit('.', 1)[0]
+        for name in set_names.get(source, []):
+            found.setdefault(f'{prefix}.{name}', declaration)
     return found
 
 
