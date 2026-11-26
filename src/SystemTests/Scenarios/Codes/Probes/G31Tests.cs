@@ -43,7 +43,7 @@ public class G31Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
         string reply = await bench.Host.ExecuteCodeAsync("G31 K0 P600 X-10 Y5 Z1.25");
-        Assert.That(reply.Trim(), Is.Empty, "G31 was accepted");
+        Assert.That(reply, Reply.IsEmpty, "G31 was accepted");
 
         Probe? probe = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]);
         Assert.Multiple(() =>
@@ -61,9 +61,9 @@ public class G31Tests : BenchFixture
         });
 
         string report = await bench.Host.ExecuteCodeAsync("G31 K0");
-        Assert.That(report, Does.Contain("threshold 600"),
+        Assert.That(report, Reply.IsSuccess("threshold 600"),
                     "the G31 report includes the threshold (RRF ZProbe::HandleG31 report)");
-        Assert.That(report, Does.Contain("trigger height 1.250"),
+        Assert.That(report, Reply.IsSuccess("trigger height 1.250"),
                     "the G31 report includes the trigger height (RRF ZProbe::HandleG31 report)");
     }
 
@@ -90,14 +90,14 @@ public class G31Tests : BenchFixture
         await using Bench bench = await StartBenchAsync($"M584 {drivers}\n{ProbeLine}\nG31 K0 P500 X0 Y0 Z0");
 
         string offsetWords = string.Join(" ", letters.Select((letter, i) => FormattableString.Invariant($"{letter}{offsets[i]}")));
-        Assert.That((await bench.Host.ExecuteCodeAsync($"G31 K0 P500 X0 Y0 {offsetWords} Z0")).Trim(), Is.Empty, "G31 was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K0 P500 X0 Y0 {offsetWords} Z0"), Reply.IsEmpty, "G31 was accepted");
 
         float[] stored = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.Offsets.ToArray());
         Assert.That(stored, Is.EqualTo(new[] { 0.0f, 0.0f, 0.0f }.Concat(offsets)).Within(1e-4f),
                     "sensors.probes[0].offsets[3..5] hold the offsets of the axes past Z (RRF ZProbe::HandleG31)");
 
         string expected = "offsets X0.0 Y0.0 " + string.Join(" ", letters.Select((letter, i) => FormattableString.Invariant($"{letter}{offsets[i]:F1}")));
-        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0"), Does.Contain(expected),
+        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0"), Reply.IsSuccess(expected),
                     "the report lists the offset of every axis but Z (RRF ZProbe::HandleG31 report)");
     }
 
@@ -114,7 +114,7 @@ public class G31Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(
             $"{ProbeLine}\nM558 K1 P8 C\"{Expansion.GpioIn(Machines.DriverBoard, 2)}\"\nG31 K0 P500 Z2");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("G31 K1 P600 Z1.20 X5 Y-5")).Trim(), Is.Empty, "G31 K1 was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K1 P600 Z1.20 X5 Y-5"), Reply.IsEmpty, "G31 K1 was accepted");
 
         (Probe first, Probe second) = await bench.Host.ReadModelAsync(model => (model.Sensors.Probes[0]!, model.Sensors.Probes[1]!));
         Assert.Multiple(() =>
@@ -132,10 +132,10 @@ public class G31Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ExecuteCodeAsync("G31 K1"),
-                        Does.Contain("Z probe 1:").And.Contain("threshold 600, trigger height 1.200").And.Contain("offsets X5.0 Y-5.0"),
+                        Reply.IsSuccess("Z probe 1:", "threshold 600, trigger height 1.200", "offsets X5.0 Y-5.0"),
                         "G31 K1 reports probe 1");
             Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0"),
-                        Does.Contain("Z probe 0:").And.Contain("threshold 500, trigger height 2.000").And.Contain("offsets X0.0 Y0.0"),
+                        Reply.IsSuccess("Z probe 0:", "threshold 500, trigger height 2.000", "offsets X0.0 Y0.0"),
                         "G31 K0 reports probe 0");
         });
     }
@@ -157,7 +157,7 @@ public class G31Tests : BenchFixture
                                            RemoteProbes.MaxReading, "probe 0's reading");
 
         Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0"),
-                    Does.Contain("Z probe 0: current reading 1000, threshold 500, trigger height 2.750, offsets X-20.5 Y10.2"),
+                    Reply.IsSuccess("Z probe 0: current reading 1000, threshold 500, trigger height 2.750, offsets X-20.5 Y10.2"),
                     "G31 reports the probe (RRF ZProbe::HandleG31 report)");
     }
 
@@ -176,7 +176,7 @@ public class G31Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync($"{CompensationSensorLine}\n{ProbeLine}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"G31 K0 Z0.7 S30 H{CompensationSensor} T0.03:0.002")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K0 Z0.7 S30 H{CompensationSensor} T0.03:0.002"), Reply.IsEmpty,
                     "G31 was accepted");
 
         Probe probe = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!);
@@ -190,10 +190,10 @@ public class G31Tests : BenchFixture
         });
 
         Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0"),
-                    Does.Contain("trigger height 0.700 at 30.0").And.Contain("temperature coefficients [0.0/").And.Contain("C^2]"),
+                    Reply.IsSuccess("trigger height 0.700 at 30.0", "temperature coefficients [0.0/", "C^2]"),
                     "the report includes the calibration temperature and coefficients (RRF ZProbe::HandleG31 report)");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"G31 K0 H{CompensationSensor} T0.01 S20")).Trim(), Is.Empty, "G31 with one T value was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K0 H{CompensationSensor} T0.01 S20"), Reply.IsEmpty, "G31 with one T value was accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TemperatureCoefficients.ToArray()),
                     Is.EqualTo(new[] { 0.01f, 0.0f }).Within(1e-6f),
                     "one T value zeroes the second coefficient (RRF ZProbe::HandleG31 clears both first)");
@@ -218,7 +218,7 @@ public class G31Tests : BenchFixture
                                                     : null,
                                            current, "the sensor reading");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"G31 K0 H{CompensationSensor} T0.02")).Trim(), Is.Empty, "G31 was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K0 H{CompensationSensor} T0.02"), Reply.IsEmpty, "G31 was accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.CalibrationTemperature),
                     Is.EqualTo(current).Within(1e-3f),
                     "sensors.probes[0].calibrationTemperature is the sensor's reading (RRF ZProbe::HandleG31)");
@@ -240,7 +240,7 @@ public class G31Tests : BenchFixture
         await using Bench bench = await StartBenchAsync($"{CompensationSensorLine}\n{ProbeLine}");
 
         Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K0 H{CompensationSensor} T0.02"),
-                    Does.StartWith("Warning:").And.Contain("did not provide a valid temperature reading"),
+                    Reply.IsWarning("did not provide a valid temperature reading"),
                     "a sensor with no reading is warned about (RRF ZProbe::HandleG31)");
         Probe probe = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!);
         Assert.Multiple(() =>
@@ -268,7 +268,7 @@ public class G31Tests : BenchFixture
         await using Bench bench = await StartBenchAsync($"{CompensationSensorLine}\n{ProbeLine}\nG31 K0 H{CompensationSensor} T0.01 S40");
 
         Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K0 H{unknownSensor} T0.02"),
-                    Does.StartWith("Warning:").And.Contain($"invalid sensor number {unknownSensor}"),
+                    Reply.IsWarning($"invalid sensor number {unknownSensor}"),
                     "an unknown sensor is warned about (RRF ZProbe::HandleG31)");
         Probe probe = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!);
         Assert.Multiple(() =>
@@ -290,7 +290,7 @@ public class G31Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync($"{CompensationSensorLine}\n{ProbeLine}\nG31 K0 H{CompensationSensor} T0.01 S40");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0 S30"), Does.Contain("Z probe 0: current reading"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0 S30"), Reply.IsSuccess("Z probe 0: current reading"),
                     "G31 S alone reports the probe (RRF ZProbe::HandleG31)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.CalibrationTemperature),
                     Is.EqualTo(40.0f).Within(1e-4f), "and leaves the calibration temperature alone");
@@ -314,7 +314,7 @@ public class G31Tests : BenchFixture
                                              .WithController(c => AnswerReadInputs(c, 0))
                                              .StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("G31 K0 P600")).Trim(), Is.Empty, "G31 P was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0 P600"), Reply.IsEmpty, "G31 P was accepted");
 
         var changes = bench.CanMaster.CanMessages<CanMessageChangeInputMonitorV1>();
         if (sent)
@@ -345,7 +345,7 @@ public class G31Tests : BenchFixture
                                              .WithController(c => c.ReportWith<CanMessageChangeInputMonitorV1>(refusal, CodeResult.Error))
                                              .StartAsync();
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0 P600"), Does.StartWith("Error:").And.Contain(refusal),
+        Assert.That(await bench.Host.ExecuteCodeAsync("G31 K0 P600"), Reply.IsError(refusal),
                     "the board's refusal is the reply (RRF RemoteZProbe::HandleG31)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.Threshold), Is.EqualTo(600),
                     "sensors.probes[0].threshold holds what G31 gave (RRF ZProbe::HandleG31)");
@@ -365,7 +365,7 @@ public class G31Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K{probe} Z2"), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"G31 K{probe} Z2"), Reply.IsError(),
                     $"G31 K{probe} is refused (RRF EndstopsManager::HandleG31)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes.Count(p => p is not null)), Is.EqualTo(1),
                     "and no probe is created");

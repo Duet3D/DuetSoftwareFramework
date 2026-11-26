@@ -51,7 +51,7 @@ public class M116Tests : BenchFixture
         }
         foreach (string code in setup.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync(code)).Trim(), Is.Empty, $"setup {code}");
+            Assert.That(await bench.Host.ExecuteCodeAsync(code), Reply.IsEmpty, $"setup {code}");
         }
         return (bench, bench.Host.Services.GetRequiredService<HeatManager>());
     }
@@ -65,7 +65,7 @@ public class M116Tests : BenchFixture
         Assert.That(waiting.IsCompleted, Is.False, $"{code} waits for the cold heater");
 
         await bench.Host.ExecuteCodeAsync("M108");
-        Assert.That((await waiting.WaitAsync(TimeSpan.FromSeconds(5))).Trim(), Is.Empty, $"{code} ends with M108");
+        Assert.That(await waiting.WaitAsync(TimeSpan.FromSeconds(5)), Reply.IsEmpty, $"{code} ends with M108");
     }
 
     /// <summary>
@@ -109,7 +109,7 @@ public class M116Tests : BenchFixture
         }
         else
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync(code, timeoutMs: 5_000)).Trim(), Is.Empty, $"{code} does not wait");
+            Assert.That(await bench.Host.ExecuteCodeAsync(code, timeoutMs: 5_000), Reply.IsEmpty, $"{code} does not wait");
         }
     }
 
@@ -122,7 +122,7 @@ public class M116Tests : BenchFixture
         await using Bench _ = bench;
         await bench.ReportHeaterAsync(5, HeaterMode.Heating, 56.0f);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M116 S5", timeoutMs: 5_000)).Trim(), Is.Empty, "4C short is within S5");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M116 S5", timeoutMs: 5_000), Reply.IsEmpty, "4C short is within S5");
         await AssertWaitsAsync(bench, heat, "M116");
     }
 
@@ -135,7 +135,7 @@ public class M116Tests : BenchFixture
         (Bench bench, HeatManager _) = await StartAsync("M140 S60");
         await using Bench disposeBench = bench;
 
-        Assert.That(await bench.Host.ExecuteCodeAsync(code, timeoutMs: 5_000), Does.StartWith("Error").And.Contain("value must be greater than zero"));
+        Assert.That(await bench.Host.ExecuteCodeAsync(code, timeoutMs: 5_000), Reply.IsError(CodeErrors.NotGreaterThanZero));
     }
 
     /// <summary>A heater above its target is waited for until it has cooled, whichever form is used</summary>
@@ -165,6 +165,6 @@ public class M116Tests : BenchFixture
         Assert.That(waiting.IsCompleted, Is.False, "tool 0 is still cold");
 
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 60.0f);
-        Assert.That((await waiting.WaitAsync(TimeSpan.FromSeconds(5))).Trim(), Is.Empty, "both there ends the wait");
+        Assert.That(await waiting.WaitAsync(TimeSpan.FromSeconds(5)), Reply.IsEmpty, "both there ends the wait");
     }
 }

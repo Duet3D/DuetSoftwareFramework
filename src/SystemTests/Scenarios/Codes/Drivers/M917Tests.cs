@@ -26,7 +26,7 @@ public class M917Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M917 X60 Y60 Z60")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M917 X60 Y60 Z60"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStandstillCurrentFactor>();
         Assert.That(sent, Has.Count.EqualTo(3), "one request per axis named");
@@ -65,8 +65,8 @@ public class M917Tests : BenchFixture
             Assert.That(sent.Values[0], Is.EqualTo(50.0f).Within(1e-3));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M917")).TrimEnd(),
-                    Is.EqualTo("Motor standstill current % of normal - X:71, Y:71, Z:71, E:50"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M917"),
+                    Reply.IsSuccess("Motor standstill current % of normal - X:71, Y:71, Z:71, E:50"),
                     "and the report carries every drive (m917-standstill-current-for-extruder.yaml)");
     }
 }

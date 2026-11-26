@@ -39,9 +39,9 @@ public class M950PortTests : BenchFixture
         string two = await bench.Host.ExecuteCodeAsync("M950 F0 P0");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(none, Does.StartWith("Error:"),
+            Assert.That(none, Reply.IsError(),
                         "M950 naming no device is an error (Platform.cpp ConfigurePort)");
-            Assert.That(two, Does.StartWith("Error:"),
+            Assert.That(two, Reply.IsError(),
                         "M950 naming two devices is the same rejection as naming none (Platform.cpp ConfigurePort)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.Zero,
                         "neither code added anything to fans[]");
@@ -167,7 +167,7 @@ public class M950PortTests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M950 D1 C\"{Expansion.SpiCs(Machines.DriverBoard, 0)}\"");
-        Assert.That(reply, Does.StartWith("Error:").And.Contain("not supported in SBC mode"));
+        Assert.That(reply, Reply.IsError("not supported in SBC mode"));
     }
 
     /// <summary>
@@ -187,7 +187,7 @@ public class M950PortTests : BenchFixture
         var sent = bench.CanMaster.CanMessages<CanMessageM950Gpio>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "the delete succeeds");
+            Assert.That(reply, Reply.IsEmpty, "the delete succeeds");
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut.ElementAtOrDefault(0)), Is.Null,
                         "state.gpOut[0] is empty");
             Assert.That(sent, Has.Count.EqualTo(1), "one message, the release");
@@ -242,7 +242,7 @@ public class M950PortTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 P5 C\"{Expansion.Out(Machines.DriverBoard, 6)}\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("Pin 1.out6 is not free"),
+            Assert.That(reply, Reply.IsError("Pin 1.out6 is not free"),
                         "the board's refusal is the result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut.ElementAtOrDefault(5)), Is.Null,
                         "and state.gpOut[5] is empty");
@@ -267,7 +267,7 @@ public class M950PortTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 P0 C\"{Expansion.Out(Machines.DriverBoard, 5)}\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Warning:").And.Contain("Port 0 not found"));
+            Assert.That(reply, Reply.IsWarning("Port 0 not found"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut[0]!.Port),
                         Is.EqualTo(Expansion.Out(Machines.DriverBoard, 5)), "and the new port is still claimed");
         });
@@ -292,7 +292,7 @@ public class M950PortTests : BenchFixture
         (byte board, CanMessageM950Gpio query) = bench.CanMaster.LastCanMessage<CanMessageM950Gpio>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo(report), "the board's report is the reply");
+            Assert.That(reply, Reply.IsSuccess(report), "the board's report is the reply");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard));
             Assert.That(query.P, Is.EqualTo(3), "the query names the port");
             Assert.That(query.C, Is.Null, "and nothing else");
@@ -314,7 +314,7 @@ public class M950PortTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 P7");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo("GPIO/servo port 7 has no pin"));
+            Assert.That(reply, Reply.IsSuccess("GPIO/servo port 7 has no pin"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty);
         });
     }
@@ -332,7 +332,7 @@ public class M950PortTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 P7 Q100");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut.Count), Is.Zero);
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty);
         });
@@ -352,7 +352,7 @@ public class M950PortTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 P0 Q100");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut[0]!.Freq), Is.EqualTo(500),
                         "state.gpOut[0].freq keeps what the board still has");
         });
@@ -372,7 +372,7 @@ public class M950PortTests : BenchFixture
             $"M950 {letter}{GpioManager.MaxGpOutPorts} C\"{Expansion.Out(Machines.DriverBoard, 4)}\"");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty);
         });
     }

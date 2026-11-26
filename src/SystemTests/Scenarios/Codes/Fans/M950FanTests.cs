@@ -156,13 +156,13 @@ public class M950FanTests : BenchFixture
         await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 3)}\" K4");
         bench.CanMaster.ClearCapture();
 
-        string tooLow = (await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 4)}\" K0.1")).TrimEnd();
-        string tooHigh = (await bench.Host.ExecuteCodeAsync("M950 F0 K1000")).TrimEnd();
+        string tooLow = await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 4)}\" K0.1");
+        string tooHigh = await bench.Host.ExecuteCodeAsync("M950 F0 K1000");
         Assert.Multiple(() =>
         {
-            Assert.That(tooLow, Does.StartWith("Error:"),
+            Assert.That(tooLow, Reply.IsError(),
                         "K below the minimum is refused (CANlib MinFanPulsesPerRev)");
-            Assert.That(tooHigh, Does.StartWith("Error:"),
+            Assert.That(tooHigh, Reply.IsError(),
                         "and K above the maximum too (CANlib MaxFanPulsesPerRev)");
         });
 
@@ -200,7 +200,7 @@ public class M950FanTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 F{FanManager.MaxFans} C\"{Expansion.Out(Machines.DriverBoard, 3)}\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"),
+            Assert.That(reply, Reply.IsError(),
                         "a fan number at MaxFans is refused (FansManager.cpp ConfigureFanPort, GetLimitedUIValue)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.Zero,
                         "and fans[] is left as it was");
@@ -318,7 +318,7 @@ public class M950FanTests : BenchFixture
         string deleted = await bench.Host.ExecuteCodeAsync("M950 F0 C\"nil\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(deleted, Does.Not.StartWith("Error:"), "C\"nil\" is a delete, not a bad port name");
+            Assert.That(deleted, Reply.IsNotError, "C\"nil\" is a delete, not a bad port name");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
                         "the fan leaves fans[] (FansManager.cpp ConfigureFanPort)");
         });
@@ -332,14 +332,14 @@ public class M950FanTests : BenchFixture
                         "and says \"nil\", which is what frees the pin there rather than only here");
         });
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M950 F0"), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M950 F0"), Reply.IsError(),
                     "reporting a fan that has been deleted is an error, not a description of the fan that used "
                     + "to be there (FansManager.cpp ConfigureFanPort)");
 
         string reused = await bench.Host.ExecuteCodeAsync($"M950 F1 C\"{Expansion.Out(Machines.DriverBoard, 3)}\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reused, Does.Not.StartWith("Error:"),
+            Assert.That(reused, Reply.IsNotError,
                         "the pin really is free again: this only succeeds if the delete released it");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[1]), Is.Not.Null,
                         "and fans[1] now holds the fan that took the pin over");
@@ -439,7 +439,7 @@ public class M950FanTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 F0 C\"{Expansion.Out(Machines.DriverBoard, 6)}\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("is not free"), "the board's refusal is the result");
+            Assert.That(reply, Reply.IsError("is not free"), "the board's refusal is the result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null,
                         "and fans[0] is empty: the old fan was deleted and the new one refused");
         });
@@ -459,7 +459,7 @@ public class M950FanTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 F0 Q100 K4");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "the board's refusal is the result");
+            Assert.That(reply, Reply.IsError(), "the board's refusal is the result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.Frequency), Is.EqualTo(500),
                         "fans[0].frequency keeps the frequency the board still has");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]!.TachoPpr), Is.EqualTo(2.0).Within(1e-3),
@@ -523,7 +523,7 @@ public class M950FanTests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Fan0Config);
         bench.CanMaster.ReportWith<CanMessageM950Fan>(report);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M950 F0")).Trim(), Is.EqualTo(report));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M950 F0"), Reply.IsSuccess(report));
     }
 
     /// <summary>
@@ -539,7 +539,7 @@ public class M950FanTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 F0 C\"nil\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "the delete succeeds");
+            Assert.That(reply, Reply.IsEmpty, "the delete succeeds");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans[0]), Is.Null, "and fans[0] is empty");
         });
     }

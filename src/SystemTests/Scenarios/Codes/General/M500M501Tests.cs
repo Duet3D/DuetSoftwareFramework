@@ -34,7 +34,7 @@ public class M500M501Tests : BenchFixture
     private static async Task<string> SaveAsync(Bench bench, string code = "M500")
     {
         string reply = await bench.Host.ExecuteCodeAsync(code);
-        Assert.That(reply, Does.Not.StartWith("Error"), $"{code} writes config-override.g");
+        Assert.That(reply, Reply.IsNotError, $"{code} writes config-override.g");
         return await File.ReadAllTextAsync(OverridePath(bench));
     }
 
@@ -135,7 +135,7 @@ public class M500M501Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M500");
-        Assert.That(reply, Does.StartWith("Error").And.Contain("config-override.g"),
+        Assert.That(reply, Reply.IsError("config-override.g"),
                     "the failure is an error naming the file (RRF WriteConfigOverrideFile)");
     }
 
@@ -160,10 +160,10 @@ public class M500M501Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).TrimEnd();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Warning").And.EndWith(NoM501Warning), "the reply warns that config.g does not load the file");
+            Assert.That(reply, Reply.IsWarning(NoM501Warning), "the reply warns that config.g does not load the file");
             Assert.That(File.Exists(OverridePath(bench)), Is.True, "the file is written all the same");
         });
     }
@@ -179,7 +179,7 @@ public class M500M501Tests : BenchFixture
                                              .WithSd(sd => sd.WriteSys("config-override.g", "G4 P0\n"))
                                              .StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M500")).Trim(), Is.Empty, "config.g loads the file, so there is nothing to warn about");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M500"), Reply.IsEmpty, "config.g loads the file, so there is nothing to warn about");
     }
 
     /// <summary>
@@ -201,7 +201,7 @@ public class M500M501Tests : BenchFixture
                                              })
                                              .StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M500")).Trim(), Is.Empty, "the macro's M501 ran while config.g was running");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M500"), Reply.IsEmpty, "the macro's M501 ran while config.g was running");
     }
 
     /// <summary>
@@ -217,7 +217,7 @@ public class M500M501Tests : BenchFixture
                                              .StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M501");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M500")).TrimEnd(), Does.StartWith("Warning").And.EndWith(NoM501Warning),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M500"), Reply.IsWarning(NoM501Warning),
                     "config.g still does not load the file");
     }
 
@@ -267,7 +267,7 @@ public class M500M501Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M665 R160 H340");
         await bench.Host.ExecuteCodeAsync("M666 X0 Y0 Z0");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M501")).Trim(), Is.Empty, "the saved calibration loads without complaint");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M501"), Reply.IsEmpty, "the saved calibration loads without complaint");
 
         DeltaKinematics delta = await bench.Host.ReadModelAsync(model => (DeltaKinematics)model.Move.Kinematics);
         Assert.Multiple(() =>
@@ -663,7 +663,7 @@ public class M500M501Tests : BenchFixture
         float[] offsets = await ReadWorkplaceAsync(bench, 2);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "M501 replies with nothing");
+            Assert.That(reply, Reply.IsEmpty, "M501 replies with nothing");
             Assert.That(offsets, Is.EqualTo(new[] { 5f, 6f, 7f }).Within(1e-3f), "move.axes[*].workplaceOffsets[1] are the file's");
         });
     }
@@ -742,7 +742,7 @@ public class M500M501Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M500 P99");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"), "an unknown P is not refused");
+            Assert.That(reply, Reply.IsNotError, "an unknown P is not refused");
             Assert.That(File.Exists(OverridePath(bench)), Is.True, "the file is written");
         });
     }
@@ -779,8 +779,8 @@ public class M500M501Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M501")).TrimEnd();
-        Assert.That(reply, Does.StartWith("Warning").And.EndWith("Macro file config-override.g not found"),
+        string reply = await bench.Host.ExecuteCodeAsync("M501");
+        Assert.That(reply, Reply.IsWarning("Macro file config-override.g not found"),
                     "a missing file is a warning (RRF DoFileMacro)");
     }
 
@@ -799,8 +799,8 @@ public class M500M501Tests : BenchFixture
         string runs = await bench.Host.ExecuteCodeAsync("echo global.overrideRuns");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "the nested M501 is passed over without complaint");
-            Assert.That(runs.Trim(), Is.EqualTo("1"), "the file ran once");
+            Assert.That(reply, Reply.IsEmpty, "the nested M501 is passed over without complaint");
+            Assert.That(runs, Reply.IsSuccess("1"), "the file ran once");
         });
     }
 

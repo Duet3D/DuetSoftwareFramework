@@ -40,7 +40,7 @@ public class G93G94Tests : BenchFixture
                     "G93 sets inputs[].inverseTimeMode (RRF GCodes2.cpp case 93)");
 
         string reply = await bench.Host.ExecuteCodeAsync("G1 X10");
-        Assert.That(reply, Does.Contain("Feed rate must be specified with every move when using inverse time mode"),
+        Assert.That(reply, Reply.IsError("Feed rate must be specified with every move when using inverse time mode"),
                     "an inverse time move without F is refused (RRF GCodes.cpp LoadFeedrateFromGCode)");
 
         // F60 asks for the whole move in one second; the stored feed rate must not pick it up

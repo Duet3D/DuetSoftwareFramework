@@ -23,34 +23,34 @@ public class JobControlRefusalTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ExecuteCodeAsync("M25"),
-                        Does.Contain("Cannot pause print, because no file is being printed!"),
+                        Reply.IsError("Cannot pause print, because no file is being printed!"),
                         "M25 with no job");
             Assert.That(await bench.Host.ExecuteCodeAsync("M226"),
-                        Does.Contain("use M226/600/601 only within a file being printed"),
+                        Reply.IsError("use M226/600/601 only within a file being printed"),
                         "M226 from the console");
             Assert.That(await bench.Host.ExecuteCodeAsync("M600"),
-                        Does.Contain("use M226/600/601 only within a file being printed"),
+                        Reply.IsError("use M226/600/601 only within a file being printed"),
                         "M600 from the console");
             Assert.That(await bench.Host.ExecuteCodeAsync("M601"),
-                        Does.Contain("use M226/600/601 only within a file being printed"),
+                        Reply.IsError("use M226/600/601 only within a file being printed"),
                         "M601 from the console");
             Assert.That(await bench.Host.ExecuteCodeAsync("M24"),
-                        Does.Contain("Cannot print, because no file is selected!"),
+                        Reply.IsError("Cannot print, because no file is selected!"),
                         "M24 with no file selected");
             Assert.That(await bench.Host.ExecuteCodeAsync("M0"),
-                        Does.Contain("Pause the print before attempting to cancel it"),
+                        Reply.IsError("Pause the print before attempting to cancel it"),
                         "M0 with no job at all");
             Assert.That(await bench.Host.ExecuteCodeAsync("M26"),
-                        Does.Contain("Not printing a file"),
+                        Reply.IsError("Not printing a file"),
                         "M26 with no file selected");
             Assert.That(await bench.Host.ExecuteCodeAsync("G60 S9"),
-                        Does.StartWith("Error:"),
+                        Reply.IsError(),
                         "G60 S9 is out of range");
             Assert.That(await bench.Host.ExecuteCodeAsync("M505"),
-                        Does.Contain("Sys file path is"),
+                        Reply.IsSuccess("Sys file path is"),
                         "M505 without P reports the sys path");
             Assert.That(await bench.Host.ExecuteCodeAsync("M505 P\"0:/sys/nope\""),
-                        Does.Contain("Directory not found"),
+                        Reply.IsError("Directory not found"),
                         "M505 with a missing directory");
         });
     }
@@ -73,22 +73,22 @@ public class JobControlRefusalTests : BenchFixture
         await bench.Host.WaitForStatusAsync(MachineStatus.Processing);
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M0"),
-                    Does.Contain("Pause the print before attempting to cancel it"),
+                    Reply.IsError("Pause the print before attempting to cancel it"),
                     "M0 while running unpaused");
         Assert.That(await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/other.gcode\""),
-                    Does.Contain("Cannot set file to print, because a file is already being printed"),
+                    Reply.IsError("Cannot set file to print, because a file is already being printed"),
                     "M23 while printing");
         Assert.That(await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/other.gcode\""),
-                    Does.Contain("Cannot set file to print, because a file is already being printed"),
+                    Reply.IsError("Cannot set file to print, because a file is already being printed"),
                     "M32 while printing");
 
         await bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.That(await bench.Host.ExecuteCodeAsync("M25"),
-                    Does.Contain("Printing is already paused!"),
+                    Reply.IsError("Printing is already paused!"),
                     "M25 while already paused");
         Assert.That(await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/other.gcode\""),
-                    Does.Contain("Cannot set file to print, because a file is already being printed"),
+                    Reply.IsError("Cannot set file to print, because a file is already being printed"),
                     "M23 while paused");
 
         await bench.Host.ExecuteCodeAsync("M0");
@@ -119,7 +119,7 @@ public class JobControlRefusalTests : BenchFixture
         // While the machine is pausing (pause.g's park is still on its way to X0 Y0)...
         Task<string> pausing = bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.WaitForStatusAsync(MachineStatus.Pausing);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M24", DuetAPI.CodeChannel.Telnet)).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M24", DuetAPI.CodeChannel.Telnet), Reply.IsEmpty,
                     "M24 while pausing is silently ignored");
         await pausing;
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
@@ -127,7 +127,7 @@ public class JobControlRefusalTests : BenchFixture
         // ...and while it is resuming (moving back to the pause point)
         Task<string> resuming = bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Resuming);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M24", DuetAPI.CodeChannel.Telnet)).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M24", DuetAPI.CodeChannel.Telnet), Reply.IsEmpty,
                     "a second M24 while resuming is ignored, not refused");
         await resuming;
         await bench.Host.WaitForStatusAsync(MachineStatus.Processing);
@@ -151,7 +151,7 @@ public class JobControlRefusalTests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
         Assert.That(await bench.Host.ExecuteCodeAsync("M26 S-1"),
-                    Does.Contain("Position is out of range"),
+                    Reply.IsError("Position is out of range"),
                     "M26 S-1 on a selected file");
         Assert.That(await bench.Host.GlobalAsync("startRan"), Is.Zero, "M23 alone must not start the job");
 

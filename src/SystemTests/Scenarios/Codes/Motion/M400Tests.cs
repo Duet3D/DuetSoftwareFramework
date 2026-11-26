@@ -28,7 +28,7 @@ public class M400Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G91");
         await bench.Host.ExecuteCodeAsync("G1 X5 F6000");
         string reply = await bench.Host.ExecuteCodeAsync("M400");
-        Assert.That(reply.Trim(), Is.Empty, "M400 executes without error (RRF GCodes2.cpp case 400)");
+        Assert.That(reply, Reply.IsEmpty, "M400 executes without error (RRF GCodes2.cpp case 400)");
 
         Assert.That(bench.CanMaster.ScheduledSteps(Machines.XDriver), Is.EqualTo(5 * Machines.XyStepsPerMm),
                     "after M400 the whole 5 mm move has been sent (RRF GCodes2.cpp case 400)");

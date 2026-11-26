@@ -172,10 +172,10 @@ public class M563Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "M563 P0 reports the tool number (RRF Tool::PrintTool)");
-            Assert.That(reply, Does.Contain($"name: {name}"), "M563 P0 reports the model's tool name (RRF Tool::PrintTool)");
-            Assert.That(reply, Does.Contain("drives: 0"), "M563 P0 reports the mapped drive (RRF Tool::PrintTool)");
-            Assert.That(reply, Does.Contain("status: off"), "an unselected tool reports status off (RRF Tool::PrintTool)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "M563 P0 reports the tool number (RRF Tool::PrintTool)");
+            Assert.That(reply, Reply.IsSuccess($"name: {name}"), "M563 P0 reports the model's tool name (RRF Tool::PrintTool)");
+            Assert.That(reply, Reply.IsSuccess("drives: 0"), "M563 P0 reports the mapped drive (RRF Tool::PrintTool)");
+            Assert.That(reply, Reply.IsSuccess("status: off"), "an unselected tool reports status off (RRF Tool::PrintTool)");
         });
     }
 
@@ -223,10 +223,10 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync("M563 P0 S\"OnlyTool\"");
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M563")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M563");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "M563 without P is an error (RRF GetLimitedUIValue('P', MaxTools))");
+            Assert.That(reply, Reply.IsError(), "M563 without P is an error (RRF GetLimitedUIValue('P', MaxTools))");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count), Is.EqualTo(1), "tool 0 is untouched");
         });
     }
@@ -239,10 +239,10 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "the code is an error (RRF GetLimitedUIValue('P', MaxTools))");
+            Assert.That(reply, Reply.IsError(), "the code is an error (RRF GetLimitedUIValue('P', MaxTools))");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "no tool is created");
         });
     }
@@ -259,10 +259,10 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync("M563 P0 S\"OnlyTool\"");
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M563 P1")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M563 P1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "reporting an absent tool is an error (RRF GCodes::ManageTool)");
+            Assert.That(reply, Reply.IsError(), "reporting an absent tool is an error (RRF GCodes::ManageTool)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count), Is.EqualTo(1), "M563 P1 does not create tool 1 (RRF GCodes::ManageTool reports only)");
         });
     }
@@ -313,11 +313,11 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(TwoExtruderConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync($"M563 P0 {drives}")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync($"M563 P0 {drives}");
         Tool tool = await bench.Host.ReadModelAsync(model => model.Tools[0]!);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"), "the tool is accepted (RRF Tool::Create)");
+            Assert.That(reply, Reply.IsNotError, "the tool is accepted (RRF Tool::Create)");
             Assert.That(tool.Extruders, Is.EqualTo(extruders), "tools[0].extruders is D as given (RRF Tool::Create)");
             Assert.That(tool.FilamentExtruder, Is.EqualTo(filamentExtruder), "tools[0].filamentExtruder (RRF ManageTool filamentDrive)");
         });
@@ -379,10 +379,10 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M563 P0 F-1")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M563 P0 F-1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"), "F-1 is accepted (RRF ManageTool)");
+            Assert.That(reply, Reply.IsNotError, "F-1 is accepted (RRF ManageTool)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count > 0 ? model.Tools[0]?.Fans.ToArray() : null), Is.Empty, "tools[0].fans is empty (RRF FansBitmap::MakeFromArray)");
         });
     }
@@ -400,13 +400,13 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        string reply = (await bench.Host.ExecuteCodeAsync($"M563 P0 H{UnconfiguredHeater} F{UnconfiguredFan}")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync($"M563 P0 H{UnconfiguredHeater} F{UnconfiguredFan}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"), "the tool is accepted (RRF Tool::Create)");
+            Assert.That(reply, Reply.IsNotError, "the tool is accepted (RRF Tool::Create)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count > 0 ? model.Tools[0]?.Heaters.ToArray() : null), Is.EqualTo(new[] { UnconfiguredHeater }), "tools[0].heaters names the heater (RRF Tool::Create)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count > 0 ? model.Tools[0]?.Fans.ToArray() : null), Is.EqualTo(new[] { UnconfiguredFan }), "tools[0].fans names the fan (RRF ManageTool fanMap)");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "no CAN message is sent for a heater that does not exist (RRF Heat::SetAsToolHeater)");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "no CAN message is sent for a heater that does not exist (RRF Heat::SetAsToolHeater)");
         });
     }
 
@@ -500,10 +500,10 @@ public class M563Tests : BenchFixture
             """;
         await using Bench bench = await Bench.StartAsync(Machines.Xye, HeaterConfig, config);
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "the definition is refused (RRF Tool::Create / GCodes::ManageTool)");
+            Assert.That(reply, Reply.IsError(), "the definition is refused (RRF Tool::Create / GCodes::ManageTool)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "no tool is created");
         });
     }
@@ -537,10 +537,10 @@ public class M563Tests : BenchFixture
         DcsTestHost host = bench.Host;
         Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 selects the tool before the redefinition");
 
-        string reply = (await host.ExecuteCodeAsync("M563 P0 D1")).Trim();
+        string reply = await host.ExecuteCodeAsync("M563 P0 D1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "drive 1 does not exist (RRF Tool::Create)");
+            Assert.That(reply, Reply.IsError(), "drive 1 does not exist (RRF Tool::Create)");
             Assert.That(await host.ReadModelAsync(model => model.Tools.Count), Is.Zero, "the old tool 0 was deleted before the new one was refused (RRF GCodes::ManageTool)");
             Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(-1), "the old tool was deselected (RRF GCodes::ManageTool SelectTool(-1))");
             Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>().Select(m => (m.Board, (int)m.Message.HeaterNumber, m.Message.Command, m.Message.Function, m.Message.SetPoint)),
@@ -567,10 +567,10 @@ public class M563Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.Xye, HeaterConfig, $"M563 P0 D0 H{HeaterNumber} S\"Old\"\nT0");
         DcsTestHost host = bench.Host;
 
-        string reply = (await host.ExecuteCodeAsync("M563 P0 X0 Y0")).Trim();
+        string reply = await host.ExecuteCodeAsync("M563 P0 X0 Y0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "X and Y mapped to one axis is refused (RRF GCodes::ManageTool)");
+            Assert.That(reply, Reply.IsError(), "X and Y mapped to one axis is refused (RRF GCodes::ManageTool)");
             Assert.That(await host.ReadModelAsync(model => model.Tools.Count > 0 ? model.Tools[0]?.Name : null), Is.EqualTo("Old"), "tool 0 is kept (RRF GCodes::ManageTool)");
             Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "tool 0 stays selected");
             Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>(), Is.Empty, "the heater is left alone");
@@ -614,7 +614,7 @@ public class M563Tests : BenchFixture
         DcsTestHost host = bench.Host;
 
         await host.ExecuteCodeAsync("M563 P1 S\"Bare tool\"");
-        Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "a tool with no heater sends no CAN message (RRF Tool::Create)");
+        Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "a tool with no heater sends no CAN message (RRF Tool::Create)");
 
         await host.ExecuteCodeAsync($"M563 P0 D0 H{HeaterNumber}");
         (byte Board, CanMessageSetDefaultHeaterModel Message)[] defaults = [.. bench.CanMaster.CanMessages<CanMessageSetDefaultHeaterModel>()];
@@ -669,12 +669,12 @@ public class M563Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync("M563 P0 S\"OnlyTool\"");
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M563 P1 D-1 H-1")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M563 P1 D-1 H-1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty, "the deletion succeeds silently (RRF GCodes::ManageTool)");
+            Assert.That(reply, Reply.IsEmpty, "the deletion succeeds silently (RRF GCodes::ManageTool)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Tools.Count), Is.EqualTo(1), "tool 0 is untouched");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 }

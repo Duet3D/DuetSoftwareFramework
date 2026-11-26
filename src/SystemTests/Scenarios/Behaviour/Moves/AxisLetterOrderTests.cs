@@ -177,7 +177,7 @@ public class AxisLetterOrderTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M290 S0.1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.Babystep), Is.EqualTo(0.1f).Within(1e-5f));
             foreach (char other in "XYU")
             {
@@ -211,7 +211,7 @@ public class AxisLetterOrderTests : BenchFixture
 
         string refused = await bench.Host.ExecuteCodeAsync("G28 Z");
         string xy = new([.. order.Where(letter => letter is 'X' or 'Y')]);
-        Assert.That(refused.Trim(), Is.EqualTo($"Error: G28: Must home axes [{xy}] before homing [Z]"),
+        Assert.That(refused, Reply.IsError($"Must home axes [{xy}] before homing [Z]"),
                     "Z alone cannot be homed before X and Y");
 
         string reply = await bench.Host.ExecuteCodeAsync("G28 Z Y X");
@@ -219,7 +219,7 @@ public class AxisLetterOrderTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(ran.Last(), Is.EqualTo('z'), "Z is homed after X and Y, wherever it is in the axis list");
             Assert.That(ran.Order(), Is.EqualTo("xyz"), "each macro ran once");
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.Homed), Is.True);
@@ -332,7 +332,7 @@ public class AxisLetterOrderTests : BenchFixture
             model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
         Assert.Multiple(() =>
         {
-            Assert.That(refused.Trim(), Is.EqualTo("Error: M669: Invalid kinematics matrix"), "RepRapFirmware's words");
+            Assert.That(refused, Reply.IsError("Invalid kinematics matrix"), "RepRapFirmware's words");
             Assert.That(inverse[0][..2], Is.EqualTo(new[] { 1.0f, 0.0f }), "the geometry that was there stays");
             Assert.That(inverse[1][..2], Is.EqualTo(new[] { 0.0f, 1.0f }));
             Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (Machines.DriverBoard, XDriver) }), "and still moves");
@@ -355,7 +355,7 @@ public class AxisLetterOrderTests : BenchFixture
             model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
         Assert.Multiple(() =>
         {
-            Assert.That(refused.Trim(), Is.EqualTo("Error: M669: The machine has no A axis"));
+            Assert.That(refused, Reply.IsError("The machine has no A axis"));
             Assert.That(inverse[0][..4], Is.EqualTo(new[] { 1.0f, 0.0f, 0.0f, 0.0f }), "X's row is as it was");
             Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (Machines.DriverBoard, XDriver) }), "and X still moves alone");
         });
@@ -369,7 +369,7 @@ public class AxisLetterOrderTests : BenchFixture
 
         string refused = await bench.Host.ExecuteCodeAsync("M669 X1:0:0:0:1");
 
-        Assert.That(refused.Trim(), Is.EqualTo("Error: at column 15: M669: array too long for parameter 'X'"),
+        Assert.That(refused, Reply.IsError(CodeErrors.ArrayTooLong('X')),
                     "RepRapFirmware's words, pointing at the value there is no motor for");
     }
 
@@ -389,7 +389,7 @@ public class AxisLetterOrderTests : BenchFixture
             model => ((CoreKinematics)model.Move.Kinematics).InverseMatrix.Select(row => row.ToArray()).ToArray());
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(inverse[0], Is.EqualTo(new[] { 1.0f, 0.0f, 0.0f, 0.0f }), "the motors the row leaves out are zero");
             Assert.That(inverse[1], Is.EqualTo(new[] { 1.0f, -1.0f, 0.0f, 0.0f }), "and Y's row is as it was");
             Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (Machines.DriverBoard, XDriver) }), "so X moves its own motor alone");
@@ -455,7 +455,7 @@ public class AxisLetterOrderTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(refused.Trim(), Is.EqualTo("Error: M669: The machine has no U or V axis, which coreXYU kinematics needs"));
+            Assert.That(refused, Reply.IsError("The machine has no U or V axis, which coreXYU kinematics needs"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
                         "the geometry that was there stays");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Homed).ToArray()), Has.All.True,
@@ -579,8 +579,8 @@ public class AxisLetterOrderTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(refused.Trim(), Is.EqualTo("Error: M290: The machine has no Z axis"));
-            Assert.That(accepted.Trim(), Is.Empty, "the axes that do exist can still be babystepped");
+            Assert.That(refused, Reply.IsError("The machine has no Z axis"));
+            Assert.That(accepted, Reply.IsEmpty, "the axes that do exist can still be babystepped");
             Assert.That(await bench.Host.ReadAxisAsync('X', axis => axis.Babystep), Is.EqualTo(0.1f).Within(1e-5f));
             Assert.That(await bench.Host.ReadAxisAsync('Y', axis => axis.Babystep), Is.Zero, "the refused code changed nothing");
         });
@@ -611,7 +611,7 @@ public class AxisLetterOrderTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(refused.Trim(), Is.EqualTo($"Error: {geometry[..4]}: {error}"));
+            Assert.That(refused, Reply.IsError(error));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
                         "the geometry that was there stays");
             Assert.That(move.DriversMoved(), Is.EqualTo(new[] { (Machines.DriverBoard, XDriver) }), "and moves as it did");

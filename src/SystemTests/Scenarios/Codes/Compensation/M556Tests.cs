@@ -46,7 +46,7 @@ public class M556Tests : BenchFixture
                     "M556 P1 clears move.compensation.skew.compensateXY (RRF SetXYCompensation(P <= 0))");
 
         string report = await host.ExecuteCodeAsync("M556");
-        Assert.That(report.Trim(), Is.EqualTo("Axis compensations - YX: 0.02000, YZ: 0.01000, ZX: 0.00500"),
+        Assert.That(report, Reply.IsSuccess("Axis compensations - YX: 0.02000, YZ: 0.01000, ZX: 0.00500"),
                     "bare M556 reports the tangents in RRF's format (GCodes2.cpp case 556)");
     }
 }

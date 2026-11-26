@@ -33,11 +33,11 @@ public class M38Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M38 \"0:/gcodes/hashed.gcode\"")).Trim(),
-                        Is.EqualTo("091d63b8"),
+            Assert.That(await bench.Host.ExecuteCodeAsync("M38 \"0:/gcodes/hashed.gcode\""),
+                        Reply.IsSuccess("091d63b8"),
                         "M38 reports the CRC32 of the file as eight hex digits (GCodes3.cpp AdvanceHash)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M38 \"0:/gcodes/absent.gcode\""),
-                        Does.Contain("Cannot open file"),
+                        Reply.IsError("Cannot open file"),
                         "M38 reports a file it cannot open (GCodes2.cpp case 38)");
         });
     }

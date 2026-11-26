@@ -48,7 +48,7 @@ public class M470M471M472Tests : BenchFixture
         });
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M472 P\"0:/gcodes/archive\""),
-                    Does.Contain("delete failed"),
+                    Reply.IsError("delete failed"),
                     "M472 without R1 refuses to delete a directory that is not empty (GCodes2.cpp case 472)");
 
         await bench.Host.ExecuteCodeAsync("M472 P\"0:/gcodes/archive\" R1");

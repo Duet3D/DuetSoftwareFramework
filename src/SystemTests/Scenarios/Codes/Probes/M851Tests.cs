@@ -35,7 +35,7 @@ public class M851Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
         string reply = await bench.Host.ExecuteCodeAsync("M851 Z-0.8");
-        Assert.That(reply.Trim(), Is.Empty, "M851 Z was accepted");
+        Assert.That(reply, Reply.IsEmpty, "M851 Z was accepted");
 
         Probe? probe = await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]);
         Assert.Multiple(() =>
@@ -47,7 +47,7 @@ public class M851Tests : BenchFixture
         });
 
         string report = await bench.Host.ExecuteCodeAsync("M851");
-        Assert.That(report.Trim(), Is.EqualTo("Z probe offset is -0.80mm"),
+        Assert.That(report, Reply.IsSuccess("Z probe offset is -0.80mm"),
                     "M851 reports the negated trigger height (RRF GCodes2.cpp case 851)");
     }
 }

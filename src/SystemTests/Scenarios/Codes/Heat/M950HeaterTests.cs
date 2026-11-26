@@ -134,7 +134,7 @@ public class M950HeaterTests : BenchFixture
         (_, CanMessageM950Heater sent) = bench.CanMaster.LastCanMessage<CanMessageM950Heater>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "the heater is created without comment");
+            Assert.That(reply, Reply.IsEmpty, "the heater is created without comment");
             Assert.That(sent.B, Is.EqualTo(AmbientSensorNumber), "B reaches the board that runs the heater model");
             Assert.That(heater?.AmbientSensor, Is.EqualTo(AmbientSensorNumber),
                         "and heat.heaters[2].ambientSensor records it (DSF addition)");
@@ -184,7 +184,7 @@ public class M950HeaterTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 H{HeaterNumber} C\"{Expansion.Out(Machines.DriverBoard, 1)}\"");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("missing parameter 'T'"),
+            Assert.That(reply, Reply.IsError(CodeErrors.MissingParameter('T')),
                         "a heater needs the sensor it reads (Heat.cpp ConfigureHeater, MustSee)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[HeaterNumber]?.Port),
                         Is.EqualTo(HeaterPort), "heater 2 is untouched");
@@ -215,7 +215,7 @@ public class M950HeaterTests : BenchFixture
         (byte board, CanMessageM950Heater released) = bench.CanMaster.LastCanMessage<CanMessageM950Heater>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(deleted.Trim(), Is.Empty, "deleting is not refused by what the board says about it");
+            Assert.That(deleted, Reply.IsEmpty, "deleting is not refused by what the board says about it");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters.ElementAtOrDefault(HeaterNumber)),
                         Is.Null, "heater 2 leaves heat.heaters[]");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the release goes to the heater's board");
@@ -229,7 +229,7 @@ public class M950HeaterTests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync($"M950 H{HeaterNumber}");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.StartWith("Error:").And.Contain($"Heater {HeaterNumber} does not exist"),
+            Assert.That(report, Reply.IsError($"Heater {HeaterNumber} does not exist"),
                         "a deleted heater cannot be reported (Heat.cpp ConfigureHeater)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Heater>(), Is.Empty, "and no board is asked about it");
         });
@@ -279,7 +279,7 @@ public class M950HeaterTests : BenchFixture
             $"M950 H{HeaterNumber} C\"{Expansion.Out(Machines.DriverBoard, 6)}\" T{SensorNumber}");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("is not free"), "the board's refusal is the result");
+            Assert.That(reply, Reply.IsError("is not free"), "the board's refusal is the result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters.ElementAtOrDefault(HeaterNumber)),
                         Is.Null, "and heater 2 is gone: the old one was deleted before the new one was refused");
         });
@@ -303,7 +303,7 @@ public class M950HeaterTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 H{HeaterNumber} C\"{HeaterPort}\" T5");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Warning:").And.Contain("has not been defined"),
+            Assert.That(reply, Reply.IsWarning("has not been defined"),
                         "the board's warning is the result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[HeaterNumber]?.Sensor),
                         Is.EqualTo(5), "and the heater exists, bound to the sensor it was given");
@@ -331,7 +331,7 @@ public class M950HeaterTests : BenchFixture
         (byte board, CanMessageM950Heater query) = bench.CanMaster.LastCanMessage<CanMessageM950Heater>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo(report), "the board's report is the reply");
+            Assert.That(reply, Reply.IsSuccess(report), "the board's report is the reply");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard));
             Assert.That(query.H, Is.EqualTo(HeaterNumber), "the query names the heater");
             Assert.That(query.C, Is.Null, "and nothing else");
@@ -356,7 +356,7 @@ public class M950HeaterTests : BenchFixture
         Heater? heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[HeaterNumber]);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("Can't change sensor number"),
+            Assert.That(reply, Reply.IsError("Can't change sensor number"),
                         "the sensor is fixed when the heater is created (Heat.cpp ConfigureHeater)");
             Assert.That(heater?.Sensor, Is.EqualTo(SensorNumber), "heat.heaters[2].sensor is unchanged");
             Assert.That(heater?.AmbientSensor, Is.EqualTo(-1), "as is heat.heaters[2].ambientSensor");
@@ -391,7 +391,7 @@ public class M950HeaterTests : BenchFixture
         string refused = await bench.Host.ExecuteCodeAsync($"M950 H{HeaterNumber} Q200");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(refused, Does.StartWith("Error:"), "the board's refusal is the result");
+            Assert.That(refused, Reply.IsError(), "the board's refusal is the result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Heat.Heaters[HeaterNumber]!.Frequency),
                         Is.EqualTo(100), "and heat.heaters[2].frequency keeps what the board still has");
         });
@@ -409,7 +409,7 @@ public class M950HeaterTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(Invariant($"M950 H{HeatManager.MaxHeaters} C\"{HeaterPort}\" T{SensorNumber}"));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Heater>(), Is.Empty, "and no pin was claimed");
         });
     }

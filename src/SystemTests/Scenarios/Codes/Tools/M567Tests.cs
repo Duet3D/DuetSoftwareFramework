@@ -47,6 +47,6 @@ public class M567Tests : BenchFixture
         });
 
         string reply = (await host.ExecuteCodeAsync("M567 P0")).Trim();
-        Assert.That(reply, Does.Contain("Tool 0 mix ratios: 0.600:0.400"), "bare M567 reports the mix (RRF GCodes2.cpp M567 case)");
+        Assert.That(reply, Reply.IsSuccess("Tool 0 mix ratios: 0.600:0.400"), "bare M567 reports the mix (RRF GCodes2.cpp M567 case)");
     }
 }

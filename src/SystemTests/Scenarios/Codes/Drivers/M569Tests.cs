@@ -53,7 +53,7 @@ public class M569Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: {code}: missing parameter 'P'"),
+            Assert.That(reply, Reply.IsError(CodeErrors.MissingParameter('P')),
                         "the guard is RRF's GCodeBuffer::MustSee, whose wording the reference holds");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569>(), Is.Empty,
                         "and it fires before an unaddressed command reaches a driver");
@@ -77,7 +77,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P{board}.{driver} S0");
-        Assert.That(reply.Trim(), Is.Empty, "a board that took the setting has nothing to say");
+        Assert.That(reply, Reply.IsEmpty, "a board that took the setting has nothing to say");
 
         (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.Multiple(() =>
@@ -111,7 +111,7 @@ public class M569Tests : BenchFixture
         (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo(ClosedLoopBoardReport),
+            Assert.That(reply, Reply.IsSuccess(ClosedLoopBoardReport),
                         "the board's report is what the code answers with");
             Assert.That(sentTo, Is.EqualTo(DriversRig.ClosedLoopBoard), "the query goes to the board P names");
             Assert.That(sent.P, Is.EqualTo(0), "carrying only the driver number");
@@ -145,7 +145,7 @@ public class M569Tests : BenchFixture
                 })).StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P{DriversRig.MainDriver(6)} S0");
-        Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569: {refusal}"),
+        Assert.That(reply, Reply.IsError(refusal),
                     "an error raised on an expansion board is reported as an error");
 
         Assert.That(await bench.Host.ReadModelAsync(
@@ -171,7 +171,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.MainDriverBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 2)} B3 F5 Y4:2 H300 U16 R-1")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 2)} B3 F5 Y4:2 H300 U16 R-1"), Reply.IsEmpty,
                     "the board took every field");
 
         (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
@@ -218,7 +218,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.MainDriverBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 3)} C65860")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 3)} C65860"), Reply.IsEmpty,
                     "the board took the register");
 
         (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
@@ -258,7 +258,7 @@ public class M569Tests : BenchFixture
         string driver = Expansion.Driver(DriversRig.MainDriverBoard, 2);
 
         await bench.Host.ExecuteCodeAsync($"M569 P{driver} C{0x008053}");
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{driver} F5 B3 Y4:2")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{driver} F5 B3 Y4:2"), Reply.IsEmpty);
 
         DriverConfig config = await bench.Host.ReadModelAsync(model => model.Boards[DriversRig.MainDriverBoard].Drivers![2].Config);
         Assert.Multiple(() =>
@@ -310,7 +310,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.MainDriverBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 4)} Y4:2:1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 4)} Y4:2:1"), Reply.IsEmpty);
 
         (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.That(sent.Y, Is.EqualTo(new uint[] { 4, 2, 1 }), "all three values reach the board");
@@ -336,7 +336,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.MainDriverBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} R{polarity}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} R{polarity}"), Reply.IsEmpty);
 
         (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.That(sent.R, Is.EqualTo(polarity), "R reaches the board as a signed value");
@@ -365,7 +365,7 @@ public class M569Tests : BenchFixture
                 CodeResult.Warning)).StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} U8");
-        Assert.That(reply.TrimEnd(), Is.EqualTo($"Warning: M569: {warning}"), "the board's warning is reported as a warning");
+        Assert.That(reply, Reply.IsWarning(warning), "the board's warning is reported as a warning");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config.CurrentScaler),
                     Is.EqualTo(8), "and the scaler it applied is recorded");
     }
@@ -392,7 +392,7 @@ public class M569Tests : BenchFixture
                 })).StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} S0 T2:2");
-        Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569: {refusal}"), "the board's refusal is the code's error");
+        Assert.That(reply, Reply.IsError(refusal), "the board's refusal is the code's error");
 
         DriverConfig config = await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config);
         Assert.Multiple(() =>
@@ -420,8 +420,7 @@ public class M569Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M569 P99.0 S0", timeoutMs: 5_000);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: M569:"), "a board that does not answer is an error");
-            Assert.That(reply, Does.Contain("board 99"), "naming the board");
+            Assert.That(reply, Reply.IsError("board 99"), "a board that does not answer is an error naming the board");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Boards.Any(b => b?.CanAddress == 99)),
                         Is.False, "and no board is created for it");
         });
@@ -444,8 +443,8 @@ public class M569Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P0.{driver} S0");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error: M569:"), "the driver is refused as an error");
-            Assert.That(bench.CanMaster.CanMessages<CanMessageM569>(), Is.Empty, "before anything is sent");
+            Assert.That(reply, Reply.IsError(), "the driver is refused as an error");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "before anything is sent");
         });
     }
 
@@ -476,7 +475,7 @@ public class M569Tests : BenchFixture
                 (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
                 Assert.Multiple(() =>
                 {
-                    Assert.That(reply.TrimEnd(), Is.EqualTo($"Driver {Expansion.Driver(board, driver)} runs forwards"),
+                    Assert.That(reply, Reply.IsSuccess($"Driver {Expansion.Driver(board, driver)} runs forwards"),
                                 "the reply is the report of the driver asked about");
                     Assert.That(sentTo, Is.EqualTo(board));
                     Assert.That(sent.P, Is.EqualTo(driver));
@@ -501,7 +500,7 @@ public class M569Tests : BenchFixture
         const byte board = DriversRig.MainDriverBoard;
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 3)}:{Expansion.Driver(board, 4)} S0");
-        Assert.That(reply.Trim(), Is.Empty);
+        Assert.That(reply, Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {
@@ -538,7 +537,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.ClosedLoopBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} D{mode}")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} D{mode}"), Reply.IsEmpty,
                     "the board took the mode");
 
         (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
@@ -611,7 +610,7 @@ public class M569Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.MainDriverBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 4)} T3")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 4)} T3"), Reply.IsEmpty);
 
         (_, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.That(sent.T, Is.EqualTo(new[] { 3.0f }), "the single value is sent as it was given");
@@ -641,7 +640,7 @@ public class M569Tests : BenchFixture
                 })).StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569 P{Expansion.Driver(board, 0)} D7");
-        Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569: {refusal}"));
+        Assert.That(reply, Reply.IsError(refusal));
         Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[board].Drivers![0].Config.Mode),
                     Is.EqualTo(DriverConfig.DefaultDriverMode), "the mode the driver had is still recorded");
     }

@@ -47,7 +47,7 @@ public class M666Tests : BenchFixture
         });
 
         string report = await host.ExecuteCodeAsync("M666");
-        Assert.That(report.Trim(), Is.EqualTo("Endstop adjustments X0.15 Y-0.20 Z0.05, tilt X1.00% Y-0.50%"),
+        Assert.That(report, Reply.IsSuccess("Endstop adjustments X0.15 Y-0.20 Z0.05, tilt X1.00% Y-0.50%"),
                     "bare M666 reports the adjustments in RRF's format (LinearDeltaKinematics::Configure)");
     }
 }

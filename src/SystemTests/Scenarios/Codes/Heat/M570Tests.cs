@@ -41,7 +41,7 @@ public class M570Tests : BenchFixture
         });
 
         string report = await bench.Host.ExecuteCodeAsync("M570 H0");
-        Assert.That(report, Does.Contain("15.0").And.Contain("120.0").And.Contain("5"),
+        Assert.That(report, Reply.IsSuccess("15.0", "120.0", "5"),
                     "the M570 report matches the model's fault detection parameters (RRF Heater.cpp ConfigureFaultDetectionParameters)");
     }
 }

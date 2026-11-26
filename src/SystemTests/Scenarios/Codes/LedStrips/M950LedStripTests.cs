@@ -81,7 +81,7 @@ public class M950LedStripTests : BenchFixture
         LedStrip? strip = await bench.Host.ReadModelAsync(model => model.LedStrips[1]);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(strip?.Type, Is.EqualTo(LedStripType.DotStar));
             Assert.That(strip?.ColorOrder, Is.EqualTo(LedStripColorOrder.RGB), "K2 sets ledStrips[1].colorOrder");
             Assert.That(strip?.MaxLeds, Is.EqualTo(30));
@@ -130,7 +130,7 @@ public class M950LedStripTests : BenchFixture
         (byte board, CanMessageM950Led sent) = bench.CanMaster.LastCanMessage<CanMessageM950Led>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "the delete succeeds whatever the board says");
+            Assert.That(reply, Reply.IsEmpty, "the delete succeeds whatever the board says");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard));
             Assert.That(sent.E, Is.EqualTo(0));
             Assert.That(sent.C, Is.EqualTo("nil"));
@@ -168,7 +168,7 @@ public class M950LedStripTests : BenchFixture
         string warned = await bench.Host.ExecuteCodeAsync("M950 E0 K9");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(warned, Does.StartWith("Warning:"), "the board warns about a colour order there is not");
+            Assert.That(warned, Reply.IsWarning(), "the board warns about a colour order there is not");
             Assert.That(await bench.Host.ReadModelAsync(model => model.LedStrips[0]!.ColorOrder),
                         Is.EqualTo(LedStripColorOrder.RGB), "and ledStrips[0].colorOrder keeps the last valid one");
         });
@@ -187,7 +187,7 @@ public class M950LedStripTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 E2");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("LED strip 2 does not exist"));
+            Assert.That(reply, Reply.IsError("LED strip 2 does not exist"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Led>(), Is.Empty);
         });
     }
@@ -207,7 +207,7 @@ public class M950LedStripTests : BenchFixture
         (_, CanMessageM950Led sent) = bench.CanMaster.LastCanMessage<CanMessageM950Led>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo(report));
+            Assert.That(reply, Reply.IsSuccess(report));
             Assert.That(sent.E, Is.EqualTo(0));
             Assert.That(sent.C, Is.Null);
             Assert.That(sent.K, Is.Null);
@@ -225,7 +225,7 @@ public class M950LedStripTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 E0 C\"{StripPort}\" T0");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("Unsupported LED strip type"));
+            Assert.That(reply, Reply.IsError("Unsupported LED strip type"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.LedStrips.ElementAtOrDefault(0)), Is.Null);
         });
     }
@@ -254,7 +254,7 @@ public class M950LedStripTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 {parameters}");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Led>(), Is.Empty);
         });
     }

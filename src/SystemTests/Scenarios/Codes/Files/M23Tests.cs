@@ -43,7 +43,7 @@ public class M23Tests : BenchFixture
         GCodeFileInfo jobFile = await bench.Host.ReadModelAsync(model => model.Job.File);
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.Contain("info.gcode"),
+            Assert.That(reply, Reply.IsSuccess("info.gcode"),
                         "M23 names the file it selected (GCodes2.cpp case 23)");
             Assert.That(jobFile!.FileName, Is.EqualTo("0:/gcodes/info.gcode"),
                         "M23 sets job.file.fileName (PrintMonitor.cpp filenameBeingPrinted)");

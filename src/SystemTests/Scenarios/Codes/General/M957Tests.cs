@@ -32,7 +32,7 @@ public class M957Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M957 E\"driver_warning\" D0 B1");
-        Assert.That(reply, Does.Not.Contain("Error"), "M957 accepts a driver_warning event (RRF GCodes::RaiseEvent)");
+        Assert.That(reply, Reply.IsNotError, "M957 accepts a driver_warning event (RRF GCodes::RaiseEvent)");
         await bench.Host.WaitForGlobalAsync("eventRan", 1);
         Assert.That(await bench.Host.GlobalAsync("eventRan"), Is.EqualTo(1),
                     "the raised event ran driver-warning.g once (RRF GCodes::ProcessEvent, Event::GetMacroFileName)");

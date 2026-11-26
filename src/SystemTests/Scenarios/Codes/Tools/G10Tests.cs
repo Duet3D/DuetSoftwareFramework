@@ -6,6 +6,7 @@ using DuetControlServer.Heat;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using NUnit.Framework;
 using static SystemTests.Scenarios.Codes.Tools.ToolSetup;
 
@@ -38,9 +39,9 @@ public class G10Tests : BenchFixture
         string reply = (await host.ExecuteCodeAsync("G10 P0")).Trim();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain("Tool 0: offsets"), "bare G10 P reports the offsets (RRF SetOrReportOffsets)");
-            Assert.That(reply, Does.Contain("X5.000"), "the reported X offset matches the model (RRF SetOrReportOffsets)");
-            Assert.That(reply, Does.Contain("Y-2.000"), "the reported Y offset matches the model (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0: offsets"), "bare G10 P reports the offsets (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("X5.000"), "the reported X offset matches the model (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Y-2.000"), "the reported Y offset matches the model (RRF SetOrReportOffsets)");
         });
     }
 
@@ -80,7 +81,7 @@ public class G10Tests : BenchFixture
         float[] offsets = await bench.Host.ReadModelAsync(model => model.Tools[0]!.Offsets.Take(3).ToArray());
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "G10 L1 replies with nothing");
+            Assert.That(reply, Reply.IsEmpty, "G10 L1 replies with nothing");
             Assert.That(offsets, Is.EqualTo(new[] { -2.5f, 3.25f, 0.75f }).Within(1e-6f), "tools[0].offsets");
         });
     }
@@ -106,7 +107,7 @@ public class G10Tests : BenchFixture
         float[] first = await ReadWorkplaceAsync(bench.Host, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "G10 L2 replies with nothing");
+            Assert.That(reply, Reply.IsEmpty, "G10 L2 replies with nothing");
             Assert.That(origin, Is.EqualTo(new[] { 10f, 10f, -1.5f }).Within(1e-6f), "move.axes[*].workplaceOffsets[1]");
             Assert.That(first, Is.EqualTo(new[] { 0f, 0f, 0f }), "workplace 1 is untouched");
         });
@@ -120,7 +121,7 @@ public class G10Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
         await bench.Host.ExecuteCodeAsync("G10 L2 P2 X10 Y10 Z0");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("G10 L2 P2")).Trim(), Is.EqualTo("Origin of workplace 2: X10.00 Y10.00 Z0.00"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("G10 L2 P2"), Reply.IsSuccess("Origin of workplace 2: X10.00 Y10.00 Z0.00"));
     }
 
     /// <summary>G10 L20 sets the origin so that the current position has the given coordinates in the workplace</summary>
@@ -135,8 +136,8 @@ public class G10Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
         await bench.Host.ExecuteCodeAsync("G92 X20 Y5 Z0");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("G10 L20 P2 X0 Y0 Z0")).Trim(), Is.Empty, "G10 L20 replies with nothing");
-        Assert.That((await bench.Host.ExecuteCodeAsync("G10 L2 P2")).Trim(), Is.EqualTo("Origin of workplace 2: X20.00 Y5.00 Z0.00"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("G10 L20 P2 X0 Y0 Z0"), Reply.IsEmpty, "G10 L20 replies with nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("G10 L2 P2"), Reply.IsSuccess("Origin of workplace 2: X20.00 Y5.00 Z0.00"),
                     "the origin is where the machine is, less the coordinates given");
     }
 
@@ -172,24 +173,24 @@ public class G10Tests : BenchFixture
         float[] current = await ReadWorkplaceAsync(bench.Host, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "P10 names no workplace");
+            Assert.That(reply, Reply.IsError(), "P10 names no workplace");
             Assert.That(current, Is.EqualTo(new[] { 0f, 0f, 0f }), "and the current workplace is not set in its place");
         });
     }
 
     /// <summary>An L G10 does not know is refused, and neither a workplace nor a tool changes</summary>
-    /// <remarks>GCodes2.cpp case 10 answers any other L with badOrMissingParameter, "Bad or missing parameter"</remarks>
+    /// <remarks>GCodes2.cpp case 10 refuses any L other than 1, 2 and 20</remarks>
     [Test]
     public async Task G10WithAnUnknownLIsRefused()
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyze, "M563 P0 D0");
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G10 L3 P0 X1")).TrimEnd();
+        string reply = await bench.Host.ExecuteCodeAsync("G10 L3 P0 X1");
         float[] workplace = await ReadWorkplaceAsync(bench.Host, 1);
         float toolOffset = await bench.Host.ReadModelAsync(model => model.Tools[0]!.Offsets.FirstOrDefault());
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.EndWith("Bad or missing parameter"), "L3 is no form of G10");
+            Assert.That(reply, Reply.IsError(CodeErrors.InvalidEnumValue<GCodeHandler.G10Form>('L')), "L3 is no form of G10");
             Assert.That(workplace, Is.EqualTo(new[] { 0f, 0f, 0f }), "no workplace was set");
             Assert.That(toolOffset, Is.Zero, "nor tool 0's offset");
         });
@@ -213,7 +214,7 @@ public class G10Tests : BenchFixture
         {
             Assert.That(origin[0], Is.EqualTo(25.4f).Within(1e-4f), "X is stored in mm");
             Assert.That(origin[3], Is.EqualTo(90f).Within(1e-4f), "A is stored in degrees, unconverted");
-            Assert.That(report, Is.EqualTo("Origin of workplace 2: X1.00 Y0.00 Z0.00 A90.00"), "the report is in the units it was set in");
+            Assert.That(report, Reply.IsSuccess("Origin of workplace 2: X1.00 Y0.00 Z0.00 A90.00"), "the report is in the units it was set in");
         });
     }
 
@@ -228,7 +229,7 @@ public class G10Tests : BenchFixture
         float hidden = await bench.Host.ReadModelAsync(model => model.Move.Axes[3].WorkplaceOffsets[1]);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.EqualTo("Origin of workplace 2: X0.00 Y0.00 Z0.00"), "nothing was set, so the visible axes are reported");
+            Assert.That(reply, Reply.IsSuccess("Origin of workplace 2: X0.00 Y0.00 Z0.00"), "nothing was set, so the visible axes are reported");
             Assert.That(hidden, Is.Zero, "move.axes[3].workplaceOffsets[1] is untouched");
         });
     }

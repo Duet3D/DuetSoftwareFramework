@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Model;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.General;
@@ -29,7 +30,7 @@ public class M581Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M581 T2");
-        Assert.That(reply.Trim(), Is.EqualTo("Trigger 2 is not configured"),
+        Assert.That(reply, Reply.IsSuccess("Trigger 2 is not configured"),
                     "M581 T2 without parameters reports the trigger (RRF TriggerItem::Configure report branch)");
     }
 
@@ -53,11 +54,23 @@ public class M581Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M581.1 T2 P\"global.fireTrigger\" R0");
-        Assert.That(reply, Does.Not.Contain("Error"), "M581.1 accepts an expression trigger (RRF TriggerItem::Configure fraction 1)");
+        Assert.That(reply, Reply.IsNotError, "M581.1 accepts an expression trigger (RRF TriggerItem::Configure fraction 1)");
 
         await bench.Host.ExecuteCodeAsync("set global.fireTrigger = true");
         await bench.Host.WaitForGlobalAsync("trigRan", 1, timeoutMs: 5_000);
         Assert.That(await bench.Host.GlobalAsync("trigRan"), Is.EqualTo(1),
                     "the expression's false-to-true transition ran trigger2.g once (RRF GCodes::CheckTriggers)");
+    }
+
+    /// <summary>An R that names no condition is refused</summary>
+    /// <remarks>TriggerItem::Configure stores any R, and a trigger whose R is not 0, 1 or 2 never fires; DSF refuses it instead</remarks>
+    [TestCase(3)]
+    [TestCase(-1)]
+    public async Task M581Dot1RefusesAnRThatNamesNoCondition(int condition)
+    {
+        await using Bench bench = await Bench.StartAsync("global fireTrigger = false");
+
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M581.1 T2 P\"global.fireTrigger\" R{condition}"),
+                    Reply.IsError(CodeErrors.InvalidEnumValue<SbcTriggerService.TriggerCondition>('R')));
     }
 }

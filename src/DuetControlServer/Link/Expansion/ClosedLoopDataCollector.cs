@@ -133,11 +133,16 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
     /// <remarks>CANlib's <c>MaxSamples</c>, the bound RepRapFirmware reads S against (ClosedLoop.cpp:112)</remarks>
     private const int MaxSamples = 65535;
 
-    /// <summary>
-    /// The highest collection mode A may name: 0 records the drive as it runs, 1 runs the board's own
-    /// manoeuvre first
-    /// </summary>
-    private const int MaxMode = 1;
+    /// <summary>When a collection starts, as the M569.5 A parameter selects it</summary>
+    /// <remarks>Duet3Expansion's ClosedLoop::RecordingMode, less its first entry, which A is one behind</remarks>
+    internal enum CollectionMode : byte
+    {
+        /// <summary>Start collecting at once</summary>
+        Immediate = 0,
+
+        /// <summary>Start collecting when the next move starts</summary>
+        OnNextMove = 1
+    }
 
     /// <summary>
     /// Stands in <c>_collection</c> between claiming a collection and having a file to record it in
@@ -179,9 +184,9 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
             }
         }
 
-        // The limits are the accessors' to enforce, which refuses a value out of range where it
-        // stands and in RepRapFirmware's wording. D and V carry no limit of their own there either
-        int mode = code.GetInt('A', defaultValue: 0, min: 0, max: MaxMode);
+        // The limits are the accessors' to enforce, which refuse a value out of range where it
+        // stands. D and V carry no limit of their own in RepRapFirmware either
+        CollectionMode mode = code.GetEnum<CollectionMode>('A', CollectionMode.Immediate);
         int filter = code.GetInt('D', defaultValue: 0);
         int rate = code.GetInt('R', defaultValue: 0, min: 0, max: ushort.MaxValue);
         int movement = code.GetInt('V', defaultValue: 0);

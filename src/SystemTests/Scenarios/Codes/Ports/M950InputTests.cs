@@ -56,7 +56,7 @@ public class M950InputTests : BenchFixture
         (byte board, CanMessageCreateInputMonitorV1 sent) = bench.CanMaster.LastCanMessage<CanMessageCreateInputMonitorV1>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "the input is created without comment");
+            Assert.That(reply, Reply.IsEmpty, "the input is created without comment");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the board the port names watches it");
             Assert.That(sent.Handle.Type, Is.EqualTo(RemoteInputHandle.TypeGpIn), "under a gpIn handle");
             Assert.That(sent.Handle.Major, Is.EqualTo(InputNumber), "whose major is the input number");
@@ -114,7 +114,7 @@ public class M950InputTests : BenchFixture
         (byte board, CanMessageChangeInputMonitorV1 sent) = bench.CanMaster.LastCanMessage<CanMessageChangeInputMonitorV1>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the board watching the pin is told to stop");
             Assert.That(sent.Action, Is.EqualTo(CanMessageChangeInputMonitorV1.ActionDelete));
             Assert.That(sent.Handle.All, Is.EqualTo(GpInHandle(InputNumber).All));
@@ -145,7 +145,7 @@ public class M950InputTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(InputConfig);
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("is not free"));
+            Assert.That(reply, Reply.IsError("is not free"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(InputNumber)),
                         Is.Null);
         });
@@ -169,7 +169,7 @@ public class M950InputTests : BenchFixture
         (_, CanMessageChangeInputMonitorV1 sent) = bench.CanMaster.LastCanMessage<CanMessageChangeInputMonitorV1>();
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo("Pin 1.io2.in, pullup enabled, active: true"));
+            Assert.That(reply, Reply.IsSuccess("Pin 1.io2.in, pullup enabled, active: true"));
             Assert.That(sent.Action, Is.EqualTo(CanMessageChangeInputMonitorV1.ActionReturnPinName));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.GpIn[InputNumber]!.Value), Is.EqualTo(1),
                         "and sensors.gpIn[1].value takes the state the board answered with");
@@ -186,7 +186,7 @@ public class M950InputTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 J3");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:").And.Contain("active: false"));
+            Assert.That(reply, Reply.IsSuccess("active: false"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageChangeInputMonitorV1>(), Is.Empty);
         });
     }
@@ -202,7 +202,7 @@ public class M950InputTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 J{GpioManager.MaxGpInPorts} C\"{InputPort}\"");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageCreateInputMonitorV1>(), Is.Empty);
         });
     }
@@ -224,7 +224,7 @@ public class M950InputTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M950 J{InputNumber} C\"probe0\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "a virtual input needs no board");
+            Assert.That(reply, Reply.IsEmpty, "a virtual input needs no board");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.GpIn.ElementAtOrDefault(InputNumber)),
                         Is.Not.Null, "and appears in sensors.gpIn[]");
             Assert.That(bench.CanMaster.CanMessages<CanMessageCreateInputMonitorV1>(), Is.Empty);

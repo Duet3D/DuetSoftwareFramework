@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using DuetControlServer.Link.Expansion;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
@@ -45,8 +46,8 @@ public class M569Point5Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}")).TrimEnd(),
-                    Is.EqualTo("Warning: M569.5: Closed loop data is not being collected"));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}"),
+                    Reply.IsWarning("Closed loop data is not being collected"));
     }
 
     /// <summary>
@@ -63,7 +64,7 @@ public class M569Point5Tests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync(
             $"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} F\"drt-m569-5-data.csv\" S200 A0 R100 D{Filter} V0");
-        Assert.That(reply.Trim(), Is.Empty, "the board took the request");
+        Assert.That(reply, Reply.IsEmpty, "the board took the request");
 
         (byte board, CanMessageStartClosedLoopDataCollection sent) =
             bench.CanMaster.LastCanMessage<CanMessageStartClosedLoopDataCollection>();
@@ -78,8 +79,8 @@ public class M569Point5Tests : BenchFixture
             Assert.That(sent.Movement, Is.EqualTo(0));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}")).TrimEnd(),
-                    Is.EqualTo("Collecting sample: 0/200"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}"),
+                    Reply.IsSuccess("Collecting sample: 0/200"),
                     "and while it is collecting, the bare form says how far it has got");
     }
 
@@ -131,8 +132,8 @@ public class M569Point5Tests : BenchFixture
             Assert.That(lines, Has.Length.EqualTo(5), "a heading and one line per sample");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)}")).TrimEnd(),
-                    Is.EqualTo("Warning: M569.5: Closed loop data is not being collected"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)}"),
+                    Reply.IsWarning("Closed loop data is not being collected"),
                     "and the collection is over, so the bare form says so again");
     }
 
@@ -179,8 +180,8 @@ public class M569Point5Tests : BenchFixture
         const byte board = DriversRig.ClosedLoopBoard;
 
         await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)} F\"first.csv\" S4 A0 R100 D{Filter} V0");
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)} F\"second.csv\" S4 A0 R100 D{Filter} V0")).TrimEnd(),
-                    Is.EqualTo("Error: M569.5: Closed loop data is already being collected"));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)} F\"second.csv\" S4 A0 R100 D{Filter} V0"),
+                    Reply.IsError("Closed loop data is already being collected"));
     }
 
     /// <summary>
@@ -200,10 +201,10 @@ public class M569Point5Tests : BenchFixture
         const byte board = DriversRig.ClosedLoopBoard;
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)} F\"unanswered.csv\" S4 A0 R100 D{Filter} V0");
-        Assert.That(reply, Does.Contain("CAN response timeout"), "the board is reported as not having answered");
+        Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(board, CanMessageType.StartClosedLoopDataCollection)), "the board is reported as not having answered");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)}")).TrimEnd(),
-                    Is.EqualTo("Warning: M569.5: Closed loop data is not being collected"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(board, 0)}"),
+                    Reply.IsWarning("Closed loop data is not being collected"),
                     "and nothing is left collecting, so the next one can start");
     }
 
@@ -225,8 +226,24 @@ public class M569Point5Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} {parameters} D{Filter}")
-                             .Result.TrimEnd(),
-                        Does.StartWith("Error:"));
+                             .Result,
+                        Reply.IsError());
+            Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
+        });
+    }
+
+    /// <summary>An A that names no collection mode is refused, and nothing is asked of the board</summary>
+    /// <remarks>ClosedLoop.cpp:148 reads A with <c>TryGetLimitedUIValue</c>: 0 starts at once and 1 on the next move</remarks>
+    [TestCase(2)]
+    [TestCase(-1)]
+    public async Task M569Point5RefusesAnAThatNamesNoMode(int mode)
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} S200 A{mode} D{Filter}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Reply.IsError(CodeErrors.InvalidEnumValue<ClosedLoopDataCollector.CollectionMode>('A')));
             Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
         });
     }
@@ -243,8 +260,8 @@ public class M569Point5Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} F\"empty.csv\" S0 D{Filter}")
-                             .Result.TrimEnd(),
-                        Is.EqualTo("Warning: M569.5: no samples recorded"));
+                             .Result,
+                        Reply.IsWarning("no samples recorded"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty,
                         "the board is never asked for a collection there is nothing to collect");
         });
@@ -259,7 +276,7 @@ public class M569Point5Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 S200 D{Filter}")).TrimEnd(), Is.EqualTo("Error: M569.5: missing parameter 'P'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 S200 D{Filter}"), Reply.IsError(CodeErrors.MissingParameter('P')));
         Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
     }
 }

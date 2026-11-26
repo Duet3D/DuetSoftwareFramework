@@ -23,7 +23,7 @@ public class M92Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M92 X100 Y100 Z800")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M92 X100 Y100 Z800"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanPayloads<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>();
         Assert.That(sent, Has.Count.EqualTo(1), "three axes on one board are one request");
@@ -70,8 +70,8 @@ public class M92Tests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[2].StepsPerMm), Is.EqualTo(800.0f).Within(1e-3));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M92")).TrimEnd(),
-                    Is.EqualTo("Steps/mm: X: 160.000, Y: 160.000, Z: 800.000, E: 420.000"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M92"),
+                    Reply.IsSuccess("Steps/mm: X: 160.000, Y: 160.000, Z: 800.000, E: 420.000"),
                     "and the report quotes what was stored (m92-report-steps-per-mm.yaml)");
     }
 
@@ -90,9 +90,9 @@ public class M92Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M92 X0");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"),
+            Assert.That(reply, Reply.IsError(),
                         "0 steps per mm must be an error");
-            Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>(),
+            Assert.That(bench.CanMaster.CanMessages(),
                         Is.Empty, "no CAN messages should be sent");
         });
     }
@@ -115,7 +115,7 @@ public class M92Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M92 X200 Y0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].StepsPerMm), Is.EqualTo(200.0f).Within(1e-3),
                         "X was read before the refusal, so it stands");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[1].StepsPerMm), Is.EqualTo(80.0f).Within(1e-3),

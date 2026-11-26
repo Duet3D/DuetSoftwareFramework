@@ -26,7 +26,7 @@ public class M667Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M667 S1");
-        Assert.That(reply, Does.Contain("M667 is no longer supported - use M669 instead"),
+        Assert.That(reply, Reply.IsError("M667 is no longer supported - use M669 instead"),
                     "M667 answers with RRF's retirement error (GCodes2.cpp case 667)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
                     "a refused M667 leaves move.kinematics.name at RRF's cartesian boot default");

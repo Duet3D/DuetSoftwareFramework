@@ -68,8 +68,8 @@ public class M108Tests : BenchFixture
         await bench.CanMaster.WaitUntilAsync(() => heat.IsWaitingForTemperatures, what: $"{code} waiting");
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M108")).Trim(), Is.Empty, "M108 replies nothing");
-        Assert.That((await waiting.WaitAsync(System.TimeSpan.FromSeconds(5))).Trim(), Is.Empty, $"{code} completes successfully");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M108"), Reply.IsEmpty, "M108 replies nothing");
+        Assert.That(await waiting.WaitAsync(System.TimeSpan.FromSeconds(5)), Reply.IsEmpty, $"{code} completes successfully");
 
         Heater heater = await bench.Host.ReadModelAsync(model => model.Heat.Heaters[heaterNumber]!);
         Assert.Multiple(() =>
@@ -95,11 +95,11 @@ public class M108Tests : BenchFixture
         await Task.Delay(Settle);
         Assert.That(bedWait.IsCompleted || allWait.IsCompleted, Is.False, "both channels are waiting");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M108", CodeChannel.USB)).Trim(), Is.Empty, "M108 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M108", CodeChannel.USB), Reply.IsEmpty, "M108 replies nothing");
         Assert.Multiple(async () =>
         {
-            Assert.That((await bedWait.WaitAsync(System.TimeSpan.FromSeconds(5))).Trim(), Is.Empty, "M190 completes successfully");
-            Assert.That((await allWait.WaitAsync(System.TimeSpan.FromSeconds(5))).Trim(), Is.Empty, "M116 completes successfully");
+            Assert.That(await bedWait.WaitAsync(System.TimeSpan.FromSeconds(5)), Reply.IsEmpty, "M190 completes successfully");
+            Assert.That(await allWait.WaitAsync(System.TimeSpan.FromSeconds(5)), Reply.IsEmpty, "M116 completes successfully");
         });
     }
 
@@ -114,7 +114,7 @@ public class M108Tests : BenchFixture
         (Bench bench, HeatManager heat) = await StartAsync();
         await using Bench _ = bench;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M108")).Trim(), Is.Empty, "M108 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M108"), Reply.IsEmpty, "M108 replies nothing");
         Assert.That(bench.CanMaster.CanMessages<CanMessageSetHeaterTemperatureV1>(), Is.Empty, "M108 sends nothing");
 
         Task<string> waiting = bench.Host.ExecuteCodeAsync("M190 S60");
@@ -123,6 +123,6 @@ public class M108Tests : BenchFixture
         Assert.That(waiting.IsCompleted, Is.False, "the earlier M108 does not end the wait");
 
         await bench.ReportHeaterAsync(4, HeaterMode.Stable, 60.0f);
-        Assert.That((await waiting.WaitAsync(System.TimeSpan.FromSeconds(5))).Trim(), Is.Empty, "the heater reaching its target ends it");
+        Assert.That(await waiting.WaitAsync(System.TimeSpan.FromSeconds(5)), Reply.IsEmpty, "the heater reaching its target ends it");
     }
 }

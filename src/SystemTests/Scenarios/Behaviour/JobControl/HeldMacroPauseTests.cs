@@ -353,7 +353,7 @@ public class HeldMacroPauseTests : BenchFixture
         await StartJobAsync(bench);
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         await bench.Host.ExecuteCodeAsync($"M26 S{Head.Length}");
-        Assert.That(await bench.Host.ExecuteCodeAsync("M27"), Does.Contain($"byte {Head.Length}/"), "the job stands at the offset at once");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M27"), Reply.IsSuccess($"byte {Head.Length}/"), "the job stands at the offset at once");
 
         await ResumeToTheEndAsync(bench);
         Assert.Multiple(async () =>
@@ -398,7 +398,7 @@ public class HeldMacroPauseTests : BenchFixture
         await bench.Host.ExecuteCodeAsync($"M26 S{Head.Length}");
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForGlobalAsync("macroEnd", 7);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M25")).Trim(), Is.Empty, "the M25 is deferred to the end of the second macro");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M25"), Reply.IsEmpty, "the M25 is deferred to the end of the second macro");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.Multiple(async () =>
         {
@@ -480,7 +480,7 @@ public class HeldMacroPauseTests : BenchFixture
         await StartJobAsync(bench);
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         await AssertPausedInMacroAsync(bench);
-        Assert.That((await bench.Host.ExecuteCodeAsync("G1 X30 F6000")).Trim(), Is.Empty, "another input may move");
+        Assert.That(await bench.Host.ExecuteCodeAsync("G1 X30 F6000"), Reply.IsEmpty, "another input may move");
 
         await ResumeToTheEndAsync(bench);
         Assert.Multiple(async () =>
@@ -673,7 +673,7 @@ public class HeldMacroPauseTests : BenchFixture
         Task<string> pending = bench.Host.ExecuteCodeAsync("M25");
         await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1", CodeChannel.Telnet);
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
-        Assert.That((await pending).Trim(), Is.Empty, "the M25 is answered when the job pauses");
+        Assert.That(await pending, Reply.IsEmpty, "the M25 is answered when the job pauses");
         await AssertPausedInMacroAsync(bench);
 
         await ResumeToTheEndAsync(bench);
@@ -718,7 +718,7 @@ public class HeldMacroPauseTests : BenchFixture
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.Multiple(async () =>
         {
-            Assert.That((await pending).Trim(), Is.Empty, "the M25 is answered when the job pauses");
+            Assert.That(await pending, Reply.IsEmpty, "the M25 is answered when the job pauses");
             Assert.That(await bench.Host.GlobalAsync("filChangeRan"), Is.EqualTo(1));
             Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.Zero);
             Assert.That(await bench.Host.RestorePointAsync(1), Is.EqualTo((50.0, 50.0)));

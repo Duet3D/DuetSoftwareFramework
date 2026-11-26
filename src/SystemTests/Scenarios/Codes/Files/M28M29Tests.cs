@@ -32,7 +32,7 @@ public class M28M29Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.Xye, JobMacros.Instrumented, "global captured = 0\n", Machines.Xye.Homed);
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M28 \"0:/gcodes/capture.gcode\""),
-                    Does.Contain("Writing to file: 0:/gcodes/capture.gcode"),
+                    Reply.IsSuccess("Writing to file: 0:/gcodes/capture.gcode"),
                     "M28 names the file it is writing to (GCodes2.cpp case 28)");
 
         await bench.Host.ExecuteCodeAsync("G91");

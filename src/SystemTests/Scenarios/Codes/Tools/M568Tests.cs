@@ -66,8 +66,8 @@ public class M568Tests : BenchFixture
         string reply = (await host.ExecuteCodeAsync("M568 P0")).Trim();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "bare M568 reports the tool (RRF SetOrReportOffsets)");
-            Assert.That(reply, Does.Contain("Tool 0 is Off, active temperatures: 210.0, standby temperatures: 180.0"), "bare M568 reports the model temperatures (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "bare M568 reports the tool (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0 is Off, active temperatures: 210.0, standby temperatures: 180.0"), "bare M568 reports the model temperatures (RRF SetOrReportOffsets)");
         });
     }
 
@@ -142,7 +142,7 @@ public class M568Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(HeaterToolWithTemperatures);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(code)).Trim(), Is.Empty, "M568 setting something replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync(code), Reply.IsEmpty, "M568 setting something replies nothing");
         Tool tool = await ReadToolAsync(bench, 0);
         Heater heater = await ReadHeaterAsync(bench, 0);
         Assert.Multiple(() =>
@@ -250,7 +250,7 @@ public class M568Tests : BenchFixture
         Heater heater = await ReadHeaterAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "refused");
+            Assert.That(reply, Reply.IsError(), "refused");
             Assert.That(tool.Active[0], Is.EqualTo(HeatManager.AbsoluteZero), "tools[0].active[0] is unchanged");
             Assert.That(tool.Standby[0], Is.EqualTo(HeatManager.AbsoluteZero), "tools[0].standby[0] is unchanged");
             Assert.That(heater.Active, Is.EqualTo(UnsetHeaterTemperature), "heaters[0].active is unchanged");
@@ -276,7 +276,7 @@ public class M568Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Heaters(3) + "\nM563 P0 S\"Triple\" H0:1:2");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M568 P0 {parameters}")).Trim(), Is.Empty, "accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M568 P0 {parameters}"), Reply.IsEmpty, "accepted");
         Tool tool = await ReadToolAsync(bench, 0);
         float[] heatersActive = await bench.Host.ReadModelAsync(model => model.Heat.Heaters.Take(3).Select(h => h!.Active).ToArray());
         float[] heatersStandby = await bench.Host.ReadModelAsync(model => model.Heat.Heaters.Take(3).Select(h => h!.Standby).ToArray());
@@ -293,7 +293,7 @@ public class M568Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M568 P0");
         foreach (float temperature in active.Concat(standby).Where(t => t > HeatManager.NearlyAbsoluteZero).Distinct())
         {
-            Assert.That(report, Does.Contain(temperature.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)),
+            Assert.That(report, Reply.IsSuccess(temperature.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)),
                         $"the report lists {temperature} among the tool's temperatures");
         }
     }
@@ -313,7 +313,7 @@ public class M568Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(HeaterToolWithTemperatures);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M568 P0 {letter}-274")).Trim(), Is.Empty, "accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M568 P0 {letter}-274"), Reply.IsEmpty, "accepted");
         Tool tool = await ReadToolAsync(bench, 0);
         Heater heater = await ReadHeaterAsync(bench, 0);
         Assert.Multiple(() =>
@@ -352,7 +352,7 @@ public class M568Tests : BenchFixture
         foreach ((string code, byte command, float setPoint) in steps)
         {
             bench.CanMaster.ClearCapture();
-            Assert.That((await bench.Host.ExecuteCodeAsync(code)).Trim(), Is.Empty, $"{code} replies nothing");
+            Assert.That(await bench.Host.ExecuteCodeAsync(code), Reply.IsEmpty, $"{code} replies nothing");
             await bench.ReportHeaterAsync(0, (command == CanMessageSetHeaterTemperatureV1.CommandOn) ? HeaterMode.Heating : HeaterMode.Off, reading++);
             Assert.Multiple(async () =>
             {
@@ -457,7 +457,7 @@ public class M568Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M568 P0 A{state}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"), "M568 itself succeeds");
+            Assert.That(reply, Reply.IsNotError, "M568 itself succeeds");
             Assert.That(TemperatureMessages(bench), Has.Length.EqualTo(1), "the heater state was sent once");
             Assert.That(await bench.Host.WaitForMessageAsync(MessageType.Error, refusal), Is.Not.Empty, "the board's refusal is reported as an error message");
         });
@@ -475,7 +475,7 @@ public class M568Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M568 P0 A2");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"), "M568 itself succeeds");
+            Assert.That(reply, Reply.IsNotError, "M568 itself succeeds");
             Assert.That(TemperatureMessages(bench), Is.Empty, "a heater in fault is not switched on");
             Assert.That(await bench.Host.WaitForMessageAsync(MessageType.Error, "fault"), Is.Not.Empty, "the refusal is reported as an error message");
             Assert.That((await ReadHeaterAsync(bench, 0)).State, Is.EqualTo(HeaterState.Fault), "heaters[0] stays in fault");
@@ -496,7 +496,7 @@ public class M568Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(SpindleToolConfig);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M568 P0 F6000")).Trim(), Is.Empty, "accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M568 P0 F6000"), Reply.IsEmpty, "accepted");
         Spindle spindle = await ReadSpindleAsync(bench);
         Assert.Multiple(async () =>
         {
@@ -505,9 +505,9 @@ public class M568Tests : BenchFixture
             Assert.That(spindle.State, Is.EqualTo(SpindleState.Stopped), "spindles[0] stays stopped");
             Assert.That(GpioWrites(bench), Is.Empty, "the spindle's port is not driven");
         });
-        Assert.That(await bench.Host.ExecuteCodeAsync("M568 P0"), Does.Contain("6000"), "the report shows the tool's spindle RPM");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M568 P0"), Reply.IsSuccess("6000"), "the report shows the tool's spindle RPM");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M568 P0 F0")).Trim(), Is.Empty, "F0 is accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M568 P0 F0"), Reply.IsEmpty, "F0 is accepted");
         spindle = await ReadSpindleAsync(bench);
         Assert.Multiple(async () =>
         {
@@ -534,7 +534,7 @@ public class M568Tests : BenchFixture
         Assert.That(spindle.State, Is.EqualTo(SpindleState.Forward), "precondition: M3 in config.g ran the spindle");
         int min = spindle.Min ?? 0, max = spindle.Max ?? 0;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M568 P0 F{rpm}")).Trim(), Is.Empty, "accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M568 P0 F{rpm}"), Reply.IsEmpty, "accepted");
         spindle = await ReadSpindleAsync(bench);
         float pwm = (rpm == 0) ? 0.0f : MathF.Round((float)(rpm - min) / (max - min), 4);
         Assert.Multiple(async () =>
@@ -559,7 +559,7 @@ public class M568Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M568 P0 F{max + 1}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "refused");
+            Assert.That(reply, Reply.IsError(), "refused");
             Assert.That((await ReadToolAsync(bench, 0)).SpindleRpm, Is.EqualTo(0), "tools[0].spindleRpm is unchanged");
             Assert.That((await ReadSpindleAsync(bench)).Active, Is.EqualTo(0), "spindles[0].active is unchanged");
             Assert.That(GpioWrites(bench), Is.Empty, "the spindle's port is not driven");
@@ -581,7 +581,7 @@ public class M568Tests : BenchFixture
         Tool tool = await ReadToolAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "M568 reports the tool");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "M568 reports the tool");
             Assert.That(tool.Active, Is.Empty, "tools[0].active stays empty");
             Assert.That(tool.Standby, Is.Empty, "tools[0].standby stays empty");
         });
@@ -600,7 +600,7 @@ public class M568Tests : BenchFixture
         Tool tool = await ReadToolAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "M568 reports the tool");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "M568 reports the tool");
             Assert.That(tool.SpindleRpm, Is.EqualTo(0), "tools[0].spindleRpm is unchanged");
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
         });

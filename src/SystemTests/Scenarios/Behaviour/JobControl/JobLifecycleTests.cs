@@ -53,7 +53,7 @@ public class JobLifecycleTests : BenchFixture
         // Pause mid-move: a real feedhold through the real motion engine
         await host.ExecuteCodeAsync("M25");
         await host.WaitForStatusAsync(MachineStatus.Paused);
-        Assert.That((await host.ExecuteCodeAsync("echo global.pauseRan")).Trim(), Is.EqualTo("1"),
+        Assert.That(await host.ExecuteCodeAsync("echo global.pauseRan"), Reply.IsSuccess("1"),
                     "pause.g ran once");
 
         // Resume: the restore point replays and the job carries on
@@ -62,7 +62,7 @@ public class JobLifecycleTests : BenchFixture
         await host.WaitForStatusAsync(MachineStatus.Processing);
         await fake.WaitUntilAsync(() => fake.SbcPackets(SbcRequest.ScheduleMove).Count > movesBeforeResume,
                                   what: "motion resuming after M24");
-        Assert.That((await host.ExecuteCodeAsync("echo global.resumeRan")).Trim(), Is.EqualTo("1"),
+        Assert.That(await host.ExecuteCodeAsync("echo global.resumeRan"), Reply.IsSuccess("1"),
                     "resume.g ran once");
 
         // And the job can be brought to an orderly stop from the paused state

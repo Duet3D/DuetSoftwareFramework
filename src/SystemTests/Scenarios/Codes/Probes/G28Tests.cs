@@ -45,7 +45,7 @@ public class G28Tests : BenchFixture
         StopMove(bench.CanMaster, move);
 
         string reply = await home;
-        Assert.That(reply.Trim(), Is.Empty, "G28 X completed without error");
+        Assert.That(reply, Reply.IsEmpty, "G28 X completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Homed);
         double position = await bench.Host.ReadModelAsync(model => model.Move.Axes[0].MachinePosition!.Value);
         Assert.Multiple(() =>
@@ -72,7 +72,7 @@ public class G28Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(prepareSd: sd => sd.WriteSys("homey.g", "G92 Y0\n"));
 
         string reply = await bench.Host.ExecuteCodeAsync("G28 Y");
-        Assert.That(reply.Trim(), Is.Empty, "G28 Y completed without error");
+        Assert.That(reply, Reply.IsEmpty, "G28 Y completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Homed);
         double position = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].MachinePosition!.Value);
         Assert.Multiple(() =>

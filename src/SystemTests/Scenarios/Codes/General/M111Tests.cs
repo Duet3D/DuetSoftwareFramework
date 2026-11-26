@@ -27,8 +27,7 @@ public class M111Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M111");
-        Assert.That(reply.Trim(), Is.Not.Empty, "M111 without parameters reports the debug state (RRF RepRap::ProcessM111)");
-        Assert.That(reply, Does.Not.Contain("Error"), "M111 without parameters is a report, not an error (RRF RepRap::ProcessM111)");
+        Assert.That(reply, Reply.IsSuccess().And.Not.Empty, "M111 without parameters reports the debug state (RRF RepRap::ProcessM111)");
     }
 
     /// <summary>

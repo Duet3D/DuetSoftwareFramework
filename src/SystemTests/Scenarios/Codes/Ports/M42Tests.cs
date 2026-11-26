@@ -72,8 +72,8 @@ public class M42Tests : BenchFixture
         bench.CanMaster.ReportWith<CanMessageWriteGpio>("output 0 is already driven by a fan",
                                                         CodeResult.Warning);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M42 P0 S0.5")).TrimEnd();
-        Assert.That(reply, Is.EqualTo("Warning: M42: output 0 is already driven by a fan"),
+        string reply = await bench.Host.ExecuteCodeAsync("M42 P0 S0.5");
+        Assert.That(reply, Reply.IsWarning("output 0 is already driven by a fan"),
                     "the board drove the output and warned about it, and the warning is the code's result");
     }
 }

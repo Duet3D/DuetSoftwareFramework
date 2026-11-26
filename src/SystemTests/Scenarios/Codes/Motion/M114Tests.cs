@@ -30,12 +30,12 @@ public class M114Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M114");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain($"X:{x.ToString("F3", CultureInfo.InvariantCulture)}"),
+            Assert.That(reply, Reply.IsSuccess($"X:{x.ToString("F3", CultureInfo.InvariantCulture)}"),
                         "M114 reports X consistent with move.axes[0].userPosition (RRF GCodes.cpp HandleM114)");
-            Assert.That(reply, Does.Contain($"Y:{y.ToString("F3", CultureInfo.InvariantCulture)}"),
+            Assert.That(reply, Reply.IsSuccess($"Y:{y.ToString("F3", CultureInfo.InvariantCulture)}"),
                         "M114 reports Y consistent with move.axes[1].userPosition (RRF GCodes.cpp HandleM114)");
-            Assert.That(reply, Does.Contain("Count"), "M114 includes the motor position section (RRF GCodes.cpp HandleM114)");
-            Assert.That(reply, Does.Contain("Machine"), "M114 includes the machine coordinate section (RRF GCodes.cpp HandleM114)");
+            Assert.That(reply, Reply.IsSuccess("Count"), "M114 includes the motor position section (RRF GCodes.cpp HandleM114)");
+            Assert.That(reply, Reply.IsSuccess("Machine"), "M114 includes the machine coordinate section (RRF GCodes.cpp HandleM114)");
         });
     }
 }

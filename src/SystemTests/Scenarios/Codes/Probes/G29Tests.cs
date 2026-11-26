@@ -6,6 +6,7 @@ using NUnit.Framework;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
@@ -20,6 +21,16 @@ namespace SystemTests.Scenarios.Codes.Probes;
 [GCode("G29")]
 public class G29Tests : BenchFixture
 {
+    /// <summary>An S that names no form of G29 is refused</summary>
+    /// <remarks>GCodes2.cpp case 29 refuses any S past 4</remarks>
+    [Test]
+    public async Task G29WithAnUnknownSIsRefused()
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("G29 S5"), Reply.IsError(CodeErrors.InvalidEnumValue<GCodeHandler.G29Action>('S')));
+    }
+
     /// <summary>
     /// G29 S1 loads sys/heightmap.csv and enables mesh compensation. The map is a hand-written v2
     /// file, so no probing hardware is involved
@@ -39,7 +50,7 @@ public class G29Tests : BenchFixture
         DcsTestHost host = bench.Host;
 
         string loadReply = await host.ExecuteCodeAsync("G29 S1");
-        Assert.That(loadReply.Trim(), Is.Empty, "G29 S1 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
+        Assert.That(loadReply, Reply.IsEmpty, "G29 S1 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
         Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "G29 S1 sets move.compensation.type to mesh (RRF Move::GetCompensationTypeString)");
         Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.File), Does.EndWith("heightmap.csv"),

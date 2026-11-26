@@ -39,16 +39,16 @@ public class M119Tests : BenchFixture
         await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, true, "sensors.endstops[0].triggered");
 
         string triggered = await bench.Host.ExecuteCodeAsync("M119");
-        Assert.That(triggered.Trim(),
-                    Is.EqualTo("Endstops - X: at min stop, Y: no endstop, Z: no endstop, Z probe: not stopped"),
+        Assert.That(triggered,
+                    Reply.IsSuccess("Endstops - X: at min stop, Y: no endstop, Z: no endstop, Z probe: not stopped"),
                     "M119 matches sensors.endstops[].triggered (RRF EndstopsManager::GetM119report)");
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, RemoteEndstops.HandleFor(0), active: false);
         await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, false, "sensors.endstops[0].triggered");
 
         string released = await bench.Host.ExecuteCodeAsync("M119");
-        Assert.That(released.Trim(),
-                    Is.EqualTo("Endstops - X: not stopped, Y: no endstop, Z: no endstop, Z probe: not stopped"),
+        Assert.That(released,
+                    Reply.IsSuccess("Endstops - X: not stopped, Y: no endstop, Z: no endstop, Z probe: not stopped"),
                     "M119 reports the released endstop as not stopped (RRF TranslateEndStopResult)");
     }
 
@@ -70,7 +70,7 @@ public class M119Tests : BenchFixture
         await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, true, "sensors.endstops[0].triggered");
 
         string report = await bench.Host.ExecuteCodeAsync("M119");
-        Assert.That(report, Does.Contain("X: at max stop"),
+        Assert.That(report, Reply.IsSuccess("X: at max stop"),
                     "M119 reports a triggered high-end endstop as at max stop (RRF TranslateEndStopResult)");
     }
 }

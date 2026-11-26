@@ -49,7 +49,7 @@ public class CancelRestartTests : BenchFixture
         });
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M24"),
-                    Does.Contain("Cannot print, because no file is selected!"),
+                    Reply.IsError("Cannot print, because no file is selected!"),
                     "a resume after the cancel finds no file");
         Assert.That(await bench.Host.GlobalAsync("after25"), Is.Zero, "and runs nothing");
     }

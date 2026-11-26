@@ -83,7 +83,7 @@ public class M302Tests : BenchFixture
         });
 
         string report = await bench.Host.ExecuteCodeAsync("M302");
-        Assert.That(report, Does.Contain("forbidden").And.Contain("120.0").And.Contain("110.0"),
+        Assert.That(report, Reply.IsSuccess("forbidden", "120.0", "110.0"),
                     "the M302 report matches the model's minimum temperatures (RRF GCodes2.cpp case 302)");
     }
 
@@ -96,7 +96,7 @@ public class M302Tests : BenchFixture
 
         Assert.That(await MinimumsAsync(bench), Is.EqualTo((DefaultMinExtrusionTemperature, DefaultMinRetractionTemperature)),
                     "heat.coldExtrudeTemperature and coldRetractTemperature start at RRF's defaults");
-        Assert.That(await bench.Host.ExecuteCodeAsync("M302"), Is.Not.Empty.And.Not.StartWith("Error").And.Not.StartWith("Warning"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M302"), Reply.IsSuccess().And.Not.Empty,
                     "bare M302 reports the state as a plain reply");
     }
 
@@ -133,7 +133,7 @@ public class M302Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        Assert.That(await bench.Host.ExecuteCodeAsync(code), Does.StartWith("Error"), $"{code} is refused");
+        Assert.That(await bench.Host.ExecuteCodeAsync(code), Reply.IsError(), $"{code} is refused");
         Assert.That(await MinimumsAsync(bench), Is.EqualTo((DefaultMinExtrusionTemperature, DefaultMinRetractionTemperature)),
                     $"{code} leaves the minimums alone");
     }
@@ -224,7 +224,7 @@ public class M302Tests : BenchFixture
             await bench.Host.ExecuteCodeAsync("M400");
             Assert.Multiple(() =>
             {
-                Assert.That(reply.Trim(), Is.Empty, "the move is not refused");
+                Assert.That(reply, Reply.IsEmpty, "the move is not refused");
                 Assert.That(bench.CanMaster.ScheduledSteps(Machines.XDriver), Is.EqualTo(MoveDistance * Machines.XyStepsPerMm),
                             "the axes move either way");
             });

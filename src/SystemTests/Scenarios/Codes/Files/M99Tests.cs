@@ -29,7 +29,7 @@ public class M99Tests : BenchFixture
             set global.step = "after"
             """);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99.g\"")).Trim(), Is.Empty, "the M98 completes without an error");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99.g\""), Reply.IsEmpty, "the M98 completes without an error");
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalTextAsync("step"), Is.EqualTo("before"), "the line after M99 did not run");
@@ -89,7 +89,7 @@ public class M99Tests : BenchFixture
             set global.after = 1
             """);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99-loop.g\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99-loop.g\""), Reply.IsEmpty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("passes"), Is.EqualTo(3), "the loop ran until the M99");
@@ -114,7 +114,7 @@ public class M99Tests : BenchFixture
             """);
 
         await bench.Host.ExecuteCodeAsync("G90");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99-m120.g\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-m99-m120.g\""), Reply.IsEmpty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(2), "the macro had a level of its own open");
@@ -130,7 +130,7 @@ public class M99Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M99")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M99"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "there was no level to pop");
     }
 

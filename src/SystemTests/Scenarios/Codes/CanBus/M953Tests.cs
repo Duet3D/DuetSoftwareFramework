@@ -33,7 +33,7 @@ public class M953Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M953");
-        Assert.That(reply, Does.Not.StartWith("Error:"), "a bare M953 is a report, not an error");
+        Assert.That(reply, Reply.IsNotError, "a bare M953 is a report, not an error");
 
         (byte board, CanMessageSetAddressAndNormalTiming query) =
             bench.CanMaster.LastCanMessage<CanMessageSetAddressAndNormalTiming>();
@@ -63,7 +63,7 @@ public class M953Tests : BenchFixture
         int enablesBefore = bench.CanMaster.SbcPackets(SbcRequest.EnableCAN).Count;
 
         string reply = await bench.Host.ExecuteCodeAsync("M953");
-        Assert.That(reply, Does.Not.Contain("Error"), "M953 enables CAN without a report (RRF CanInterface::EnableCan)");
+        Assert.That(reply, Reply.IsNotError, "M953 enables CAN without a report (RRF CanInterface::EnableCan)");
         await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.SbcPackets(SbcRequest.EnableCAN).Count > enablesBefore,
                                              what: "M953's enable reaching the controller");
     }

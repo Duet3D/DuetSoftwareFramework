@@ -29,7 +29,7 @@ public class M655Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M655 P1");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "M655 with neither B nor C is an error");
+            Assert.That(reply, Reply.IsError(), "M655 with neither B nor C is an error");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM655>(), Is.Empty,
                         "and the check happens before anything reaches the bus");
         });

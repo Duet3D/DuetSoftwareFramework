@@ -69,7 +69,7 @@ public class MovementLockTests : BenchFixture
             Assert.That(bench.CanMaster.MoveDistances(), Does.Not.Contain(10.0f), "and is not queued in the middle of homing");
         });
 
-        Assert.That((await timeline.WhileRunningAsync(() => home)).Trim(), Is.Empty, "G28 X homes X");
+        Assert.That(await timeline.WhileRunningAsync(() => home), Reply.IsEmpty, "G28 X homes X");
         await timeline.WhileRunningAsync(() => daemonMove);
         await timeline.RunUntilAsync(() => Task.FromResult(bench.CanMaster.MoveDistances().Contains(10.0f)),
                                      "the daemon's move being sent");
@@ -134,7 +134,7 @@ public class MovementLockTests : BenchFixture
             sd.WriteSys("homex.g", "G91\nG1 H2 X5 F6000\nabort \"homing failed\"\n")).StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("G28 X");
-        Assert.That(reply, Does.StartWith("Error"), "the macro's abort fails G28");
+        Assert.That(reply, Reply.IsError(), "the macro's abort fails G28");
 
         await bench.Host.ExecuteCodeAsync("G1 Y10 F6000", CodeChannel.Daemon, timeoutMs: 5_000);
         await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.MoveDistances().Contains(10.0f),
@@ -204,7 +204,7 @@ public class MovementLockTests : BenchFixture
         });
 
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 0, HeaterMode.Stable, currentTemperature: 60.0f);
-        Assert.That((await toolChange.WaitAsync(TimeSpan.FromSeconds(10))).Trim(), Is.Empty, "T0 completes once the bed is hot");
+        Assert.That(await toolChange.WaitAsync(TimeSpan.FromSeconds(10)), Reply.IsEmpty, "T0 completes once the bed is hot");
         await daemonMove.WaitAsync(TimeSpan.FromSeconds(5));
         await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.MoveDistances().Contains(10.0f),
                                              what: "the daemon's move being sent after the tool change");
@@ -239,7 +239,7 @@ public class MovementLockTests : BenchFixture
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
 
         string reply = await bench.Host.ExecuteCodeAsync("T0", timeoutMs: 20_000);
-        Assert.That(reply.Trim(), Is.Empty, "T0 completes after tpost0.g's M24 resumed the job");
+        Assert.That(reply, Reply.IsEmpty, "T0 completes after tpost0.g's M24 resumed the job");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
 
         Assert.Multiple(async () =>

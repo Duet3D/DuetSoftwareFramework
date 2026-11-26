@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
@@ -35,7 +36,7 @@ public class M574Tests : BenchFixture
         await using Bench bench = await StartBenchAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync(XEndstopLine);
-        Assert.That(reply.Trim(), Is.Empty, "M574 X1 S1 P was accepted");
+        Assert.That(reply, Reply.IsEmpty, "M574 X1 S1 P was accepted");
 
         (EndstopType Type, bool HighEnd, bool Triggered, string? Port)? endstop = await bench.Host.ReadModelAsync(
             model => model.Sensors.Endstops.Count > 0 && model.Sensors.Endstops[0] is Endstop e
@@ -55,9 +56,9 @@ public class M574Tests : BenchFixture
         });
 
         string report = await bench.Host.ExecuteCodeAsync("M574");
-        Assert.That(report, Does.Contain("Endstop configuration:"),
+        Assert.That(report, Reply.IsSuccess("Endstop configuration:"),
                     "M574 with no axes reports the configuration (RRF EndstopsManager::HandleM574)");
-        Assert.That(report, Does.Contain($"X: low end switch connected to pin {Expansion.GpioIn(Machines.DriverBoard, 0)}"),
+        Assert.That(report, Reply.IsSuccess($"X: low end switch connected to pin {Expansion.GpioIn(Machines.DriverBoard, 0)}"),
                     "the report names the position and pin (RRF SwitchEndstop::AppendDetails)");
     }
 
@@ -77,13 +78,13 @@ public class M574Tests : BenchFixture
         await using Bench bench = await StartBenchAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M574 X1 S5");
-        Assert.That(reply.Trim(), Is.Empty, "M574 X1 S5 was accepted");
+        Assert.That(reply, Reply.IsEmpty, "M574 X1 S5 was accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Type),
                     Is.EqualTo(EndstopType.MotorStallEncoder),
                     "M574 S5 sets sensors.endstops[0].type to motorStallEncoder "
                     + "(RRF StallDetectionEndstop::GetEndstopType)");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S6"), Does.Contain("Invalid endstop input type"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S6"), Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.RrfEndstopType>('S')),
                     "S6 names no mechanism, so it is refused rather than stored");
     }
 
@@ -102,7 +103,7 @@ public class M574Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync($"M558 P8 C\"{Expansion.GpioIn(Machines.DriverBoard, 3)}\"");
         string reply = await bench.Host.ExecuteCodeAsync("M574 X1 S2 K0");
-        Assert.That(reply.Trim(), Is.Empty, "M574 S2 K0 was accepted");
+        Assert.That(reply, Reply.IsEmpty, "M574 S2 K0 was accepted");
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Type),
@@ -112,7 +113,7 @@ public class M574Tests : BenchFixture
         });
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S2 K99"),
-                    Does.StartWith("Error:"),
+                    Reply.IsError(),
                     "a K past the last probe is refused (RRF issue #1275, GetLimitedUIValue against MaxZProbes)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Probe), Is.Zero,
                     "and the endstop still names the probe it was given");
@@ -168,7 +169,7 @@ public class M574Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{Expansion.GpioIn(Machines.DriverBoard, 1)}\"");
-        Assert.That(reply.Trim(), Is.Empty, "the board took the pin, so M574 succeeds");
+        Assert.That(reply, Reply.IsEmpty, "the board took the pin, so M574 succeeds");
 
         IReadOnlyList<(byte Board, CanMessageCreateInputMonitorV1 Message)> creates = Creates(bench);
         Assert.That(creates, Has.Count.EqualTo(1), "one monitor for one switch");
@@ -206,7 +207,7 @@ public class M574Tests : BenchFixture
 
         string port = "!" + Expansion.GpioIn(Machines.DriverBoard, 2);
         string reply = await bench.Host.ExecuteCodeAsync($"M574 Y2 S1 P\"{port}\"");
-        Assert.That(reply.Trim(), Is.Empty);
+        Assert.That(reply, Reply.IsEmpty);
 
         (byte board, CanMessageCreateInputMonitorV1 create) = bench.CanMaster.LastCanMessage<CanMessageCreateInputMonitorV1>();
         Assert.Multiple(async () =>
@@ -238,7 +239,7 @@ public class M574Tests : BenchFixture
 
         string ports = $"{Expansion.GpioIn(Machines.DriverBoard, 3)}+{Expansion.GpioIn(Machines.DriverBoard, 4)}";
         string reply = await bench.Host.ExecuteCodeAsync($"M574 Z1 S1 P\"{ports}\"");
-        Assert.That(reply.Trim(), Is.Empty);
+        Assert.That(reply, Reply.IsEmpty);
 
         IReadOnlyList<(byte Board, CanMessageCreateInputMonitorV1 Message)> creates = Creates(bench);
         Assert.That(creates.Select(c => (c.Board, c.Message.Handle.All, c.Message.PinNameString)),
@@ -250,7 +251,7 @@ public class M574Tests : BenchFixture
                     "one monitor per pin, in order, minor numbering the switch");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[2]!.Port), Is.EqualTo(ports));
         Assert.That(await bench.Host.ExecuteCodeAsync("M574"),
-                    Does.Contain($"Z: low end switches connected to pins {Expansion.GpioIn(Machines.DriverBoard, 3)} "
+                    Reply.IsSuccess($"Z: low end switches connected to pins {Expansion.GpioIn(Machines.DriverBoard, 3)} "
                                  + Expansion.GpioIn(Machines.DriverBoard, 4)));
     }
 
@@ -270,7 +271,7 @@ public class M574Tests : BenchFixture
         await using Bench bench = await StartBenchAsync();
 
         string ports = $"{Expansion.GpioIn(Machines.DriverBoard, 0)}+{Expansion.GpioIn(Machines.DriverBoard, 1)}";
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{ports}\"")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{ports}\""), Reply.IsEmpty,
                     "two switches on X, which has one motor, are accepted");
         Assert.That(Creates(bench).Select(c => c.Message.Handle.All),
                     Is.EqualTo(new[] { RemoteEndstops.HandleFor(0, 0).All, RemoteEndstops.HandleFor(0, 1).All }));
@@ -294,7 +295,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{ports}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(Creates(bench), Is.Empty, "no pin is claimed for a refused endstop");
             Assert.That(await EndstopOf(bench, 0), Is.Null, "and X has no endstop");
         });
@@ -318,7 +319,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{port}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(Creates(bench), Is.Empty);
             Assert.That(await EndstopOf(bench, 0), Is.Null);
         });
@@ -346,7 +347,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{Expansion.GpioIn(Machines.DriverBoard, 1)}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain(refusal), "the board's reason is the error");
+            Assert.That(reply, Reply.IsError(refusal), "the board's reason is the error");
             Assert.That(await EndstopOf(bench, 0), Is.Null,
                         "an endstop whose pin was refused is not recorded (RRF deletes the SwitchEndstop)");
         });
@@ -374,13 +375,13 @@ public class M574Tests : BenchFixture
                                                                                   : (CodeResult.Ok, "", false)))
                                              .StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{goodPort}\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{goodPort}\""), Reply.IsEmpty);
         bench.CanMaster.ClearCapture();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{badPort}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await EndstopOf(bench, 0), Is.Null,
                         "the old endstop was deleted before the new one was refused (RRF EndstopsManager::HandleM574)");
         });
@@ -410,7 +411,7 @@ public class M574Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("io4.in"));
+            Assert.That(reply, Reply.IsError("io4.in"));
             Assert.That(MonitorTraffic(bench), Is.EqualTo(new[]
             {
                 (Machines.DriverBoard, Create, RemoteEndstops.HandleFor(2, 0).All),
@@ -440,7 +441,7 @@ public class M574Tests : BenchFixture
         bench.CanMaster.ClearCapture();
 
         string newPort = Expansion.GpioIn(Machines.DriverBoard, 5);
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{newPort}\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{newPort}\""), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(MonitorTraffic(bench), Is.EqualTo(new[] { (Machines.DriverBoard, Create, RemoteEndstops.HandleFor(0).All) }),
@@ -467,7 +468,7 @@ public class M574Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync(XEndstopLine);
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{Expansion.GpioIn(otherBoard, 0)}\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 X1 S1 P\"{Expansion.GpioIn(otherBoard, 0)}\""), Reply.IsEmpty);
         Assert.That(MonitorTraffic(bench), Is.EqualTo(new[]
         {
             (Machines.DriverBoard, Delete, RemoteEndstops.HandleFor(0).All),
@@ -493,7 +494,7 @@ public class M574Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync($"M574 Z1 S1 P\"{first}+{second}\"");
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 Z1 S1 P\"{second}\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 Z1 S1 P\"{second}\""), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(MonitorTraffic(bench), Is.EqualTo(new[]
@@ -524,7 +525,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(line);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("X axis"), "the pin name is needed (RRF HandleM574)");
+            Assert.That(reply, Reply.IsError("X axis"), "the pin name is needed (RRF HandleM574)");
             Assert.That(await EndstopOf(bench, 0), Is.Null, "and X is left without an endstop");
             Assert.That(MonitorTraffic(bench), Is.Empty);
         });
@@ -545,7 +546,7 @@ public class M574Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync(XEndstopLine);
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 X2")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X2"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.HighEnd), Is.True);
@@ -573,7 +574,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M574 {parameters} P\"{Expansion.GpioIn(Machines.DriverBoard, 0)}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("Invalid use of P parameter"));
+            Assert.That(reply, Reply.IsError("Invalid use of P parameter"));
             Assert.That(await EndstopOf(bench, 0), Is.Null);
             Assert.That(await EndstopOf(bench, 1), Is.Null);
             Assert.That(MonitorTraffic(bench), Is.Empty);
@@ -608,7 +609,7 @@ public class M574Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 X1 Y2 S{type}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 X1 Y2 S{type}"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             foreach (int axis in new[] { 0, 1 })
@@ -639,7 +640,7 @@ public class M574Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync(XEndstopLine);
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 X1 S3")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S3"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(MonitorTraffic(bench), Is.EqualTo(new[] { (Machines.DriverBoard, Delete, RemoteEndstops.HandleFor(0).All) }));
@@ -664,7 +665,7 @@ public class M574Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(ProbeLine);
         await bench.Host.ExecuteCodeAsync(XEndstopLine);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 X1 S{type}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 X1 S{type}"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Port), Is.Null,
                     "the endstop is no longer a switch, so it has no port");
     }
@@ -685,14 +686,14 @@ public class M574Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 X1 S2 K0")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S2 K0"), Reply.IsEmpty);
         Assert.That(MonitorTraffic(bench), Is.Empty, "the probe's monitor already exists; the endstop adds none");
 
         Assert.That(await bench.Host.ExecuteCodeAsync($"M574 Y1 S1 K99 P\"{Expansion.GpioIn(Machines.DriverBoard, 2)}\""),
-                    Does.StartWith("Error:"), "K is range-checked whatever S is");
+                    Reply.IsError(), "K is range-checked whatever S is");
         Assert.That(await EndstopOf(bench, 1), Is.Null, "and the refused line configured nothing");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 Y1 S1 K1 P\"{Expansion.GpioIn(Machines.DriverBoard, 2)}\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 Y1 S1 K1 P\"{Expansion.GpioIn(Machines.DriverBoard, 2)}\""), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[1]!.Probe), Is.Null,
                     "a switch endstop names no probe even when K is given");
     }
@@ -736,7 +737,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M574 X1 S0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("no longer supported"));
+            Assert.That(reply, Reply.IsError("no longer supported"));
             Assert.That(await EndstopOf(bench, 0), Is.Null);
         });
     }
@@ -758,7 +759,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(line);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await EndstopOf(bench, 0), Is.Null);
             Assert.That(MonitorTraffic(bench), Is.Empty);
         });
@@ -785,7 +786,7 @@ public class M574Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync(XEndstopLine);
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 X0")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X0"), Reply.IsEmpty);
         (byte board, CanMessageChangeInputMonitorV1 change) = bench.CanMaster.LastCanMessage<CanMessageChangeInputMonitorV1>();
         Assert.Multiple(async () =>
         {
@@ -798,7 +799,7 @@ public class M574Tests : BenchFixture
         });
 
         bench.CanMaster.ClearCapture();
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 X0")).Trim(), Is.Empty, "removing nothing is not an error");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X0"), Reply.IsEmpty, "removing nothing is not an error");
         Assert.That(MonitorTraffic(bench), Is.Empty, "and asks nothing of any board");
     }
 
@@ -821,7 +822,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M574 X0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"), "the removal itself succeeded");
+            Assert.That(reply, Reply.IsNotError, "the removal itself succeeded");
             Assert.That(await EndstopOf(bench, 0), Is.Null);
         });
     }
@@ -854,10 +855,10 @@ public class M574Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M574");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.StartWith("Endstop configuration:"));
-            Assert.That(report, Does.Contain($"\nX: low end switch connected to pin {x}"));
-            Assert.That(report, Does.Contain($"\nY: high end switch connected to pin {y}"));
-            Assert.That(report, Does.Contain("\nZ: none"));
+            Assert.That(report, Reply.IsSuccess("Endstop configuration:"));
+            Assert.That(report, Reply.IsSuccess($"\nX: low end switch connected to pin {x}"));
+            Assert.That(report, Reply.IsSuccess($"\nY: high end switch connected to pin {y}"));
+            Assert.That(report, Reply.IsSuccess("\nZ: none"));
             Assert.That(MonitorTraffic(bench), Is.Empty,
                         "the pin names come from the object model (rrf-differences.md section 2.3)");
         });
@@ -882,9 +883,9 @@ public class M574Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M574");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.Contain("\nX: low end Z probe"));
-            Assert.That(report, Does.Contain("\nY: high end motor stall (any"));
-            Assert.That(report, Does.Contain("\nZ: low end motor stall (individual"));
+            Assert.That(report, Reply.IsSuccess("\nX: low end Z probe"));
+            Assert.That(report, Reply.IsSuccess("\nY: high end motor stall (any"));
+            Assert.That(report, Reply.IsSuccess("\nZ: low end motor stall (individual"));
         });
     }
 
@@ -902,7 +903,7 @@ public class M574Tests : BenchFixture
         await using Bench bench = await StartBenchAsync();
         await bench.Host.ExecuteCodeAsync("M574 X1 S5");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M574"), Does.Contain("\nX: low end motor stall"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574"), Reply.IsSuccess("\nX: low end motor stall"));
     }
 
     /// <summary>
@@ -920,8 +921,8 @@ public class M574Tests : BenchFixture
             $"M584 U{Expansion.Driver(Machines.DriverBoard, 3)}\nM584 A{Expansion.Driver(Machines.DriverBoard, 4)} R1");
         string u = Expansion.GpioIn(Machines.DriverBoard, 3), a = Expansion.GpioIn(Machines.DriverBoard, 4);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 U1 S1 P\"{u}\"")).Trim(), Is.Empty);
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M574 A2 S1 P\"{a}\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 U1 S1 P\"{u}\""), Reply.IsEmpty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M574 A2 S1 P\"{a}\""), Reply.IsEmpty);
 
         string report = await bench.Host.ExecuteCodeAsync("M574");
         Assert.Multiple(async () =>
@@ -931,8 +932,8 @@ public class M574Tests : BenchFixture
                         "U is axis 3 and A axis 4");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[3]!.Port), Is.EqualTo(u));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[4]!.HighEnd), Is.True);
-            Assert.That(report, Does.Contain($"\nU: low end switch connected to pin {u}"));
-            Assert.That(report, Does.Contain($"\nA: high end switch connected to pin {a}"));
+            Assert.That(report, Reply.IsSuccess($"\nU: low end switch connected to pin {u}"));
+            Assert.That(report, Reply.IsSuccess($"\nA: high end switch connected to pin {a}"));
         });
     }
 
@@ -958,21 +959,21 @@ public class M574Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyze);
         Assert.That(await bench.Host.ExecuteCodeAsync($"M950 J0 C\"!{Expansion.GpioIn(Machines.DriverBoard, 2)}\""),
-                    Does.Not.StartWith("Warning:").And.Not.StartWith("Error:"), "M950 J creates input 0");
+                    Reply.IsSuccess(), "M950 J creates input 0");
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 E0 P0")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0 P0"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].EndstopInput), Is.EqualTo(0));
-            Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Does.Contain("Extruder 0 endstop uses input pin 0"));
-            Assert.That((await bench.Host.ExecuteCodeAsync("M574")).TrimEnd(), Does.EndWith("\nE0: input pin 0"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Reply.IsSuccess("Extruder 0 endstop uses input pin 0"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M574"), Reply.IsSuccess("\nE0: input pin 0"));
             Assert.That(MonitorTraffic(bench), Is.Empty, "the input is already monitored by M950 J");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M574 E0 P-1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0 P-1"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].EndstopInput), Is.Null);
-        Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Does.Contain("Extruder 0 endstop uses motor stall detection"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Reply.IsSuccess("Extruder 0 endstop uses motor stall detection"));
     }
 
     /// <summary>
@@ -987,7 +988,7 @@ public class M574Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyze);
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Does.Contain("Extruder 0 endstop uses motor stall detection"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Reply.IsSuccess("Extruder 0 endstop uses motor stall detection"));
         Assert.That(await bench.Host.ExecuteCodeAsync("M574"), Does.Not.Contain("\nE0:"));
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].EndstopInput), Is.Null);
     }
@@ -1012,7 +1013,7 @@ public class M574Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(line);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].EndstopInput), Is.Null);
             Assert.That(await EndstopOf(bench, 0), Is.Null, "nothing was configured for X either");
         });
@@ -1042,18 +1043,17 @@ public class M574Tests : BenchFixture
     private static IReadOnlyList<(byte Board, string What, ushort Handle)> MonitorTraffic(Bench bench)
     {
         List<(byte, string, ushort)> traffic = [];
-        foreach (CapturedPacket packet in bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage))
+        foreach (SentCanMessage message in bench.CanMaster.CanMessages())
         {
-            (SendCanMessageHeader header, byte[] payload) = packet.DecodeCanMessage();
-            if (header.MsgType == (ushort)CanMessageCreateInputMonitorV1.MessageType)
+            if (message.Type == CanMessageCreateInputMonitorV1.MessageType)
             {
-                traffic.Add((header.DstAddress, Create,
-                             CanMessageSerializer.Deserialize<CanMessageCreateInputMonitorV1>(payload).Handle.All));
+                traffic.Add((message.Board, Create,
+                             CanMessageSerializer.Deserialize<CanMessageCreateInputMonitorV1>(message.Payload).Handle.All));
             }
-            else if (header.MsgType == (ushort)CanMessageChangeInputMonitorV1.MessageType)
+            else if (message.Type == CanMessageChangeInputMonitorV1.MessageType)
             {
-                CanMessageChangeInputMonitorV1 change = CanMessageSerializer.Deserialize<CanMessageChangeInputMonitorV1>(payload);
-                traffic.Add((header.DstAddress,
+                CanMessageChangeInputMonitorV1 change = CanMessageSerializer.Deserialize<CanMessageChangeInputMonitorV1>(message.Payload);
+                traffic.Add((message.Board,
                              change.Action == CanMessageChangeInputMonitorV1.ActionDelete ? Delete : $"action {change.Action}",
                              change.Handle.All));
             }

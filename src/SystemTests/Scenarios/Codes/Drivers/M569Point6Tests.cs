@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
@@ -23,9 +24,9 @@ public class M569Point6Tests : BenchFixture
     /// <summary>The verdicts Duet3Expansion's ClosedLoop::ProcessBasicTuningResult answers a finished basic tuning with, and how each is reported</summary>
     private static readonly object[] Verdicts =
     [
-        new object[] { CodeResult.Ok, $"Driver {DriversRig.ClosedLoopDriver(0)} basic tuning succeeded, measured backlash 0.010 step", "" },
-        new object[] { CodeResult.Warning, $"Driver {DriversRig.ClosedLoopDriver(0)} basic tuning succeeded but measured backlash (0.200 step) is high", "Warning: M569.6: " },
-        new object[] { CodeResult.Error, $"Driver {DriversRig.ClosedLoopDriver(0)} basic tuning failed, measured backlash (0.500 step) is too high", "Error: M569.6: " },
+        new object[] { CodeResult.Ok, $"Driver {DriversRig.ClosedLoopDriver(0)} basic tuning succeeded, measured backlash 0.010 step", MessageType.Success },
+        new object[] { CodeResult.Warning, $"Driver {DriversRig.ClosedLoopDriver(0)} basic tuning succeeded but measured backlash (0.200 step) is high", MessageType.Warning },
+        new object[] { CodeResult.Error, $"Driver {DriversRig.ClosedLoopDriver(0)} basic tuning failed, measured backlash (0.500 step) is too high", MessageType.Error },
     ];
 
     /// <summary>
@@ -46,13 +47,13 @@ public class M569Point6Tests : BenchFixture
                 CodeResult.Error)).StartAsync();
         string driver = DriversRig.ClosedLoopDriver(0);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.6 P{driver} V1")).TrimEnd(),
-                    Is.EqualTo("Error: M569.6: basic tuning is not applicable to absolute encoders"));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.6 P{driver} V1"),
+                    Reply.IsError("basic tuning is not applicable to absolute encoders"));
         (_, CanMessageM569Point6 tuning) = bench.CanMaster.LastCanMessage<CanMessageM569Point6>();
         Assert.That(tuning.V, Is.EqualTo(1), "V is the manoeuvre");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.6 P{driver}")).TrimEnd(),
-                    Is.EqualTo($"Error: M569.6: Driver {driver} calibration failed (no reason available)"));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.6 P{driver}"),
+                    Reply.IsError($"Driver {driver} calibration failed (no reason available)"));
         (_, CanMessageM569Point6 status) = bench.CanMaster.LastCanMessage<CanMessageM569Point6>();
         Assert.That(status.Generic.ParamMap, Is.EqualTo(1u), "and the bare form carries the driver alone");
     }
@@ -63,7 +64,7 @@ public class M569Point6Tests : BenchFixture
     /// </summary>
     [TestCaseSource(nameof(Verdicts))]
     [Category("KnownGap")]
-    public async Task M569Point6WaitsForTheManoeuvreToFinish(CodeResult verdict, string text, string prefix)
+    public async Task M569Point6WaitsForTheManoeuvreToFinish(CodeResult verdict, string text, MessageType severity)
     {
         const int unfinishedAnswers = 3;
         int answers = 0;
@@ -80,7 +81,7 @@ public class M569Point6Tests : BenchFixture
         IReadOnlyList<(byte Board, CanMessageM569Point6 Message)> sent = bench.CanMaster.CanMessages<CanMessageM569Point6>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo(prefix + text), "the board's verdict, at its severity, is the reply");
+            Assert.That(reply, Reply.Is(severity, text), "the board's verdict, at its severity, is the reply");
             Assert.That(sent, Has.Count.EqualTo(unfinishedAnswers + 1), "the board is asked until it has a verdict, and no more");
             Assert.That(sent[0].Message.V, Is.EqualTo(1), "the first request starts the manoeuvre");
             Assert.That(sent.Skip(1).Select(request => request.Message.Generic.ParamMap), Is.All.EqualTo(1u),
@@ -118,7 +119,7 @@ public class M569Point6Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M569.6 V1")).TrimEnd(), Is.EqualTo("Error: M569.6: missing parameter 'P'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M569.6 V1"), Reply.IsError(CodeErrors.MissingParameter('P')));
         Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point6>(), Is.Empty);
     }
 }

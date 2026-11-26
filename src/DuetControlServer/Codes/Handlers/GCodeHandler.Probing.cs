@@ -598,40 +598,49 @@ internal sealed partial class GCodeHandler
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The result</returns>
     /// <remarks>
-    /// S selects what to do: S0 probes, S1 loads a map, S2 forgets one and S3 saves one. Without S,
-    /// RepRapFirmware runs <c>mesh.g</c> if the machine has one, so that a bed that needs preparing
-    /// before it is probed can say so; only if there is no such file does it probe directly
+    /// S selects what to do, as <see cref="G29Action"/> lists. Without S, RepRapFirmware runs
+    /// <c>mesh.g</c> if the machine has one, so that a bed that needs preparing before it is probed
+    /// can say so; only if there is no such file does it probe directly
     /// </remarks>
     private async ValueTask<Message> HandleProbeGridAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('S', out int sValue))
+        if (!code.TryGetEnum('S', out G29Action action))
         {
             if (await macroRunner.TryRunAsync(code.Channel, MeshMacro, code, cancellationToken: cancellationToken))
             {
                 return new Message();
             }
-            sValue = 0;
+            action = G29Action.ProbeGrid;
         }
 
-        switch (sValue)
+        // TODO all but ProbeGrid are temporary errors: handle these cases
+        return action switch
         {
-            case 0:
-                return await ProbeGridAsync(code, cancellationToken);
+            G29Action.ProbeGrid => await ProbeGridAsync(code, cancellationToken),
+            G29Action.LoadHeightMap => new Message(MessageType.Error, "Use M375 to load a height map"),
+            G29Action.ClearHeightMap => new Message(MessageType.Error, "Use M561 to disable bed compensation"),
+            G29Action.SaveHeightMap => new Message(MessageType.Error, "Use M374 to save the height map"),
+            _ => new Message(MessageType.Error, "Probe points files are not supported yet")
+        };
+    }
 
-            case 1:
-            case 2:
-            case 3:
-                // TODO this error is temporary. handle these cases
-                return new Message(MessageType.Error, sValue switch
-                {
-                    1 => "Use M375 to load a height map",
-                    2 => "Use M561 to disable bed compensation",
-                    _ => "Use M374 to save the height map"
-                });
+    /// <summary>What G29 does, as its S parameter selects, numbered as RepRapFirmware's GCodes2.cpp case 29 reads it</summary>
+    internal enum G29Action
+    {
+        /// <summary>Probe the grid and save the height map</summary>
+        ProbeGrid = 0,
 
-            default:
-                return new Message(MessageType.Error, $"Invalid S parameter {sValue}");
-        }
+        /// <summary>Load a height map file</summary>
+        LoadHeightMap = 1,
+
+        /// <summary>Clear the height map</summary>
+        ClearHeightMap = 2,
+
+        /// <summary>Save the height map to a named file</summary>
+        SaveHeightMap = 3,
+
+        /// <summary>Load a probe points file, which says which grid points can be probed</summary>
+        LoadProbePoints = 4
     }
 
     /// <summary>Macro that runs in place of G29 when the machine has one</summary>

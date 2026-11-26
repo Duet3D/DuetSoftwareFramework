@@ -33,7 +33,7 @@ public class M220Tests : BenchFixture
                     "M220 S150 sets move.speedFactor to 1.5 (RRF GCodes2.cpp case 220)");
 
         string reply = await bench.Host.ExecuteCodeAsync("M220");
-        Assert.That(reply, Does.Contain("Speed factor: 150.0%"),
+        Assert.That(reply, Reply.IsSuccess("Speed factor: 150.0%"),
                     "M220 reports the percentage consistent with move.speedFactor (RRF GCodes2.cpp case 220)");
 
         await bench.Host.ExecuteCodeAsync("M220 S100");

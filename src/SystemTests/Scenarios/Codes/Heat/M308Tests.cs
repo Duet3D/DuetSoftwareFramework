@@ -98,7 +98,7 @@ public class M308Tests : BenchFixture
             Invariant($"M308 S{SensorNumber} P\"{ThermistorPort}\" Y\"thermistor\" T{R25} B{Beta} C{ShCText} R{SeriesResistor} A\"Test sensor\""));
         float shC = float.Parse(ShCText, CultureInfo.InvariantCulture);
 
-        Assert.That(reply, Does.Not.StartWith("Error:").And.Not.StartWith("Warning:"), "the board took the sensor");
+        Assert.That(reply, Reply.IsSuccess(), "the board took the sensor");
         Assert.That(SentM308(bench), Has.Count.EqualTo(1), "one M308 goes to one board");
         (byte board, CanMessageM308V1 sent) = SentM308(bench)[0];
         Assert.Multiple(() =>
@@ -178,7 +178,7 @@ public class M308Tests : BenchFixture
         (byte board, CanMessageM308V1 sent) = bench.CanMaster.LastCanMessage<CanMessageM308V1>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"), "the board took the sensor");
+            Assert.That(reply, Reply.IsNotError, "the board took the sensor");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the M308 goes to the board named by the port");
             Assert.That(sent.Y, Is.EqualTo(wireType), "Y travels as a reduced string");
             Assert.That(sent.P, Is.EqualTo(port[(port.IndexOf('.') + 1)..]), "P travels without the board address");
@@ -329,9 +329,8 @@ public class M308Tests : BenchFixture
         (byte board, CanMessageM308V1 query) = SentM308(bench)[0];
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:").And.Not.StartWith("Warning:"), "a report is not a failure");
-            Assert.That(reply, Does.Contain(boardReport), "the board's report reaches the caller");
-            Assert.That(reply, Does.Contain("Test sensor"), "with the sensor's name, which only this side knows");
+            Assert.That(reply, Reply.IsSuccess(boardReport), "the board's report reaches the caller as a report, not a failure");
+            Assert.That(reply, Reply.IsSuccess("Test sensor"), "with the sensor's name, which only this side knows");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the query goes to the sensor's board");
             Assert.That(query.S, Is.EqualTo(SensorNumber), "naming the sensor");
             Assert.That(query.P, Is.Null, "and nothing else: no port");
@@ -364,7 +363,7 @@ public class M308Tests : BenchFixture
         AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"));
+            Assert.That(reply, Reply.IsNotError);
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the change goes to the board the sensor is on");
             Assert.That(sent.S, Is.EqualTo(SensorNumber));
             Assert.That(sent.H, Is.EqualTo(high), "H as written");
@@ -416,7 +415,7 @@ public class M308Tests : BenchFixture
         (byte board, CanMessageM308V1 sentP) = bench.CanMaster.LastCanMessage<CanMessageM308V1>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"), "a port on the same board needs no Y");
+            Assert.That(reply, Reply.IsNotError, "a port on the same board needs no Y");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard));
             Assert.That(sentP.P, Is.EqualTo("temp1"), "the new port goes to the board");
             Assert.That(sentP.Y, Is.Null);
@@ -453,7 +452,7 @@ public class M308Tests : BenchFixture
         AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain(refusal), "the board's refusal is the reply");
+            Assert.That(reply, Reply.IsError(refusal), "the board's refusal is the reply");
             Assert.That(sensor?.R25, Is.EqualTo(R25).Within(1e-3), "sensors.analog[2].r25 keeps what the board still has");
             Assert.That(sensor?.Beta, Is.EqualTo(Beta).Within(1e-3), "and so does beta");
             Assert.That(sensor?.OffsetAdj, Is.EqualTo(1.0f), "and the offset adjustment");
@@ -523,7 +522,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "the line is refused");
+            Assert.That(reply, Reply.IsError(), "the line is refused");
             Assert.That(SentM308(bench), Is.Empty, "and no board hears of it");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Analog.Count(sensor => sensor is not null)), Is.EqualTo(1),
                         "no sensor is created");
@@ -555,7 +554,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "the new sensor is refused");
+            Assert.That(reply, Reply.IsError(), "the new sensor is refused");
             Assert.That(SentM308(bench).Select(sent => (sent.Board, (int?)sent.Message.S, sent.Message.P)),
                         Is.EqualTo(new[]
                         {
@@ -585,7 +584,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "there is no sensor to report or amend");
+            Assert.That(reply, Reply.IsError(), "there is no sensor to report or amend");
             Assert.That(SentM308(bench), Is.Empty, "no board is asked");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null,
                         "and sensors.analog[2] is not created");
@@ -617,7 +616,7 @@ public class M308Tests : BenchFixture
         (byte board, CanMessageM308V1 release) = SentM308(bench)[0];
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(deleted, Does.Not.StartWith("Error:"), "P\"nil\" is a delete, not a bad port");
+            Assert.That(deleted, Reply.IsNotError, "P\"nil\" is a delete, not a bad port");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the release goes to the sensor's board");
             Assert.That(release.S, Is.EqualTo(SensorNumber));
             Assert.That(release.P, Is.EqualTo("nil"), "P\"nil\" frees the port on the board");
@@ -633,8 +632,8 @@ public class M308Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync($"M308 S{SensorNumber}");
         Assert.Multiple(() =>
         {
-            Assert.That(again, Does.Not.StartWith("Error:"), "deleting a sensor that is gone is harmless");
-            Assert.That(report, Does.StartWith("Error:"), "reporting it is an error");
+            Assert.That(again, Reply.IsNotError, "deleting a sensor that is gone is harmless");
+            Assert.That(report, Reply.IsError(), "reporting it is an error");
             Assert.That(SentM308(bench), Is.Empty, "and neither reaches a board");
         });
     }
@@ -660,7 +659,7 @@ public class M308Tests : BenchFixture
         AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"));
+            Assert.That(reply, Reply.IsNotError);
             Assert.That(sent[0].Board, Is.EqualTo(Machines.DriverBoard), "first the old board");
             Assert.That(sent[0].Message.P, Is.EqualTo("nil"), "is told to release the sensor");
             Assert.That(sent[1].Board, Is.EqualTo(OtherBoard), "then the new board");
@@ -690,7 +689,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "a sensor cannot change board without a type");
+            Assert.That(reply, Reply.IsError(), "a sensor cannot change board without a type");
             Assert.That(SentM308(bench), Is.Empty, "no board hears of it");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)?.Port), Is.EqualTo(ThermistorPort),
                         "and the sensor stays where it was");
@@ -725,8 +724,7 @@ public class M308Tests : BenchFixture
         IReadOnlyList<(byte Board, CanMessageM308V1 Message)> sent = SentM308(bench);
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "the board's refusal is an error");
-            Assert.That(reply, Does.Contain(refusal), "carrying the board's reason");
+            Assert.That(reply, Reply.IsError(refusal), "the board's refusal is an error carrying the board's reason");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null,
                         "and sensors.analog[2] does not hold the sensor that was refused");
             Assert.That(sent.Select(s => s.Message.P), Is.EqualTo(new[] { "temp9", "nil" }),
@@ -756,7 +754,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null,
                         "neither the refused sensor nor the thermistor it replaced is left in sensors.analog[2]");
             Assert.That(SentM308(bench).First().Message.P, Is.EqualTo("nil"),
@@ -778,8 +776,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Warning:"), "the board's warning is a warning here");
-            Assert.That(reply, Does.Contain(warning), "carrying the board's text");
+            Assert.That(reply, Reply.IsWarning(warning), "the board's warning is a warning here, carrying the board's text");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)?.Type), Is.EqualTo(AnalogSensorType.Thermistor),
                         "and the sensor is kept");
         });
@@ -804,7 +801,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "a timeout is an error");
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(Machines.DriverBoard, CanMessageM308V1.MessageType)), "a timeout is an error");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null,
                         "and sensors.analog[2] does not hold a sensor no board confirmed");
         });
@@ -828,7 +825,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "board 0 has no sensor inputs");
+            Assert.That(reply, Reply.IsError(), "board 0 has no sensor inputs");
             Assert.That(SentM308(bench), Is.Empty, "no board is asked");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null,
                         "and no sensor is created");
@@ -856,7 +853,7 @@ public class M308Tests : BenchFixture
         AnalogSensor? sensor = await bench.Host.ReadModelAsync(model => SensorAt(model, 3));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"), "a pinless sensor needs no port");
+            Assert.That(reply, Reply.IsNotError, "a pinless sensor needs no port");
             Assert.That(sensor?.Type, Is.EqualTo(AnalogSensorType.McuTemp), "sensors.analog[3] is the MCU sensor");
             Assert.That(sensor?.Name, Is.EqualTo("main MCU"));
             Assert.That(SentM308(bench), Is.Empty, "and no expansion board is involved");
@@ -891,7 +888,7 @@ public class M308Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M308 S3");
         Assert.Multiple(() =>
         {
-            Assert.That(report.Trim(), Is.EqualTo(Invariant($"Sensor 3 (main MCU) type Microcontroller embedded temperature sensor, last error ok, reading {mcuTemp:F1}")),
+            Assert.That(report, Reply.IsSuccess(Invariant($"Sensor 3 (main MCU) type Microcontroller embedded temperature sensor, last error ok, reading {mcuTemp:F1}")),
                         "the report is CopyBasicDetails'");
             Assert.That(SentM308(bench), Is.Empty, "and no board is asked");
         });
@@ -901,7 +898,7 @@ public class M308Tests : BenchFixture
         await bench.Host.WaitForModelAsync(model => SensorAt(model, 3)?.LastReading,
                                            reading => reading is > mcuTemp + offset - 0.1f and < mcuTemp + offset + 0.1f,
                                            "sensors.analog[3].lastReading carrying the offset", timeoutMs: 5_000);
-        Assert.That(adjusted.Trim(), Is.Empty, "a change is not a report");
+        Assert.That(adjusted, Reply.IsEmpty, "a change is not a report");
         Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, 3)?.OffsetAdj), Is.EqualTo(offset), "U is sensors.analog[3].offsetAdj");
         Assert.That(SentM308(bench), Is.Empty);
     }
@@ -927,7 +924,7 @@ public class M308Tests : BenchFixture
 
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(SentM308(bench), Is.Empty, "no board is asked");
             Assert.That(await bench.Host.ReadModelAsync(model => SensorAt(model, SensorNumber)), Is.Null, "and no sensor is created");
         });

@@ -106,20 +106,20 @@ public class M37Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed);
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M37"), Does.Contain("Simulation mode: off"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M37"), Reply.IsSuccess("Simulation mode: off"),
                     "M37 with no parameters reports the simulation mode (GCodes2.cpp case 37)");
 
         await bench.Host.ExecuteCodeAsync("M37 S1");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(await bench.Host.ExecuteCodeAsync("M37"), Does.Contain("Simulation mode: on"),
+            Assert.That(await bench.Host.ExecuteCodeAsync("M37"), Reply.IsSuccess("Simulation mode: on"),
                         "M37 S1 turns simulation on (GCodes3.cpp ChangeSimulationMode)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.Status), Is.EqualTo(MachineStatus.Idle),
                         "simulation mode with no file being printed is still idle (RepRap.cpp GetStatusIndex)");
         });
 
         await bench.Host.ExecuteCodeAsync("M37 S0");
-        Assert.That(await bench.Host.ExecuteCodeAsync("M37"), Does.Contain("Simulation mode: off"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M37"), Reply.IsSuccess("Simulation mode: off"),
                     "M37 S0 turns simulation off again (GCodes3.cpp ChangeSimulationMode)");
     }
 }

@@ -31,7 +31,7 @@ public class M671Tests : BenchFixture
 
         await host.ExecuteCodeAsync("M669 K0");
         string configureReply = await host.ExecuteCodeAsync("M671 X10:190 Y5:195 S2.5 P0.7 F1.2");
-        Assert.That(configureReply.Trim(), Is.Empty,
+        Assert.That(configureReply, Reply.IsEmpty,
                     "cartesian kinematics accepts M671 silently (RRF ZLeadscrewKinematics::Configure)");
 
         double screwX0 = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewX[0]);
@@ -59,7 +59,7 @@ public class M671Tests : BenchFixture
                     "configuring positions zeroes move.kinematics.tiltCorrection.lastCorrections");
 
         string report = await host.ExecuteCodeAsync("M671");
-        Assert.That(report.Trim(), Is.EqualTo("Z leadscrew coordinates (10.0,5.0) (190.0,195.0), factor 1.20, maximum correction 2.50mm, manual adjusting screw pitch 0.70mm"),
+        Assert.That(report, Reply.IsSuccess("Z leadscrew coordinates (10.0,5.0) (190.0,195.0), factor 1.20, maximum correction 2.50mm, manual adjusting screw pitch 0.70mm"),
                     "bare M671 reports the leadscrews in RRF's format (ZLeadscrewKinematics::Configure)");
     }
 }

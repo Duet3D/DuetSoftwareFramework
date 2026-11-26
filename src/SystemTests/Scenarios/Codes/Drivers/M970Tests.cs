@@ -30,7 +30,7 @@ public class M970Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970 Y1 Z1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970 Y1 Z1"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageM970>();
         Assert.That(sent.Select(message => (message.Board, message.Message.P, message.Message.S)),
@@ -76,7 +76,7 @@ public class M970Tests : BenchFixture
         {
             Assert.That(board, Is.EqualTo(DriversRig.ClosedLoopBoard));
             Assert.That(sent.P, Is.EqualTo(0));
-            Assert.That(reply.TrimEnd(), Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PhaseStep), Is.False,
                         "a refused mode leaves the drive as it was");
         });
@@ -104,7 +104,7 @@ public class M970Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M970 X1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.TrimEnd(), Does.StartWith("Error: M970: CAN response timeout: board 1, req type 6072"),
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(DriversRig.MainDriverBoard, CanMessageType.M970)),
                         "RepRapFirmware's own wording, which CanResponse.FromTimeout already carries");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PhaseStep), Is.False,
                         "and the axis is still in step/direction mode, because nothing took it out");
@@ -129,11 +129,11 @@ public class M970Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.ExecuteCodeAsync("M970 X2").Result.TrimEnd(),
-                        Does.StartWith("Error:"),
+            Assert.That(bench.Host.ExecuteCodeAsync("M970 X2").Result,
+                        Reply.IsError(),
                         "an axis names the parameter, because that is what read it");
-            Assert.That(bench.Host.ExecuteCodeAsync("M970 E2").Result.TrimEnd(),
-                        Does.StartWith("Error:"),
+            Assert.That(bench.Host.ExecuteCodeAsync("M970 E2").Result,
+                        Reply.IsError(),
                         "and an extruder names the value, because ConfigureStepMode checked it itself");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM970>(), Is.Empty,
                         "neither reaches a board");
@@ -152,8 +152,8 @@ public class M970Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970.1 X-1")).TrimEnd(),
-                    Does.StartWith("Error:"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970.1 X-1"),
+                    Reply.IsError());
     }
 
     /// <summary>
@@ -165,8 +165,8 @@ public class M970Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970 X")).TrimEnd(),
-                    Does.StartWith("Error: at column 7: M970: expected number after 'X'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970 X"),
+                    Reply.IsError(CodeErrors.ExpectedNumber('X')));
     }
 
     /// <summary>
@@ -179,8 +179,8 @@ public class M970Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
         await bench.Host.ExecuteCodeAsync("M970 X1");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970")).TrimEnd(),
-                    Is.EqualTo("Axis step mode - X:1, Y:0, Z:0, E:0"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970"),
+                    Reply.IsSuccess("Axis step mode - X:1, Y:0, Z:0, E:0"));
     }
 
     /// <summary>
@@ -213,10 +213,10 @@ public class M970Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M970.1")).TrimEnd(),
-                        Is.EqualTo("Axis phase step Kv - X:2000.000000, Y:0.000000, Z:0.000000, E:0.000000"));
-            Assert.That((await bench.Host.ExecuteCodeAsync("M970.2")).TrimEnd(),
-                        Is.EqualTo("Axis phase step Ka - X:0.000000, Y:60000.000000, Z:60000.000000, E:0.000000"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M970.1"),
+                        Reply.IsSuccess("Axis phase step Kv - X:2000.000000, Y:0.000000, Z:0.000000, E:0.000000"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M970.2"),
+                        Reply.IsSuccess("Axis phase step Ka - X:0.000000, Y:60000.000000, Z:60000.000000, E:0.000000"));
         });
     }
 
@@ -254,8 +254,8 @@ public class M970Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(bench.Host.ExecuteCodeAsync("M970.3").Result.TrimEnd(),
-                        Is.EqualTo("Error: M970.3: missing parameter 'P'"));
+            Assert.That(bench.Host.ExecuteCodeAsync("M970.3").Result,
+                        Reply.IsError(CodeErrors.MissingParameter('P')));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM970Point3>(), Is.Empty);
         });
     }
@@ -274,10 +274,10 @@ public class M970Tests : BenchFixture
                                              .WithController(canMaster => canMaster.ReportWith<CanMessageM970>(
                 "phase stepping is untuned on this driver", CodeResult.Warning)).StartAsync();
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M970 E1")).TrimEnd();
+        string reply = await bench.Host.ExecuteCodeAsync("M970 E1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo("Warning: M970: phase stepping is untuned on this driver"),
+            Assert.That(reply, Reply.IsWarning("phase stepping is untuned on this driver"),
                         "the board took the mode and warned about it, and the warning is the code's result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PhaseStep), Is.True,
                         "a warning is not a refusal, so the drive keeps the mode the code set");

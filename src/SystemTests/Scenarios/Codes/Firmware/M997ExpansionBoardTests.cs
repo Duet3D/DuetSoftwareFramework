@@ -122,7 +122,7 @@ public class M997ExpansionBoardTests : BenchFixture
         (byte updateBoard, CanMessageUpdateYourFirmware update) = bench.CanMaster.LastCanMessage<CanMessageUpdateYourFirmware>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo($"Board {Board} starting firmware update"), "the board's own reply is the result");
+            Assert.That(reply, Reply.IsSuccess($"Board {Board} starting firmware update"), "the board's own reply is the result");
 
             Assert.That(infoBoard, Is.EqualTo(Board));
             Assert.That(info.Type, Is.EqualTo(CanMessageReturnInfo.TypeBoardName));
@@ -168,7 +168,7 @@ public class M997ExpansionBoardTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:"));
+            Assert.That(reply, Reply.IsNotError);
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageReturnInfo>().Message.Type,
                         Is.EqualTo(CanMessageReturnInfo.TypeBootloaderName));
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageUpdateYourFirmware>().Message.Module,
@@ -189,7 +189,7 @@ public class M997ExpansionBoardTests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync($"M997 B{Board}");
 
-        Assert.That(reply, Does.Not.StartWith("Error:"), "the .uf2 is the file being looked for");
+        Assert.That(reply, Reply.IsNotError, "the .uf2 is the file being looked for");
         Assert.That(bench.CanMaster.CanMessages<CanMessageUpdateYourFirmware>(), Has.Count.EqualTo(1));
     }
 
@@ -209,7 +209,7 @@ public class M997ExpansionBoardTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain("Error: "));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageReturnInfo>(), Is.Empty, "refused before asking the board anything");
             Assert.That(bench.CanMaster.CanMessages<CanMessageUpdateYourFirmware>(), Is.Empty);
         });
@@ -225,7 +225,7 @@ public class M997ExpansionBoardTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain("CAN address out of range"));
+            Assert.That(reply, Reply.IsError("CAN address out of range"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageReturnInfo>(), Is.Empty);
         });
     }
@@ -244,7 +244,7 @@ public class M997ExpansionBoardTests : BenchFixture
         BoardState? state = await bench.Host.ReadModelAsync(model => model.FindBoard(Board)?.State);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain($"Firmware file {FirmwareFile} not found"));
+            Assert.That(reply, Reply.IsError($"Firmware file {FirmwareFile} not found"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageUpdateYourFirmware>(), Is.Empty);
             Assert.That(state, Is.EqualTo(BoardState.Running));
         });
@@ -264,7 +264,7 @@ public class M997ExpansionBoardTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain($"CAN response timeout: board {Board}"));
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(Board)));
             Assert.That(bench.CanMaster.CanMessages<CanMessageUpdateYourFirmware>(), Is.Empty);
         });
     }
@@ -291,7 +291,7 @@ public class M997ExpansionBoardTests : BenchFixture
         BoardState? state = await bench.Host.ReadModelAsync(model => model.FindBoard(Board)?.State);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("unknown firmware module number"));
+            Assert.That(reply, Reply.IsError("unknown firmware module number"));
             Assert.That(state, Is.EqualTo(BoardState.Running));
         });
     }

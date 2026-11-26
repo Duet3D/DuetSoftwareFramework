@@ -86,7 +86,7 @@ public class M593Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M593 P\"none\"");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Shaping.Type), Is.EqualTo(InputShapingType.None),
                     "M593 P\"none\" sets move.shaping.type back to none (RRF AxisShaper::Configure)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M593")).Trim(), Is.EqualTo("Input shaping is disabled"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M593"), Reply.IsSuccess("Input shaping is disabled"),
                     "bare M593 with shaping off reports so (AxisShaper::Configure)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Shaping.Amplitudes.Count), Is.EqualTo(1),
                     "a disabled shaper is a single unit impulse (RRF numImpulses = 1)");

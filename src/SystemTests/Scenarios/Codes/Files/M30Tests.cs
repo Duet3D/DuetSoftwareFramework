@@ -42,7 +42,7 @@ public class M30Tests : BenchFixture
                         "M20 no longer lists the deleted file");
         });
         Assert.That(await bench.Host.ExecuteCodeAsync("M30 \"0:/gcodes/doomed.gcode\""),
-                    Does.Contain("delete failed"),
+                    Reply.IsError("delete failed"),
                     "M30 reports a failure to delete (GCodes2.cpp case 30)");
     }
 }

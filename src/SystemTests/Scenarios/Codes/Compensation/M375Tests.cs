@@ -32,6 +32,6 @@ public class M375Tests : BenchFixture
                     "M375 sets move.compensation.file to the loaded map");
         Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.LiveGrid!.Spacings[0]), Is.EqualTo(40).Within(1e-3),
                     "move.compensation.liveGrid.spacings[0] comes from the file's grid");
-        Assert.That(loadReply.Trim(), Is.Empty, "M375 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
+        Assert.That(loadReply, Reply.IsEmpty, "M375 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
     }
 }

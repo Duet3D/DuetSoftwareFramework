@@ -63,8 +63,8 @@ public class M3M4M5Tests : BenchFixture
             Assert.That(spindle!.Active, Is.EqualTo(6000), "M5 keeps the configured RPM in spindles[0].active (RRF Spindle::SetState)");
         });
 
-        string reply = (await host.ExecuteCodeAsync("M3 S5000")).Trim();
-        Assert.That(reply, Does.Contain("No P parameter and no active tool with spindle"),
+        string reply = await host.ExecuteCodeAsync("M3 S5000");
+        Assert.That(reply, Reply.IsError("No P parameter and no active tool with spindle"),
                     "M3 without P and without a spindle tool is refused (RRF GCodes2.cpp M3 case)");
     }
 

@@ -32,9 +32,9 @@ public class M350Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(
-                        $"M350 X{microstepping} Y{microstepping} Z{microstepping} I{(interpolated ? 1 : 0)}")).Trim(),
-                    Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync(
+                        $"M350 X{microstepping} Y{microstepping} Z{microstepping} I{(interpolated ? 1 : 0)}"),
+                    Reply.IsEmpty);
 
         (_, CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping sent) =
             bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>();
@@ -82,8 +82,8 @@ public class M350Tests : BenchFixture
         });
 
         await bench.Host.ExecuteCodeAsync("M350 E16 I0");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350")).TrimEnd(),
-                    Is.EqualTo("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350"),
+                    Reply.IsSuccess("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16"),
                     "the report suffixes (on) for an interpolating drive and nothing for one that is "
                     + "not (m350-microstepping-for-extruder.yaml)");
     }
@@ -101,8 +101,8 @@ public class M350Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.WithoutDriveSettings);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350")).TrimEnd(),
-                    Is.EqualTo("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16(on)"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350"),
+                    Reply.IsSuccess("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16(on)"));
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public class M350Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M350 X32{interpolation}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M350 X32{interpolation}"), Reply.IsEmpty);
 
         (_, CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping sent) =
             bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>();
@@ -147,7 +147,7 @@ public class M350Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(report), "the same report a bare M350 gives");
+            Assert.That(reply, Reply.IsSuccess(report), "the same report a bare M350 gives");
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Microstepping.Interpolated), Is.True,
                         "I alone does not touch any drive");
@@ -166,7 +166,7 @@ public class M350Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350")).TrimEnd(), Is.EqualTo(expected));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350"), Reply.IsSuccess(expected));
     }
 
     private static readonly TestCaseData[] Reports =
@@ -199,7 +199,7 @@ public class M350Tests : BenchFixture
         float zSteps = await bench.Host.ReadModelAsync(model => model.Move.Axes[2].StepsPerMm);
         float eSteps = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].StepsPerMm);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350 X32 Z64 E64 I1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350 X32 Z64 E64 I1"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>();
         Assert.That(sent, Has.Count.EqualTo(2), "one request per board");
@@ -256,7 +256,7 @@ public class M350Tests : BenchFixture
             await bench.Host.ReadModelAsync(model => model.Move.Extruders[1].StepsPerMm),
         ];
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M350 {parameter} I1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M350 {parameter} I1"), Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {
@@ -292,7 +292,7 @@ public class M350Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(
             DriversRig.Config, $"M584 E{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)}\nM350 E16:16 I1");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M350 E-1:64 I1"), Does.StartWith("Error:"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350 E-1:64 I1"), Reply.IsError());
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Microstepping.Value), Is.EqualTo(16));
@@ -320,7 +320,7 @@ public class M350Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Microstepping.Value), Is.EqualTo(32),
                         "X was read before the refusal, so it stands");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].StepsPerMm), Is.EqualTo(xSteps * 2).Within(1e-3));
@@ -370,7 +370,7 @@ public class M350Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.X);
 
         await bench.Host.ExecuteCodeAsync("G1 X10 F6000");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350 X32 I1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350 X32 I1"), Reply.IsEmpty);
         int before = bench.CanMaster.ScheduledSteps(Machines.XDriver);
         IReadOnlyList<ScheduledMove> after = await bench.RunMoveAsync("G1 X20 F6000");
 
@@ -413,8 +413,7 @@ public class M350Tests : BenchFixture
         float Expected(float steps) => MathF.Max(steps * microstepping / 16, Move.MinimumStepsPerMm);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
-            Assert.That(reply, Does.Contain(refusal), "the board's reason is carried back");
+            Assert.That(reply, Reply.IsError(refusal), "the board's reason is carried back");
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>().Select(m => m.Board),
                         Is.EqualTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
                         "the refusal from the first board does not stop the second being told");
@@ -441,7 +440,7 @@ public class M350Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M350 X32 I1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Microstepping.Value), Is.EqualTo(32));
         });
     }

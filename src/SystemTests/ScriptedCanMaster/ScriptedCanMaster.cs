@@ -799,6 +799,15 @@ internal sealed class ScriptedCanMaster : IDisposable
                     .Where(p => p.SbcRequest == request)
                     .ToArray();
 
+    /// <summary>Every CAN message the machine has sent, of any type, oldest first</summary>
+    /// <remarks>
+    /// What a scenario asserts is empty when a code must put nothing on the bus at all. A failure
+    /// names each message and the board it went to
+    /// </remarks>
+    public IReadOnlyList<SentCanMessage> CanMessages()
+        => [.. SbcPackets(SbcRequest.SendCANMessage).Select(packet => packet.DecodeCanMessage())
+                                                    .Select(sent => new SentCanMessage(sent.Header.DstAddress, (CanMessageType)sent.Header.MsgType, sent.Payload))];
+
     /// <summary>Every CAN message of one type the machine has sent, oldest first</summary>
     /// <typeparam name="T">The message, which names its own <c>CanMessageType</c></typeparam>
     /// <returns>The messages, each with the CAN address of the board it was addressed to</returns>
