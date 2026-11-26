@@ -71,7 +71,7 @@ public sealed class MachineCapture(CaptureHeader header)
     {
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, FileName);
-        using (StreamWriter writer = new(path, append: false, Encoding.UTF8))
+        using (StreamWriter writer = new(path, append: false, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
         {
             writer.WriteLine(JsonSerializer.Serialize(Header, JsonOptions));
             foreach (CaptureEvent e in _events)

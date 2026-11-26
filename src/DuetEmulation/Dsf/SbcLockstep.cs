@@ -43,7 +43,12 @@ internal sealed class SbcLockstep
 
     private static long s_hostPoolThreads;
 
+    // The longest run of the emulation while the SBC link is idle
+    private static readonly TimeSpan MaxSlice = TimeSpan.FromMilliseconds(8);
+
     private readonly EmulatedSystem _system;
+    private TimeSpan _slice;
+    private bool _linkActive = true;
     private uint _exchangesSynced;
     private bool _connectionSynced;
     private TimeSpan _sbcTime;
@@ -80,9 +85,28 @@ internal sealed class SbcLockstep
         while (_system.Time < until)
         {
             await CatchUpAsync(cancellationToken);
-            await _system.RunForAsync(_system.Quantum, cancellationToken);
+            TimeSpan slice = NextSlice(until);
+            await _system.RunForAsync(slice, cancellationToken);
         }
         await CatchUpAsync(cancellationToken);
+    }
+
+    // How long to run before the SBC side next catches up: a quantum while the link is busy, so that
+    // the SBC answers the controller as promptly as it would; longer, up to MaxSlice, while it is
+    // idle, since each run of the emulation costs far more real time than a quantum of it. Never past
+    // the end of the wait or DuetControlServer's next timer, and always whole quanta
+    private TimeSpan NextSlice(TimeSpan until)
+    {
+        TimeSpan quantum = _system.Quantum;
+        _slice = _linkActive ? quantum : TimeSpan.FromTicks(Math.Min(_slice.Ticks * 2, MaxSlice.Ticks));
+        _linkActive = false;
+        TimeSpan limit = until - _system.Time;
+        if (Clock.NextDue is TimeSpan due)
+        {
+            limit = due - _system.Time < limit ? due - _system.Time : limit;
+        }
+        long quanta = Math.Max(1, Math.Min(_slice.Ticks, (limit.Ticks + quantum.Ticks - 1) / quantum.Ticks * quantum.Ticks) / quantum.Ticks);
+        return TimeSpan.FromTicks(quanta * quantum.Ticks);
     }
 
     /// <summary>
@@ -109,6 +133,7 @@ internal sealed class SbcLockstep
             if (frame == due)
             {
                 DuetRT_EmulatorReleaseFrame();
+                _linkActive = true;
             }
             else
             {
@@ -202,6 +227,7 @@ internal sealed class SbcLockstep
         }
 
         ulong framesSent = await _system.Renode.ExecuteForNumberAsync($"{SbcBridge} Sync 1 {exchangesSent}", _system.Main.Machine, cancellationToken);
+        _linkActive = true;
         _connectionSynced = true;
         _exchangesSynced = exchangesSent;
 
