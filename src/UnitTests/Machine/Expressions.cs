@@ -92,6 +92,18 @@ namespace UnitTests.Machine
         }
 
         [Test]
+        public async Task DeepNestingThrows()
+        {
+            DuetControlServer.Commands.Code code = new();
+            string shallowExpression = new string('(', 50) + "1" + new string(')', 50);
+            Assert.That(await DuetControlServer.Model.Expressions.EvaluateExpression(code, shallowExpression, true, false), Is.EqualTo(shallowExpression));
+
+            await Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.EvaluateExpression(code, new string('(', 1000000) + "1" + new string(')', 1000000), true, false));
+            await Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.EvaluateExpression(code, new string('[', 1000000) + "1" + new string(']', 1000000), true, false));
+            await Assert.ThrowsAsync<CodeParserException>(async () => await DuetControlServer.Model.Expressions.EvaluateExpression(code, new string('{', 1000000) + "1" + new string('}', 1000000), true, false));
+        }
+
+        [Test]
         public async Task EvaluateEnum()
         {
             DuetControlServer.Model.Provider.Get.Network.Interfaces.Clear();

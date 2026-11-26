@@ -334,6 +334,7 @@ namespace DuetControlServer.Codes.Handlers
                                 FileStream fileStream = new(physicalFile, FileMode.Create, FileAccess.Write, FileShare.Read, Settings.FileBufferSize);
                                 StreamWriter writer = new(fileStream, new UTF8Encoding(false), Settings.FileBufferSize);
                                 Commands.Code.FilesBeingWritten[numChannel] = writer;
+                                Commands.Code.FileWriterConnections[numChannel] = code.SourceConnection;
                                 return new Message(MessageType.Success, prefix + $"Writing to file: {file}");
                             }
                             catch (Exception e)

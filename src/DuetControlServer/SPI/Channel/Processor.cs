@@ -601,6 +601,15 @@ namespace DuetControlServer.SPI.Channel
 
             if (abortAll)
             {
+                // Cancelling the codes wakes the job task, which must see the job aborted
+                if (Channel is CodeChannel.File or CodeChannel.File2)
+                {
+                    using (JobProcessor.Lock())
+                    {
+                        JobProcessor.Abort();
+                    }
+                }
+
                 // Cancel pending codes and requests
                 InvalidateRegular();
             }
@@ -623,8 +632,8 @@ namespace DuetControlServer.SPI.Channel
                 }
             }
 
-            // Abort the file print if necessary
-            if ((Channel is CodeChannel.File or CodeChannel.File2) && (abortAll || !macroAborted))
+            // Abort the file print if the aborted file was the job itself rather than a macro
+            if ((Channel is CodeChannel.File or CodeChannel.File2) && !abortAll && !macroAborted)
             {
                 using (JobProcessor.Lock())
                 {
@@ -688,11 +697,7 @@ namespace DuetControlServer.SPI.Channel
                 }
             }
 
-            // Cancel pending codes and requests
-            _allFilesAborted = (DataTransfer.ProtocolVersion >= 3);
-            InvalidateRegular();
-
-            // Abort the job files if necessary
+            // Cancelling the codes wakes the job task, which must see the job aborted
             if (Channel is CodeChannel.File or CodeChannel.File2)
             {
                 using (await JobProcessor.LockAsync())
@@ -700,6 +705,10 @@ namespace DuetControlServer.SPI.Channel
                     JobProcessor.Abort();
                 }
             }
+
+            // Cancel pending codes and requests
+            _allFilesAborted = (DataTransfer.ProtocolVersion >= 3);
+            InvalidateRegular();
         }
 
         /// <summary>

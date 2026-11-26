@@ -107,6 +107,15 @@ namespace DuetControlServer.IPC.Processors
             using StreamReader streamReader = new(stream);
             await using StreamWriter streamWriter = new(stream);
 
+            // Prepare some code instances as a buffer
+            int numCodes = Math.Max(_bufferSize, 1);
+            AsyncMonitor codeLock = new();
+            Queue<Code> codes = new();
+            for (int i = 0; i < numCodes; i++)
+            {
+                codes.Enqueue(new Code());
+            }
+
             _streamWriter = streamWriter;
             lock (_streams)
             {
@@ -121,15 +130,6 @@ namespace DuetControlServer.IPC.Processors
                     // Fanuc CNC and LaserWeb G-code may omit the last major G-code number
                     parserBuffer.MayRepeatCode = Model.Provider.Get.State.MachineMode == MachineMode.CNC ||
                                                  Model.Provider.Get.State.MachineMode == MachineMode.Laser;
-                }
-
-                // Prepare some code instances as a buffer
-                int numCodes = Math.Max(_bufferSize, 1);
-                AsyncMonitor codeLock = new();
-                Queue<Code> codes = new();
-                for (int i = 0; i < numCodes; i++)
-                {
-                    codes.Enqueue(new Code());
                 }
 
                 do
@@ -158,7 +158,9 @@ namespace DuetControlServer.IPC.Processors
                                     code = codes.Dequeue();
                                 }
                             }
+                            // Reset() keeps the token, which may be cancelled by now
                             code.Reset();
+                            code.CancellationToken = default;
 
                             // Read the next code from the stream, execute it, and put the code instance back into the buffer
                             try
@@ -281,7 +283,57 @@ namespace DuetControlServer.IPC.Processors
                     _streams.Remove(this);
                 }
                 _streamWriter = null;
+
+                // The pending codes may still be lines of a file being written, so they must finish before that file is abandoned
+                using (await codeLock.EnterAsync(Program.CancellationToken))
+                {
+                    while (codes.Count < numCodes)
+                    {
+                        await codeLock.WaitAsync(Program.CancellationToken);
+                    }
+                }
+                await AbortTextFileUploadAsync();
             }
+        }
+
+        /// <summary>
+        /// Abandon the text file upload that this connection has started with M28 and not finished with M29, and delete the partial file.
+        /// Otherwise the codes of the next connection on this channel would be written to the file.
+        /// RepRapFirmware does the same when the host of a serial input disconnects.
+        /// </summary>
+        /// <returns>Asynchronous task</returns>
+        private async Task AbortTextFileUploadAsync()
+        {
+            int numChannel = (int)_channel;
+            string physicalFile;
+            using (await Code.FileLocks[numChannel].LockAsync(Program.CancellationToken))
+            {
+                StreamWriter? writer = Code.FilesBeingWritten[numChannel];
+                if (writer is null || Code.FileWriterConnections[numChannel] != Connection.Id)
+                {
+                    return;
+                }
+
+                Code.FilesBeingWritten[numChannel] = null;
+                physicalFile = ((FileStream)writer.BaseStream).Name;
+                try
+                {
+                    File.Delete(physicalFile);
+                }
+                catch (Exception e)
+                {
+                    _logger.Debug(e, "IPC#{0}: Failed to delete partial file", Connection.Id);
+                }
+                try
+                {
+                    await writer.DisposeAsync();
+                }
+                catch (Exception e)
+                {
+                    _logger.Debug(e, "IPC#{0}: Failed to close partial file", Connection.Id);
+                }
+            }
+            await Utility.Logger.LogOutputAsync(MessageType.Error, $"Upload of {await Files.FilePath.ToVirtualAsync(physicalFile)} aborted because the client disconnected, partial file deleted");
         }
 
         /// <summary>

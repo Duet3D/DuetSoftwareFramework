@@ -99,6 +99,11 @@ namespace DuetControlServer.Commands
         public static readonly StreamWriter?[] FilesBeingWritten = new StreamWriter[Inputs.Total];
 
         /// <summary>
+        /// IDs of the connections that started the files being written to, so that a code stream can abandon its file when it is closed
+        /// </summary>
+        public static readonly int[] FileWriterConnections = new int[Inputs.Total];
+
+        /// <summary>
         /// Constructor of a new code
         /// </summary>
         public Code() : base() { }

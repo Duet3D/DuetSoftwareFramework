@@ -9,6 +9,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -767,6 +768,12 @@ namespace DuetControlServer.Model
             // Eat a sub-expression and evaluate SBC-only properties + custom functions where applicable
             async Task<string> eatExpression(char brace, bool raw = false)
             {
+                // A stack overflow cannot be caught and would terminate the process
+                if (!RuntimeHelpers.TryEnsureSufficientExecutionStack())
+                {
+                    throw new CodeParserException("Expression nesting too deep", code);
+                }
+
                 StringBuilder lastToken = new(), result = new();
                 while (i < expression.Length)
                 {
