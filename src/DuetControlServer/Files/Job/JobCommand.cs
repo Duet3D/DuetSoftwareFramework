@@ -73,8 +73,8 @@ internal enum FreezeAt
 /// </summary>
 /// <param name="Stream">Motion system</param>
 /// <param name="Point">The rewind point, or null when the reader's own position is the answer</param>
-/// <param name="AbandonedMacros">Whether the resume replays a macro invocation</param>
-internal readonly record struct StreamRewind(int Stream, JobResumePoint? Point, bool AbandonedMacros);
+/// <param name="RestartsMacro">Whether the resume replays a macro invocation</param>
+internal readonly record struct StreamRewind(int Stream, JobResumePoint? Point, bool RestartsMacro);
 
 /// <summary>
 /// How a sequence ended

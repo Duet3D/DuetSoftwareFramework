@@ -424,4 +424,22 @@ public class JobEdgeCaseTests : BenchFixture
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job finished normally");
         });
     }
+
+    /// <summary>A macro called first after a resume at the job's own level is not a restarted one</summary>
+    /// <remarks>RRF sets firstCommandAfterRestart on a resume only if the pause abandoned a macro (GCodes4.cpp resuming3)</remarks>
+    [Test]
+    public async Task MacroAfterAResumeIsNotRestarted()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed).WithSd(sd =>
+        {
+            sd.WriteMacro("outer.g", "set global.macroRuns = 1\nif state.macroRestarted\n    set global.macroRuns = 2\n");
+            sd.WriteGCode("job.gcode", "G90\nG1 X20 Y20 F6000\nM226\nM98 P\"0:/macros/outer.g\"\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(1));
+    }
 }

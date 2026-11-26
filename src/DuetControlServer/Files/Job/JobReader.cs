@@ -146,7 +146,7 @@ internal sealed class JobReader
     {
         using (await File.LockAsync(cancellationToken))
         {
-            File.FirstCommandAfterRestart = restartMacro || File.Position > 0;
+            File.FirstCommandAfterRestart = restartMacro;
             File.HoldAtNextCode = false;
         }
 

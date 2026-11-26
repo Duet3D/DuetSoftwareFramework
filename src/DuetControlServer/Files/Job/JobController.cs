@@ -789,7 +789,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                     await EndRunAsync(PrintStoppedReason.Abort);
                     return;
                 }
-                await BeginRunningAsync(state);
+                await BeginRunningAsync(state with { Streams = [.. Starting(state.Streams)] });
                 request?.Reply(outcome.Reply);
                 return;
 
@@ -869,7 +869,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         await PublishAsync(state with { Phase = JobPhase.Running });
         foreach (JobStream stream in state.Streams)
         {
-            await stream.Reader.RunAsync(stream.AbandonedMacros, RunToken, _lifetime.ApplicationStopping);
+            await stream.Reader.RunAsync(stream.RestartsMacro, RunToken, _lifetime.ApplicationStopping);
         }
         await PublishAsync(_state with
         {
@@ -1113,7 +1113,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     {
         JobReader reader = new(index, file, _commands.Writer, _codeFactory, _codeProcessor, _eventLogger,
                                _loggerFactory.CreateLogger<JobReader>(), _settings.BufferedPrintCodes);
-        return new JobStream(index, file.Channel, reader, AbandonedMacros: false, Finished: false);
+        return new JobStream(index, file.Channel, reader, RestartsMacro: false, Finished: false);
     }
 
     /// <summary>
@@ -1128,13 +1128,25 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     }
 
     /// <summary>
+    /// The streams as a run that has not begun starts them
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>StartPrinting</c> takes a start from an offset for a restart</remarks>
+    private static IEnumerable<JobStream> Starting(ImmutableArray<JobStream> streams)
+    {
+        foreach (JobStream stream in streams)
+        {
+            yield return stream with { RestartsMacro = stream.Reader.Position > 0 };
+        }
+    }
+
+    /// <summary>
     /// The streams with what a resume has just spent taken back off
     /// </summary>
     private static IEnumerable<JobStream> Restarted(ImmutableArray<JobStream> streams)
     {
         foreach (JobStream stream in streams)
         {
-            yield return stream with { AbandonedMacros = false, Finished = false };
+            yield return stream with { RestartsMacro = false, Finished = false };
         }
     }
 
@@ -1153,7 +1165,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 {
                     if (rewind.Stream == stream.Index)
                     {
-                        result = stream with { AbandonedMacros = rewind.AbandonedMacros };
+                        result = stream with { RestartsMacro = rewind.RestartsMacro };
                         break;
                     }
                 }

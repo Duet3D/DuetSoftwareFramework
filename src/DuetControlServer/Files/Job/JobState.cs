@@ -81,12 +81,12 @@ internal sealed record NextSelection(JobFile File, bool Start);
 /// <param name="Index">Motion system this stream belongs to</param>
 /// <param name="Channel">Channel its codes go to</param>
 /// <param name="Reader">The reader that owns its file</param>
-/// <param name="AbandonedMacros">
-/// Whether the pause abandoned macros this stream was inside, which is RepRapFirmware's
-/// <c>pausedInMacro</c> and what the resume sets <c>firstCommandAfterRestart</c> from
+/// <param name="RestartsMacro">
+/// Whether the first code it reads is run again: the pause abandoned macros the stream was inside, RepRapFirmware's
+/// <c>pausedInMacro</c>, or the job starts from an offset. RepRapFirmware's <c>firstCommandAfterRestart</c>
 /// </param>
 /// <param name="Finished">Whether this stream has read its file to the end</param>
-internal sealed record JobStream(int Index, CodeChannel Channel, JobReader Reader, bool AbandonedMacros, bool Finished);
+internal sealed record JobStream(int Index, CodeChannel Channel, JobReader Reader, bool RestartsMacro, bool Finished);
 
 /// <summary>
 /// Everything there is to know about the job, as one value
