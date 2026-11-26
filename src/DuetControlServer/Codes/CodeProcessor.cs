@@ -101,13 +101,23 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// </remarks>
     public async Task AbortAllFilesAsync(CodeChannel channel, CancellationToken cancellationToken = default)
     {
-        await Processors.Value[(int)channel].AbortAllFilesAsync(cancellationToken);
-
         if (channel is CodeChannel.File or CodeChannel.File2)
         {
-            await serviceProvider.GetRequiredService<Files.Job.JobController>().AbortAsync();
+            // The job and its macros are one thing to abort, so its controller does both
+            await serviceProvider.GetRequiredService<Files.Job.JobController>().AbortAsync(channel);
+            return;
         }
+        await AbortMacrosAsync(channel, cancellationToken);
     }
+
+    /// <summary>
+    /// Abort the macros running on a code channel, leaving the job to the caller
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task, which does not wait for the macros to end</returns>
+    public Task AbortMacrosAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+        => Processors.Value[(int)channel].AbortAllFilesAsync(cancellationToken);
 
     /// <summary>
     /// Whether every macro running on a channel can be restarted from its beginning

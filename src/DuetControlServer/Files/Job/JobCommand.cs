@@ -133,8 +133,8 @@ internal abstract record JobCommand
     /// <summary>Stop the job, or put the machine down when there is none (M0, M1, M2)</summary>
     public sealed record Stop(CodeChannel Channel) : JobCommand;
 
-    /// <summary>Tear the job down because something went wrong</summary>
-    public sealed record Abort : JobCommand;
+    /// <summary>Tear the job down because something went wrong, with the macros on one of the file channels</summary>
+    public sealed record Abort(CodeChannel Channel) : JobCommand;
 
     /// <summary>Set where in the file the job starts or carries on from (M26)</summary>
     public sealed record SetFilePosition(int Stream, long Position) : JobCommand;

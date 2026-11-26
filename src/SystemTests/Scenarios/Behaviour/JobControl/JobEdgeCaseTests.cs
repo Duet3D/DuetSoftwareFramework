@@ -425,6 +425,57 @@ public class JobEdgeCaseTests : BenchFixture
         });
     }
 
+    /// <summary>An abort in a macro ends the job with the macro, so nothing after the call runs</summary>
+    /// <remarks>RRF GCodes::AbortPrint stops the print before anything else of the file is read</remarks>
+    [Test]
+    public async Task AbortInAMacroOfTheJob()
+    {
+        await using Bench bench = await Bench.With(JobMacros.Instrumented, "global jobAfter = 0").WithSd(sd =>
+        {
+            sd.WriteMacro("outer.g", "M98 P\"0:/macros/inner.g\"\nset global.jobAfter = 1\n");
+            sd.WriteMacro("inner.g", "set global.macroRuns = global.macroRuns + 1\nabort\n");
+            sd.WriteGCode("job.gcode", "M98 P\"0:/macros/outer.g\"\nset global.jobAfter = 2\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.Zero);
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Job.LastFileAborted), Is.True);
+    }
+
+    /// <summary>An abort in stop.g ends that run only: a job that stop.g chained to runs whole, its start.g included</summary>
+    [Test]
+    public async Task AbortInStopMacroLeavesTheNextJobAlone()
+    {
+        await using Bench bench = await Bench.With(JobMacros.Instrumented, "global jobAfter = 0\nglobal startEnd = 0").WithSd(sd =>
+        {
+            sd.WriteGCode("job.gcode", "set global.macroRuns = 1\n");
+            sd.WriteGCode("second.gcode", "set global.jobAfter = global.jobAfter + 1\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("stopRan", 1);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        bench.Host.Sd.WriteSys("start.g", "set global.startRan = global.startRan + 1\nG4 P200\nset global.startEnd = global.startEnd + 1\n");
+        bench.Host.Sd.WriteSys("stop.g", """
+            set global.stopRan = global.stopRan + 1
+            if global.stopRan == 2
+                M32 "0:/gcodes/second.gcode"
+                abort
+            """);
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("stopRan", 3);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("startEnd"), Is.EqualTo(2), "the start.g of the chained job ran to its end");
+            Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(1), "the chained job ran");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[DuetAPI.CodeChannel.File]!.StackDepth), Is.Zero);
+        });
+    }
+
     /// <summary>A macro called first after a resume at the job's own level is not a restarted one</summary>
     /// <remarks>RRF sets firstCommandAfterRestart on a resume only if the pause abandoned a macro (GCodes4.cpp resuming3)</remarks>
     [Test]

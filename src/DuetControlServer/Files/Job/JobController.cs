@@ -225,18 +225,19 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         => PostAsync(new JobCommand.Stop(channel), cancellationToken);
 
     /// <summary>
-    /// Tear the job down because it cannot carry on
+    /// Tear the job down because it cannot carry on, and abort the macros of a file channel
     /// </summary>
+    /// <param name="channel">File channel whose macros to abort, whether or not there is a job</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
     /// A code error, an <c>abort</c> keyword, the link going down, a shutdown. Awaited only as far as
     /// the transition: what the machine does about it is a sequence like any other
     /// </remarks>
-    public async ValueTask AbortAsync()
+    public async ValueTask AbortAsync(CodeChannel channel)
     {
         try
         {
-            await PostAsync(new JobCommand.Abort(), CancellationToken.None);
+            await PostAsync(new JobCommand.Abort(channel), CancellationToken.None);
         }
         catch (OperationCanceledException)
         {
@@ -256,7 +257,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// the job has in flight. The command is queued like any other, so it is still ordered against
     /// everything else the job is asked to do
     /// </remarks>
-    public void Abort() => _commands.Writer.TryWrite(new JobCommand.Abort());
+    public void Abort() => _commands.Writer.TryWrite(new JobCommand.Abort(CodeChannel.File));
 
     /// <summary>
     /// Fork the job onto the second file channel
@@ -596,6 +597,12 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private async ValueTask OnAbortAsync(JobCommand.Abort command)
     {
         JobState state = _state;
+
+        // In one step, so that no macro carries on in the job and no other job starts under the abort. The reading
+        // stops first, because the code that called an aborted macro ends with it
+        StopReading(state);
+        await _codeProcessor.AbortMacrosAsync(command.Channel);
+
         switch (state.Phase)
         {
             case JobPhase.Idle:
@@ -612,10 +619,15 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
 
             case JobPhase.Finishing:
                 // The stop macro is cut short and never runs again; what is left is the teardown,
-                // which the run cannot end without
+                // which the run cannot end without. The sequence that ran the macro unwinds first, so
+                // that the next job does not start on top of it
+                Task stopping = _sequence ?? Task.CompletedTask;
                 CancelSequence();
-                StopReading(state);
-                StartSequence(null, token => _sequences.TeardownAsync(_state, token));
+                StartSequence(null, async token =>
+                {
+                    await stopping;
+                    return await _sequences.TeardownAsync(_state, token);
+                });
                 command.Reply(new Message());
                 return;
 
@@ -624,7 +636,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 return;
 
             default:
-                StopReading(state);
                 await PublishAsync(state with { Phase = JobPhase.Aborting, PendingPause = null });
                 await DropPendingPauseAsync(state);
                 if (_sequence is null)
@@ -750,7 +761,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         _logger.LogError(command.Error, "Job stream {Stream} failed", command.Stream);
         if (_state.IsProcessing)
         {
-            await OnAbortAsync(new JobCommand.Abort());
+            await OnAbortAsync(new JobCommand.Abort(CodeChannel.File));
         }
     }
 
