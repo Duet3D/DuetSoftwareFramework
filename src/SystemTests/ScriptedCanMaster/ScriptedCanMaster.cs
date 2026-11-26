@@ -921,10 +921,10 @@ internal sealed class ScriptedCanMaster : IDisposable
     /// <summary>Wait until the given condition holds, failing with the capture dump if it never does</summary>
     public async Task WaitUntilAsync(Func<bool> condition, int timeoutMs = 10_000, string? what = null)
     {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        long deadline = Environment.TickCount64 + timeoutMs;
         while (!condition())
         {
-            if (DateTime.UtcNow >= deadline)
+            if (Environment.TickCount64 >= deadline)
             {
                 throw new TimeoutException($"Timed out waiting: {what ?? "condition"}\nCaptured exchanges:\n{DumpCapture()}");
             }
