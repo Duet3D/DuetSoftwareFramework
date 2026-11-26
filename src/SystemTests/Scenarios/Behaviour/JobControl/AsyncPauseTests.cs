@@ -162,15 +162,10 @@ public class AsyncPauseTests : BenchFixture
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
 
         // The machine has stopped and nothing has moved it since, so this is the position the
-        // restore point is meant to hold
-        double restX = await bench.Host.MachinePositionAsync(0);
-        double restY = await bench.Host.MachinePositionAsync(1);
+        // restore point is meant to hold. The live position is read from the engine every so often
         (double pausedX, double pausedY) = await bench.Host.RestorePointAsync(1);
-        Assert.Multiple(() =>
-        {
-            Assert.That(pausedX, Is.EqualTo(restX).Within(0.05), "the restore point holds the X the head stopped at");
-            Assert.That(pausedY, Is.EqualTo(restY).Within(0.05), "and the Y");
-        });
+        await bench.WaitForMachinePositionAsync(0, pausedX);
+        await bench.WaitForMachinePositionAsync(1, pausedY);
 
         // And the interpreter agrees, so what the resume schedules is measured from the same place:
         // a planner that believed the head were elsewhere would make the rest of the job travel the
@@ -438,5 +433,31 @@ public class AsyncPauseTests : BenchFixture
             Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(8 * Machines.EStepsPerMm).Within(1e-2f),
                         "the extrusion over the whole line totals 8 mm regardless of the two stops");
         });
+    }
+
+    /// <summary>A pause does not wait for one stream of a forked job to get to a code that the other waits at</summary>
+    /// <remarks>The first stream forks in a macro, so the second gets to the M226 first and waits there for it</remarks>
+    [Test]
+    public async Task PauseWhileOneStreamWaitsForTheOther()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "global jobAfter = 0", Machines.Xye.Homed).WithSd(sd =>
+        {
+            sd.WriteMacro("fork.g", "M98 R1\nM606 S1\nset global.macroRuns = 1\nG4 P1500\n");
+            sd.WriteGCode("job.gcode", "M98 P\"0:/macros/fork.g\"\nM226\nset global.jobAfter = 1\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await Task.Delay(250);
+        await bench.Host.ExecuteCodeAsync("M25", timeoutMs: 5000);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.Zero);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForGlobalAsync("pauseRan", 2);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(1));
     }
 }

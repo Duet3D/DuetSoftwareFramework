@@ -1,46 +1,42 @@
 ﻿using DuetAPI.Commands;
-using System.Collections.Generic;
 
 namespace DuetControlServer.Files;
 
 /// <summary>
-/// Class representing a code block in a conditional G-code file
+/// A code block that is open in a G-code file, and the blocks around it
 /// </summary>
-public record CodeBlock
+/// <remarks>
+/// Immutable, so that every code can refer to the blocks it was read in (<see cref="CodeFileState"/>). Reading on replaces
+/// a block by a changed copy of it
+/// </remarks>
+public sealed record CodeBlock
 {
     /// <summary>
     /// Constructor of this class
     /// </summary>
     /// <param name="startingCode">Code starting this block</param>
     /// <param name="processBlock">Whether instructions from this block may be processed</param>
-    public CodeBlock(Code startingCode, bool processBlock)
+    /// <param name="parent">Block around this one</param>
+    public CodeBlock(Code startingCode, bool processBlock, CodeBlock? parent)
     {
         Indent = startingCode.Indent;
         FilePosition = startingCode.FilePosition;
         LineNumber = startingCode.LineNumber;
         Keyword = startingCode.Keyword;
         ProcessBlock = processBlock;
+        Parent = parent;
+        Depth = (parent?.Depth ?? 0) + 1;
     }
 
     /// <summary>
-    /// Copy constructor used by with-expressions. The local variables need a deep copy, else forked
-    /// files share the same list and clearing it in one file clears it in the other one too
+    /// Block around this one, or null if there is none
     /// </summary>
-    /// <param name="original">Block to copy from</param>
-    protected CodeBlock(CodeBlock original)
-    {
-        Indent = original.Indent;
-        FilePosition = original.FilePosition;
-        LineNumber = original.LineNumber;
-        Keyword = original.Keyword;
-        ProcessBlock = original.ProcessBlock;
-        SeenCodes = original.SeenCodes;
-        ExpectingElse = original.ExpectingElse;
-        ContinueLoop = original.ContinueLoop;
-        Iterations = original.Iterations;
-        HasLocalVariables = original.HasLocalVariables;
-        LocalVariables = [.. original.LocalVariables];
-    }
+    public CodeBlock? Parent { get; private init; }
+
+    /// <summary>
+    /// How many blocks deep this one is, counting itself
+    /// </summary>
+    public int Depth { get; }
 
     /// <summary>
     /// Indentation of this block
@@ -72,35 +68,51 @@ public record CodeBlock
     /// <summary>
     /// Last evaluation result of the conditional start code indicating if this block is supposed to be processed
     /// </summary>
-    public bool ProcessBlock { get; set; }
+    public bool ProcessBlock { get; init; }
 
     /// <summary>
     /// Whether any codes or echo instructions have been executed so far
     /// </summary>
-    public bool SeenCodes { get; set; }
+    public bool SeenCodes { get; init; }
 
     /// <summary>
     /// Indicates if the corresponding condition may be followed by elif/else
     /// </summary>
-    public bool ExpectingElse { get; set; }
+    public bool ExpectingElse { get; init; }
 
     /// <summary>
     /// Indicates if continue was called in a while loop
     /// </summary>
-    public bool ContinueLoop { get; set; }
+    public bool ContinueLoop { get; init; }
 
     /// <summary>
     /// Number of times this code block has been run so far
     /// </summary>
-    public int Iterations { get; set; }
+    public int Iterations { get; init; }
 
     /// <summary>
     /// Indicates if this block contains local variables
     /// </summary>
-    public bool HasLocalVariables { get; set; }
+    public bool HasLocalVariables { get; init; }
 
     /// <summary>
-    /// List of local variables
+    /// The innermost while loop, this block included
     /// </summary>
-    public List<string> LocalVariables { get; } = [];
+    public CodeBlock? Loop => (Keyword == KeywordType.While) ? this : Parent?.Loop;
+
+    /// <summary>
+    /// Whether this block is in a while loop that is going to run again, or is one
+    /// </summary>
+    public bool IsInsideActiveLoop
+        => (Keyword == KeywordType.While && (ProcessBlock || ContinueLoop)) || Parent?.IsInsideActiveLoop == true;
+
+    /// <summary>
+    /// Skip the rest of this block and of the blocks around it, up to the innermost while loop
+    /// </summary>
+    /// <param name="continueLoop">Whether that loop goes on to its next iteration</param>
+    /// <returns>This block with that done</returns>
+    public CodeBlock Leave(bool continueLoop)
+        => (Keyword == KeywordType.While)
+            ? this with { ProcessBlock = false, ContinueLoop = continueLoop }
+            : this with { ProcessBlock = false, Parent = Parent?.Leave(continueLoop) };
 }

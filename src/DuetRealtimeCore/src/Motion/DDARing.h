@@ -37,7 +37,15 @@ class DDARing final
 
 	[[nodiscard]] unsigned int GetNumDdas() const noexcept { return m_numDdasInRing; }
 
-	[[nodiscard]] bool CanAddMove() const noexcept;
+	// A move is not added while the moves that are not committed will take this long...
+	static constexpr uint32_t maxUncommittedClocks = 2 * stepClockRate;
+
+	// ...and those after the first of them will take this long
+	static constexpr uint32_t maxUncommittedClocksAfterFirst = stepClockRate / 2;
+
+	// Whether the ring has room for another move, after `numPending` moves that will take `pendingClocks` between them
+	// and are on their way to it
+	[[nodiscard]] bool CanAddMove(unsigned int numPending = 0, uint32_t pendingClocks = 0) const noexcept;
 
 	// Queue a move that DuetControlServer has already worked out the shape of. Replaces upstream's
 	// AddStandardMove: the caller has done everything up to the point where the ring is needed.

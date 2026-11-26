@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using DuetAPI;
 using DuetAPI.ObjectModel;
 using NUnit.Framework;
 
@@ -18,13 +19,17 @@ namespace SystemTests.Scenarios.Behaviour.JobControl;
 public class DeferredPauseTests : BenchFixture
 {
     /// <summary>Four slow edges the pause can land in, counting its runs</summary>
+    /// <remarks>
+    /// The second and third edges take over 2 seconds between them, so the fourth does not fit into the
+    /// queue and the macro is still running while the first one is made (DDARing::CanAddMove)
+    /// </remarks>
     private const string SquareMacro = """
         set global.macroRuns = global.macroRuns + 1
         G90
         G1 X50 Y20 F3000
-        G1 X50 Y50 F3000
-        G1 X20 Y50 F3000
-        G1 X20 Y20 F3000
+        G1 X50 Y50 F1600
+        G1 X20 Y50 F1600
+        G1 X20 Y20 F6000
         """;
 
     /// <summary>
@@ -80,13 +85,12 @@ public class DeferredPauseTests : BenchFixture
     }
 
     /// <summary>
-    /// A pause during a non-pausable macro defers: every move of the macro completes, a second
-    /// M25 while the first is pending is refused with a warning, the pause fires after the macro
-    /// as a synchronous pause, and the macro is not rerun on resume
+    /// A pause during a non-pausable macro defers: every move of the macro completes, the M25 is not
+    /// answered until the macro has ended, a second M25 from another input is told that one is pending,
+    /// the pause fires after the macro as a synchronous pause, and the macro is not rerun on resume
     /// </summary>
     [Test]
     [Category("LongRunning")]
-    [Category("KnownGap")]
     public async Task PauseDuringPlainMacroDefers()
     {
         await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "global afterMacro = 0\n", Machines.Xye.Homed)
@@ -106,11 +110,14 @@ public class DeferredPauseTests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
         await bench.RunToPositionAsync(axis: 0, position: 30);
 
-        // The pause is accepted but pending; a second one is told so
-        await bench.Host.ExecuteCodeAsync("M25");
-        Assert.That(await bench.Host.ExecuteCodeAsync("M25"), Does.Contain("Pausing is already pending"),
+        // RRF holds the M25 in GCodeState::doingDeferredPause, and runs an M226 of the file in its place
+        Task<string> pause = bench.Host.ExecuteCodeAsync("M25");
+        await bench.RunToPositionAsync(axis: 0, position: 40);
+        Assert.That((await bench.Host.ExecuteCodeAsync("M25", CodeChannel.Telnet)).Trim(), Is.EqualTo("Pausing is already pending"),
                     "a second M25 while the first is pending");
+        Assert.That(pause.IsCompleted, Is.False, "the first M25 waits for the macro to end");
 
+        Assert.That((await pause).Trim(), Is.Empty, "the M25 reports nothing: the pause is made by the file");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.Multiple(async () =>
         {
@@ -130,6 +137,117 @@ public class DeferredPauseTests : BenchFixture
                         "the macro was not rerun: the deferred pause found nothing part-way");
             Assert.That(await bench.Host.GlobalAsync("afterMacro"), Is.EqualTo(1), "the job carried on after it");
             Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)), "and finished");
+        });
+    }
+
+    /// <summary>The macro of a deferred pause runs on the input of the job</summary>
+    [Test]
+    public async Task DeferredPauseRunsThePauseMacroOnTheFileInput()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "global onFile = 0", Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteMacro("plain.g", "set global.macroRuns = 1\nG4 P500\n");
+            sd.WriteGCode("job.gcode", "M98 P\"0:/macros/plain.g\"\nG4 P0\n");
+        }).StartAsync();
+        int file = await bench.Host.InputIndexAsync(CodeChannel.File);
+        bench.Host.Sd.WriteSys("pause.g", $"if inputs[{file}].inMacro\n    set global.onFile = 1\n");
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+
+        Assert.That(await bench.Host.GlobalAsync("onFile"), Is.EqualTo(1));
+    }
+
+    /// <summary>
+    /// A condition that has been read when the macro ends is evaluated after the resume, once the codes
+    /// before it have run
+    /// </summary>
+    [TestCase("if var.x == 1", TestName = "{m}(if)")]
+    [TestCase("while iterations < var.x", TestName = "{m}(while)")]
+    public async Task DeferredPauseBeforeACondition(string condition)
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "global met = 0", Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteMacro("plain.g", "set global.macroRuns = global.macroRuns + 1\nG4 P500\n");
+            sd.WriteGCode("job.gcode", $"""
+                M98 P"0:/macros/plain.g"
+                var x = 1
+                {condition}
+                    set global.met = global.met + 1
+                """);
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(await bench.Host.GlobalAsync("met"), Is.Zero, "the pause follows the macro");
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(1), "the macro is not run again");
+            Assert.That(await bench.Host.GlobalAsync("met"), Is.EqualTo(1));
+            Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the job ended normally");
+        });
+    }
+
+    /// <summary>An M25 that waits for a macro of the job lets that macro move, although its own input holds the movement lock</summary>
+    [Test]
+    public async Task DeferredPauseFromAnInputThatHoldsTheMovementLock()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteSys("homeall.g", "M25\n");
+            sd.WriteMacro("plain.g", "set global.macroRuns = 1\nG4 P500\nG1 X20 F6000\n");
+            sd.WriteGCode("job.gcode", "M98 P\"0:/macros/plain.g\"\nG4 P0\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("G28");
+
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(bench.CanMaster.MoveDistances(), Is.EqualTo(new[] { 20.0f }).Within(0.1f), "the move of the macro was made");
+    }
+
+    /// <summary>A pause that waits for a macro called in a loop leaves the iterations that are left</summary>
+    [Test]
+    [Category("LongRunning")]
+    public async Task PauseDuringMacroInsideWhileLoop()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteMacro("plain-moves.g", SquareMacro);
+            sd.WriteGCode("job.gcode", """
+                G90
+                G1 X20 Y20 F6000
+                while iterations < 2
+                    M98 P"0:/macros/plain-moves.g"
+                G1 X10 Y10 F6000
+                G60 S3
+                """);
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.RunToPositionAsync(axis: 0, position: 30);
+        await bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(1), "the pause follows the first iteration");
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(2), "the second iteration ran");
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)), "final position");
         });
     }
 

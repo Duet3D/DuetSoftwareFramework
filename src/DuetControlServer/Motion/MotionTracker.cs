@@ -76,6 +76,11 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
 
     private readonly Lock _lock = new();
 
+    /// <summary>
+    /// Set when a move ends, whether it ran or not
+    /// </summary>
+    public AutoResetEvent MoveEnded { get; } = new(false);
+
     private static RingState[] CreateRings()
     {
         RingState[] rings = new RingState[MotionLimits.MaxRings];
@@ -130,6 +135,7 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
                 }
             }
         }
+        MoveEnded.Set();
     }
 
     /// <summary>
@@ -185,6 +191,7 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
                 }
             }
         }
+        MoveEnded.Set();
     }
 
     /// <summary>
@@ -306,6 +313,7 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
                 }
             }
         }
+        MoveEnded.Set();
     }
 
     /// <summary>
@@ -368,6 +376,7 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
                 state.Waiters.Clear();
             }
         }
+        MoveEnded.Set();
     }
 
     private bool IsValidRing(int ring)

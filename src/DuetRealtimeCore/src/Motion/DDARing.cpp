@@ -79,7 +79,7 @@ void DDARing::Init(Duet::Sbc::Motion::MotionSystem& move, unsigned int numDdas) 
 	assert(m_addPointer->GetNext() != nullptr && m_addPointer->GetPrevious() != nullptr);
 }
 
-bool DDARing::CanAddMove() const noexcept
+bool DDARing::CanAddMove(unsigned int numPending, uint32_t pendingClocks) const noexcept
 {
 	// We have two constraints here that may prevent us from using the last free element in the ring:
 	// 1. DDA::Prepare needs to access the previous DDA in the ring to find the endpoints of the previous move.
@@ -88,14 +88,22 @@ bool DDARing::CanAddMove() const noexcept
 	//    of nothing but committed moves would have it walk for ever.
 	//    So we must not allocate an empty slot if the next one has state 'committed'.
 	// The simplest solution is not to allow the last free slot to be allocated.
-	if (m_addPointer->GetState() == DDA::Empty && m_addPointer->GetNext()->GetState() == DDA::Empty)
+	const DDA* slot = m_addPointer;
+	bool hasRoom = numPending + 2 <= m_numDdasInRing;
+	for (unsigned int i = 0; hasRoom && i < numPending + 2; ++i)
+	{
+		hasRoom = slot->GetState() == DDA::Empty;
+		slot = slot->GetNext();
+	}
+
+	if (hasRoom)
 	{
 		// In order to react faster to speed and extrusion rate changes, only add more moves if the total duration of
 		// all un-frozen moves is less than 2 seconds, or the total duration of all but the first un-frozen move is less
 		// than 0.5 seconds. When using S-curve acceleration we use late planning, so GetClocksNeeded() for provisional
 		// moves is the minimum clocks that it will need.
 		const DDA* dda = m_addPointer;
-		uint32_t unPreparedTime = 0;
+		uint32_t unPreparedTime = pendingClocks;
 		uint32_t prevMoveTime = 0;
 		for (;;)
 		{
@@ -108,7 +116,7 @@ bool DDARing::CanAddMove() const noexcept
 			prevMoveTime = dda->GetClocksNeeded();
 		}
 
-		return (unPreparedTime < stepClockRate / 2 || unPreparedTime + prevMoveTime < 2 * stepClockRate);
+		return (unPreparedTime < maxUncommittedClocksAfterFirst || unPreparedTime + prevMoveTime < maxUncommittedClocks);
 	}
 	return false;
 }

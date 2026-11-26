@@ -91,12 +91,24 @@ run, or what has to be dropped.
 | `M600` | synchronous | none | `filament-change.g`, falling back to `pause.g` |
 | `heater_fault`, `filament_error` default action | asynchronous | feedhold | `pause.g` |
 | `driver_error` default action | asynchronous | feedhold | none, a driver in error is not asked to move |
-| Any of the above during a macro that cannot restart | deferred | whichever it becomes when it runs | as asked for |
+
+While the job is in a macro, whether the macro can be restarted decides how the pause is made:
+
+| Entry point | Macro that can be restarted | Macro that cannot |
+|---|---|---|
+| `M25` in the macro | held at the `M25` | held at the `M25` |
+| `M226`, `M600`, `M601` in the macro | held at the code | deferred to the end of the macro |
+| `M25` from a console or interface | feedhold, and the resume runs the macro again | deferred to the end of the macro |
+| An event's default action | feedhold, and the resume runs the macro again | held at the next code of the macro |
 
 `M226`, `M600` and `M601` are refused outside a job file with "use M226/600/601 only within a file
 being printed". `M25` on the second file channel returns without doing anything: the restore point
 and the interpreter state belong to the first channel, so a fork of the job neither pauses itself nor
 records anything.
+
+**A pause that holds the macro** leaves it on the stack with the codes it has read, and the resume carries on at the next of them (`JobMacroHold`). Nothing is dropped, rewound or run again: the moves queued so far are made, and the job file is stopped at the end of the code that called the macro, however the macro ends. The resume reads the codes behind it again. The macros that the pause and the resume run on the job's channel are not held. While the job is paused, the movement lock of the codes that called the macro is suspended, so that other inputs can move. `M0` drops the macro, and so does `M26` when the job is resumed.
+
+An event does not hold a macro that runs under a code holding the movement lock, such as a tool change or homing. It waits for that code to end, and pauses before the next code of the macro that called it or, if there is none, before the next code of the job. It also waits for the code that the macro is on, so a long wait in the macro delays it.
 
 **A deferred pause** waits for the job to leave a macro that has not declared itself pausable
 (`M98 R1` from inside the macro, and `InterpreterStateStack.CanRestartMacros`, which walks every
@@ -106,6 +118,12 @@ and the reader arms a barrier on the job file's own stack level, so the code tha
 the macro is cancelled where it would have been started and the pause lands at that boundary.
 RepRapFirmware makes the same check in `StartNextGCode`, before it starts the next command from the
 file.
+
+One pause serves every request made before it begins. `M600` takes the place of a deferred pause that is not for a filament change. If the job is held in the macro while an `M600` is deferred, the `M600` still pauses the job at the end of the macro, unless `M26` moves the job out of it. After a `driver_error`, the pause runs no macro, whichever request it begins with.
+
+The `M25` that asked suspends any movement lock its channel holds, because the macro has to move, and is answered, with no text, when the macro has ended and the pause begins, or when the job ends first. Another `M25` in the meantime replies `Pausing is already pending`. The pause macro runs on the job's own channel, as for the `M226` RepRapFirmware runs in its place.
+
+A macro has ended for this purpose once its last code has run, which is before its last move has been made. How long before is bounded by the move queue: a move is accepted while the moves not yet committed, including those on their way to the motion thread, add up to less than 2 seconds, or to less than 0.5 seconds without the first of them.
 
 ---
 
@@ -146,7 +164,7 @@ sequenceDiagram
     PL->>PL: ResyncFromEngine, SyncInterpreterToMachine, SegmentsLeft = 0<br/>MotionTracker.FailAfter, last submitted id rolled back
     PL-->>P: FeedholdOutcome
     S->>S: the purge generation moved on, throw OperationCanceledException
-    P->>P: AbandonMacrosForPauseAsync on File
+    P->>P: AbandonMacrosAsync on File
     P->>J: Drain: every code the stream started has ended
     P->>PL: JobRewindPointFor, from the surviving move
     PL-->>P: JobResumePoint, or nothing
@@ -247,13 +265,13 @@ The last row includes absolute extrusion. An axis has a start that the resume mo
 not, because the engine carries the fraction of a step between moves, so the amount itself is what
 shrinks.
 
-Two more things travel with the fraction, because the line being resumed is one the file was already
-reading rather than one it was about to start:
+Three more things travel with the fraction, because the line being resumed is one the file was already reading rather than one it was about to start:
 
-- **the modal G command**, since the line may be a bare `X100 Y100 E5` whose `G1` is several lines
-  above the rewind point, and seeking throws the parser's modal state away;
-- **the feed rate the line was read with**, unscaled by `M220`, since the line need not name `F`.
-  Restoring the scaled one would fold the speed factor into the file's own feed rate on every pause.
+- **the feed rate the line was read with**, unscaled by `M220`, since the line need not name `F`. Restoring the scaled one would fold the speed factor into the file's own feed rate on every pause;
+- **the state of the parser** at that code: the modal G command, since the line may be a bare `X100 Y100 E5` whose `G1` is several lines above the rewind point, and the indentation and `G53` of a line the rewind lands in the middle of;
+- **the open code blocks and the local variables**. The file is usually read past the rewind point, so the `while` loop the rewind lands in may have moved on to a later iteration or ended, and its variables may have changed or been deleted. The rewind puts both back, so the loop carries on in the iteration the machine stopped in. Global variables are not put back: a `set global` after the rewind point that has already run runs again.
+
+The last two are the `CodeFileState` that every code of the job carries: what the reader had open when it read the code, and the local variables when the code ran. Blocks and variables are immutable and replaced when they change, so a code only refers to them and nothing is copied per code.
 
 Only the job file's own codes may spend the fraction. A macro invoked between the resume and the
 job's next move runs on the same channel, and would otherwise be shortened by what the job is owed.
@@ -281,9 +299,7 @@ the head, and neither is meaningful on a machine that does not know where it is.
 macro made have run, the job is paused and the reply is `Printing paused at X... Y... Z...`, taken
 from the restore point.
 
-The job task, meanwhile, has stopped reading, drained what it had read ahead, seeked to the pause
-position, and is waiting. Block state does not survive that seek: an open `while` is re-parsed from
-the rewound position, so its counter starts again ([file management](file-management.md#print-jobs)).
+The job task, unless the job is held in a macro, has meanwhile stopped reading, drained what it had read ahead, seeked to the pause position, put back the code blocks and local variables that go with it (§4), and is waiting.
 
 ---
 
@@ -303,15 +319,22 @@ sequenceDiagram
     M->>L: StartOrResumeAsync, runMacro unless M24 P0
     L->>L: Paused -> Resuming, publish
     L->>R: start the sequence
+    R->>J: ApplyPositionAsync, if M26 moved a job that is held in a macro
     R->>MR: resume.g, only when every axis is homed
+    R->>R: JobMacroHold.RestoreMovementAsync, if the job is held in a macro
     R->>PL: wait for standstill, then MoveBackToRestorePointAsync
     R->>PL: RestoreInterpreterStateAsync, the restore point's F and distance modes
     R->>PL: MoveFractionToSkip = rp.ProportionDone
     R->>L: SequenceCompleted
     L->>L: Resuming -> Running, publish
-    L->>J: RunAsync with the stream's rewind point
-    J->>J: ModalGCommand = rp.GCommandNumber, FirstCommandAfterRestart
-    J->>S: read the code at the rewound position again
+    alt held in a macro
+        L->>J: JobMacroHold.Release
+        J->>S: the macro carries on, and the file is read again behind the code that called it
+    else
+        L->>J: RunAsync with the stream's rewind point
+        J->>J: ModalGCommand = rp.GCommandNumber, FirstCommandAfterRestart if the pause abandoned a macro
+        J->>S: read the code at the rewound position again
+    end
     S->>PL: BuildRawMove scales relative words and extrusion by 1 minus the fraction
     S->>PL: MoveFractionToSkip = 0, spent by this one move
 ```
@@ -369,17 +392,14 @@ resume that fails settles back to `Paused` and reports the error rather than res
 
 ## 8. Starting part-way through a line: M26
 
-`M26` is the same problem from the other end. `M26 S<offset>` seeks the job file, and the two
-parameters that go with it describe how the line at that offset is to be read:
+`M26` is the same problem from the other end. `M26 S<offset>` seeks the job file, leaving any code blocks and local variables behind, and the two parameters that go with it describe how the line at that offset is to be read:
 
 - `P<fraction>` is how much of the line the machine has already made,
 - `C<number>` is the modal G command it was read under.
 
-Both are held until `M24`, because that is what starts printing, and they take exactly the route a
-resumed pause takes: `RestartMoveFractionDone` and `RestartGCommandNumber` become
-`MoveFractionToSkip` and the file's modal command, and the first move built afterwards is scaled by
-what is left. This is what a `resurrect.g` written after a power failure uses; writing that file is
-not implemented (§9).
+Both are held until `M24`, because that is what starts printing, and they take exactly the route a resumed pause takes: `RestartMoveFractionDone` and `RestartGCommandNumber` become `MoveFractionToSkip` and the file's modal command, and the first move built afterwards is scaled by what is left, as in §4. An absolute target is therefore not scaled: whoever sets the fraction has to move the head to where the line was interrupted first.
+
+The codes above the offset are not read, so `M24` also gives the file the feed rate, distance and extrusion modes, units, plane, volumetric extrusion and inverse time mode of the channel that sends it. A job started from the beginning of its file ignores `P` and `C`, and starts with volumetric extrusion and inverse time mode off and the XY plane selected. This is what a `resurrect.g` written after a power failure uses; writing that file is not implemented (§9).
 
 ---
 
@@ -409,6 +429,8 @@ one restore point and one interpreter state.
 | `Files/Job/JobController.cs` | the transition table: what each of M0, M23, M24, M25, M26, M32, M37, M226 and M606 does from the phase the job is in |
 | `Files/Job/JobSequences.cs` | `PauseAsync`, `ResumeAsync`, `StopAsync`, `SaveRestorePointAsync`, `MoveBackToRestorePointAsync` |
 | `Files/Job/JobReader.cs` | the read-ahead loop, the freeze, the rewind, the published file position |
+| `Codes/JobMacroHold.cs` | what holds the macros of the job while it is paused in one |
+| `Files/CodeFileState.cs` | the open code blocks, local variables and place in the line that a rewind puts back |
 | `Codes/Handlers/MCodeHandler.cs` | `M25`, `M226`/`M600`/`M601`, `M24`, `M26` |
 | `Motion/MovePlanner.cs` | `StopEarlyAsync`, `JobRewindPointFor`, `FeedholdOutcome` |
 | `Motion/JobMoveIndex.cs` | `JobMoveOrigin` and its `PointAt`, `JobResumePoint`, the move id index |

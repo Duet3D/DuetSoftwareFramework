@@ -447,6 +447,12 @@ namespace
 		CHECK(added > 1, "the ring takes enough moves to look ahead with");
 		CHECK(added < 10, "the ring stops on queued time, well before its 20 slots are full");
 		CHECK(Drain(ring), "the throttled moves finish");
+
+		// Moves on their way to the ring count as if they were in it
+		CHECK(ring.CanAddMove(ring.GetNumDdas() - 2, 0), "there is a slot left after the pending moves");
+		CHECK(!ring.CanAddMove(ring.GetNumDdas() - 1, 0), "the pending moves take all slots");
+		CHECK(ring.CanAddMove(1, stepClockRate), "a second of pending movement leaves room");
+		CHECK(!ring.CanAddMove(1, 2 * stepClockRate), "two seconds of it do not");
 	}
 
 	// A move the ring refuses must not take the add slot down with it.

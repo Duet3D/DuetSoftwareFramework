@@ -1168,6 +1168,61 @@ public class Code
         Assert.That(codes[1].Length, Is.EqualTo(codes[0].Length));
     }
 
+    [Test]
+    public void ParseSeveralCodesOfALineFromAReader()
+    {
+        using StringReader reader = new("G91 G1 X{1 + 2} Y3 M106 S1\n");
+        List<string> codes = [];
+        DuetAPI.Commands.Code code = new();
+        int length = 0;
+        while (DuetAPI.Commands.Code.Parse(reader, code))
+        {
+            codes.Add(code.ToString());
+            length += code.Length!.Value;
+            code.Reset();
+        }
+        Assert.Multiple(() =>
+        {
+            Assert.That(codes, Is.EqualTo(new[] { "G91", "G1 X{1 + 2} Y3", "M106 S1" }));
+            Assert.That(length, Is.EqualTo("G91 G1 X{1 + 2} Y3 M106 S1\n".Length), "every character belongs to one code");
+        });
+    }
+
+    [Test]
+    public async Task ParseAsyncReadsTheNextCodeOfALineFromWhereTheLastOneEnded()
+    {
+        const string content = "    G1 X1 G1 X2\n    G1 X3\n";
+        await using MemoryStream stream = new(Encoding.UTF8.GetBytes(content));
+        CodeParserBuffer buffer = new(128, true);
+        DuetAPI.Commands.Code code = new();
+
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        long end = code.FilePosition!.Value + code.Length!.Value;
+        CodeParserState state = buffer.State;
+        Assert.Multiple(() =>
+        {
+            Assert.That(end, Is.EqualTo(content.IndexOf("G1 X2")), "where the second code starts");
+            Assert.That(state, Is.EqualTo(new CodeParserState(true, 4, false, null, 1)));
+        });
+
+        // Seek there from somewhere else
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        stream.Seek(end, SeekOrigin.Begin);
+        buffer.Invalidate();
+        buffer.State = state;
+
+        code.Reset();
+        await DuetAPI.Commands.Code.ParseAsync(stream, code, buffer);
+        Assert.Multiple(() =>
+        {
+            Assert.That(code.GetInt('X'), Is.EqualTo(2));
+            Assert.That(code.Indent, Is.EqualTo(4), "the indentation of the line");
+            Assert.That(code.FilePosition + code.Length, Is.EqualTo(content.IndexOf("    G1 X3")), "the rest of the line");
+            Assert.That(buffer.State, Is.EqualTo(new CodeParserState(false, 0, false, null, 2)));
+        });
+    }
+
     /// <summary>Read a value the way <c>GetFloat</c> and its siblings do</summary>
     private delegate T Getter<T, TRefusal>(char letter, T? defaultValue, T? min, T? max,
                                           Func<TRefusal, string>? errorString = null) where T : struct;

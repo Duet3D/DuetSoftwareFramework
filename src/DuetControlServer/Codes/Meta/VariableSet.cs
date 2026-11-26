@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 
 namespace DuetControlServer.Codes.Meta;
 
@@ -34,6 +35,13 @@ public enum VariableAssignment
 }
 
 /// <summary>
+/// A local variable
+/// </summary>
+/// <param name="Value">Value it holds</param>
+/// <param name="Depth">Depth of the code block that created it, and that deletes it when it ends</param>
+internal readonly record struct LocalVariable(object? Value, int Depth);
+
+/// <summary>
 /// The variables one execution context can see
 /// </summary>
 /// <remarks>
@@ -65,7 +73,13 @@ public sealed class VariableSet
     /// <summary>
     /// Local variables, addressed as <c>var.name</c>
     /// </summary>
-    private readonly Dictionary<string, object?> _variables = [];
+    /// <remarks>Immutable, so that <see cref="Snapshot"/> copies nothing</remarks>
+    private ImmutableDictionary<string, LocalVariable> _variables = ImmutableDictionary<string, LocalVariable>.Empty;
+
+    /// <summary>
+    /// Whether a snapshot may hold the arrays of the variables
+    /// </summary>
+    private bool _snapshotTaken;
 
     /// <summary>
     /// Parameters the file was called with, addressed as <c>param.name</c>
@@ -82,7 +96,9 @@ public sealed class VariableSet
     {
         lock (_lock)
         {
-            return _variables.TryGetValue(name, out value);
+            bool found = _variables.TryGetValue(name, out LocalVariable variable);
+            value = variable.Value;
+            return found;
         }
     }
 
@@ -105,16 +121,22 @@ public sealed class VariableSet
     /// </summary>
     /// <param name="name">Variable name without the <c>var.</c> prefix</param>
     /// <param name="value">Value to give it</param>
+    /// <param name="depth">Depth of the code block that creates it</param>
     /// <returns>True if it was created, false if a variable of that name already exists</returns>
     /// <remarks>
     /// RepRapFirmware refuses to let <c>var</c> reassign an existing variable, because a name that
     /// silently changes meaning halfway through a file is harder to find than an error
     /// </remarks>
-    public bool TryCreateVariable(string name, object? value)
+    public bool TryCreateVariable(string name, object? value, int depth = 0)
     {
         lock (_lock)
         {
-            return _variables.TryAdd(name, value);
+            if (_variables.ContainsKey(name))
+            {
+                return false;
+            }
+            _variables = _variables.Add(name, new LocalVariable(value, depth));
+            return true;
         }
     }
 
@@ -128,11 +150,11 @@ public sealed class VariableSet
     {
         lock (_lock)
         {
-            if (!_variables.ContainsKey(name))
+            if (!_variables.TryGetValue(name, out LocalVariable existing))
             {
                 return false;
             }
-            _variables[name] = value;
+            _variables = _variables.SetItem(name, existing with { Value = value });
             return true;
         }
     }
@@ -152,11 +174,84 @@ public sealed class VariableSet
     {
         lock (_lock)
         {
-            if (!_variables.TryGetValue(name, out object? existing))
+            if (!_variables.TryGetValue(name, out LocalVariable existing))
             {
                 return VariableAssignment.UnknownVariable;
             }
-            return AssignElement(existing, indices, value);
+            if (!_snapshotTaken)
+            {
+                return AssignElement(existing.Value, indices, value);
+            }
+
+            VariableAssignment result = TryReplaceElement(existing.Value, indices, 0, value, out object? updated);
+            if (result == VariableAssignment.Assigned)
+            {
+                _variables = _variables.SetItem(name, existing with { Value = updated });
+            }
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Copy the arrays an index chain goes through, with the element it names replaced
+    /// </summary>
+    /// <param name="target">Value the rest of the chain is applied to</param>
+    /// <param name="indices">Index of the element, one per dimension</param>
+    /// <param name="dimension">How many of the indices have been applied</param>
+    /// <param name="value">Value to give the element</param>
+    /// <param name="updated">Receives the copy</param>
+    /// <returns>What happened</returns>
+    private static VariableAssignment TryReplaceElement(object? target, IReadOnlyList<int> indices, int dimension, object? value, out object? updated)
+    {
+        updated = value;
+        if (dimension == indices.Count)
+        {
+            return (dimension > 0) ? VariableAssignment.Assigned : VariableAssignment.NotAnArray;
+        }
+        if (target is not object?[] array)
+        {
+            return VariableAssignment.NotAnArray;
+        }
+
+        int index = indices[dimension];
+        if (index < 0 || index >= array.Length)
+        {
+            return VariableAssignment.IndexOutOfRange;
+        }
+
+        VariableAssignment result = TryReplaceElement(array[index], indices, dimension + 1, value, out object? element);
+        if (result == VariableAssignment.Assigned)
+        {
+            object?[] copy = [.. array];
+            copy[index] = element;
+            updated = copy;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// The local variables as they are now
+    /// </summary>
+    /// <returns>Variables by name, for <see cref="Restore"/></returns>
+    internal ImmutableDictionary<string, LocalVariable> Snapshot()
+    {
+        lock (_lock)
+        {
+            _snapshotTaken = true;
+            return _variables;
+        }
+    }
+
+    /// <summary>
+    /// Put the local variables back to what they were
+    /// </summary>
+    /// <param name="snapshot">What <see cref="Snapshot"/> returned, of this set or of another</param>
+    internal void Restore(ImmutableDictionary<string, LocalVariable> snapshot)
+    {
+        lock (_lock)
+        {
+            _snapshotTaken = true;
+            _variables = snapshot;
         }
     }
 
@@ -195,19 +290,20 @@ public sealed class VariableSet
     }
 
     /// <summary>
-    /// Delete a local variable
+    /// Delete the local variables that a code block and the blocks in it created
     /// </summary>
-    /// <param name="name">Variable name without the <c>var.</c> prefix</param>
-    /// <remarks>
-    /// Called when the code block that created the variable ends. Deleting one that is not there is
-    /// not an error: the block records the names it created, and a file that was aborted mid-block
-    /// may never have reached the statement that created one of them
-    /// </remarks>
-    public void DeleteVariable(string name)
+    /// <param name="depth">Depth of the block</param>
+    public void DeleteVariables(int depth)
     {
         lock (_lock)
         {
-            _variables.Remove(name);
+            foreach (KeyValuePair<string, LocalVariable> variable in _variables)
+            {
+                if (variable.Value.Depth >= depth)
+                {
+                    _variables = _variables.Remove(variable.Key);
+                }
+            }
         }
     }
 
@@ -238,7 +334,7 @@ public sealed class VariableSet
     {
         lock (_lock)
         {
-            _variables.Clear();
+            _variables = _variables.Clear();
             _parameters.Clear();
         }
     }

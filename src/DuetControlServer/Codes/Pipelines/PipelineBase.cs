@@ -447,7 +447,9 @@ public abstract class PipelineBase
             {
                 throw new ArgumentException($"Stack underrun on pipeline {ChannelProcessor.Channel}");
             }
-            _stack.Pop().PendingCodes.Writer.Complete();
+
+            // The item completes its own queue on shutdown
+            _stack.Pop().PendingCodes.Writer.TryComplete();
         }
     }
 

@@ -281,12 +281,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <summary>
     /// Whether a firmware update is in progress
     /// </summary>
-    /// <remarks>
-    /// One of the conditions <c>MachineStatusService</c> derives <c>state.status</c> from. Setting it
-    /// no longer writes the status itself: RepRapFirmware computes its status from conditions like
-    /// this one rather than storing it, and a condition that also wrote the answer would be one of
-    /// several writers racing to describe the same machine
-    /// </remarks>
+    /// <remarks>This and the conditions below are what <see cref="UpdateStatus"/> reads, and are written under the write lock</remarks>
     internal bool IsUpdating { get; set; }
 
     /// <summary>
@@ -304,6 +299,90 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// Whether the machine is still starting up, which it is until config.g has run
     /// </summary>
     internal bool IsStarting { get; set; } = true;
+
+    /// <summary>
+    /// What the job makes of the status, or null if it says nothing about it
+    /// </summary>
+    internal MachineStatus? JobStatus { get; set; }
+
+    /// <summary>
+    /// Whether the motion engine has moves to run
+    /// </summary>
+    /// <remarks>The one condition that ends without anything writing to the object model, so <c>MotionService</c> watches for it</remarks>
+    internal bool IsMoving { get; set; }
+
+    /// <summary>
+    /// Derive <c>state.status</c> from the conditions of the machine
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Called whenever the write lock is about to be released, so the status never disagrees with the conditions.
+    /// RepRapFirmware has no field for it either: <c>RepRap::GetStatusIndex</c> works it out every time it is asked
+    /// </para>
+    /// <para>
+    /// The most overriding condition comes first, in RepRapFirmware's order
+    /// </para>
+    /// </remarks>
+    internal void UpdateStatus() => State.Status = DeriveStatus();
+
+    /// <summary>
+    /// The machine's status, from its conditions
+    /// </summary>
+    /// <returns>What the machine is doing</returns>
+    private MachineStatus DeriveStatus()
+    {
+        // Updating the main firmware comes before the link because it is what takes the link down
+        if (IsUpdating)
+        {
+            return MachineStatus.Updating;
+        }
+        if (IsDisconnected)
+        {
+            return MachineStatus.Disconnected;
+        }
+        foreach (Board board in Boards)
+        {
+            if (board.State == BoardState.Flashing)
+            {
+                return MachineStatus.Updating;
+            }
+        }
+        if (IsHalted)
+        {
+            return MachineStatus.Halted;
+        }
+        if (IsStarting)
+        {
+            return MachineStatus.Starting;
+        }
+        if (JobStatus is MachineStatus jobStatus)
+        {
+            return jobStatus;
+        }
+
+        // TODO ChangingTool, which needs the tool subsystem to say that a change is in progress. RRF is also busy while it
+        // waits for a message to be acknowledged (M291) and while it tunes a heater (M303)
+        return (IsMoving || IsDoingFileMacro) ? MachineStatus.Busy : MachineStatus.Idle;
+    }
+
+    /// <summary>
+    /// Whether an input other than the daemon is running a macro
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>GCodes::DoingFileMacro</c></remarks>
+    private bool IsDoingFileMacro
+    {
+        get
+        {
+            foreach (InputChannel? input in Inputs)
+            {
+                if (input is { InMacro: true, Name: not CodeChannel.Daemon })
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
 
     /// <summary>
     /// Dictionary of the properties vs. sender type + JSON content that failed to be deserialized

@@ -85,6 +85,11 @@ internal sealed class JobMoveOrigin
     public long CodeLength { get; init; }
 
     /// <summary>
+    /// State to rewind the job file to the code in
+    /// </summary>
+    public Files.CodeFileState FileState { get; init; }
+
+    /// <summary>
     /// How many segments the build produced
     /// </summary>
     public int SegmentCount { get; init; }
@@ -118,7 +123,7 @@ internal sealed class JobMoveOrigin
         {
             // The invocation runs again whole; nothing of it has been made that the job could skip
             return new JobResumePoint(filePosition, 0.0f, GCommandNumber, FeedRate,
-                                      AxesRelative, DrivesRelative);
+                                      AxesRelative, DrivesRelative, FileState);
         }
 
         // Every segment queued means the whole code will be made, so what is left of it is the code
@@ -127,10 +132,10 @@ internal sealed class JobMoveOrigin
         if (SegmentCount > 0 && segmentsMade >= SegmentCount)
         {
             return new JobResumePoint(filePosition + CodeLength, 0.0f, GCommandNumber, FeedRate,
-                                      AxesRelative, DrivesRelative);
+                                      AxesRelative, DrivesRelative, FileState);
         }
         return new JobResumePoint(filePosition, ProportionAt(segmentsMade), GCommandNumber, FeedRate,
-                                  AxesRelative, DrivesRelative);
+                                  AxesRelative, DrivesRelative, FileState);
     }
 
     /// <summary>
@@ -193,21 +198,22 @@ internal sealed class JobMoveOrigin
 /// </summary>
 /// <param name="FilePosition">Where in the job file the invoking code starts</param>
 /// <param name="CodeLength">How long it is, so the code after it can be named</param>
+/// <param name="FileState">State to rewind the job file to it in</param>
 /// <remarks>
 /// The whole of what a macro's moves need to say about the job file. The modal state is not part of
 /// it: the invocation is replayed in full, so the macro sets whatever it set the first time, and
 /// the invoking line names its own command rather than repeating a modal one
 /// </remarks>
-internal readonly record struct JobMacroInvocation(long FilePosition, long CodeLength)
+internal readonly record struct JobMacroInvocation(long FilePosition, long CodeLength, Files.CodeFileState FileState)
 {
     /// <summary>
     /// The invocation a code describes, if it is one of the job file's own
     /// </summary>
     /// <param name="code">Code that started the macro</param>
     /// <returns>The invocation, or null if the code did not come from the job file</returns>
-    public static JobMacroInvocation? From(DuetAPI.Commands.Code code)
+    public static JobMacroInvocation? From(Commands.Code code)
         => JobMoveOrigin.IsJobFileCode(code) && code.FilePosition is long filePosition
-           ? new JobMacroInvocation(filePosition, code.Length ?? 0)
+           ? new JobMacroInvocation(filePosition, code.Length ?? 0, code.FileState)
            : null;
 }
 
@@ -220,13 +226,15 @@ internal readonly record struct JobMacroInvocation(long FilePosition, long CodeL
 /// <param name="FeedRate">The feed rate it was read with, unscaled by M220</param>
 /// <param name="AxesRelative">Whether axis words were distances when it was read (G91)</param>
 /// <param name="DrivesRelative">Whether extrusion was relative when it was read (M83)</param>
+/// <param name="FileState">State to rewind the job file in: its open code blocks and local variables</param>
 /// <remarks>
 /// The whole of what a stop tells the job file, in one value. It is produced by
 /// <see cref="MovePlanner.JobRewindPointFor"/> and read by the rewind, the restore point and the
 /// modal state the resume puts back
 /// </remarks>
 internal readonly record struct JobResumePoint(long FilePosition, float ProportionDone, int GCommandNumber,
-                                               float FeedRate, bool AxesRelative, bool DrivesRelative);
+                                               float FeedRate, bool AxesRelative, bool DrivesRelative,
+                                               Files.CodeFileState FileState);
 
 /// <summary>
 /// Remembers which job code each queued move came from, so a stop can say where to resume

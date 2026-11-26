@@ -47,25 +47,21 @@ public enum PauseMacro
 /// the file has already reached the point it stops at, so everything queued ahead of it must run
 /// </param>
 /// <param name="ReportPosition">Whether to announce where the job paused</param>
+/// <param name="InAnyMacro">
+/// Whether the pause stops the job inside a macro that cannot be restarted and carries on in it, rather than waiting
+/// for the macro to end
+/// </param>
 internal sealed record PauseRequest(CodeChannel Channel, PrintPausedReason Reason, PauseMacro Macro,
-                                    bool Synchronous, bool ReportPosition);
-
-/// <summary>
-/// How far a reader is allowed to get before it stops
-/// </summary>
-internal enum FreezeAt
+                                    bool Synchronous, bool ReportPosition, bool InAnyMacro)
 {
     /// <summary>
-    /// Now: the generation is cancelled, so nothing more is read and the codes read ahead are
-    /// dropped before they are dispatched
+    /// This request, made so that the pause serves the request of an event too
     /// </summary>
-    Now,
-
-    /// <summary>
-    /// At the end of the code the reader is on, and of any macro that code is running. The
-    /// read-ahead is held at the dispatch barrier instead of being cancelled
-    /// </summary>
-    AfterCurrentCode
+    /// <param name="other">Request of an event, or null</param>
+    /// <returns>The request to pause with</returns>
+    /// <remarks>An event whose pause runs no macro is a driver error, after which nothing may move the machine</remarks>
+    public PauseRequest Serving(PauseRequest? other)
+        => other?.Macro == PauseMacro.None ? this with { Macro = PauseMacro.None, Reason = other.Reason } : this;
 }
 
 /// <summary>
@@ -73,8 +69,8 @@ internal enum FreezeAt
 /// </summary>
 /// <param name="Stream">Motion system</param>
 /// <param name="Point">The rewind point, or null when the reader's own position is the answer</param>
-/// <param name="AbandonedMacros">Whether the resume replays a macro invocation</param>
-internal readonly record struct StreamRewind(int Stream, JobResumePoint? Point, bool AbandonedMacros);
+/// <param name="RestartsMacro">Whether the resume replays a macro invocation</param>
+internal readonly record struct StreamRewind(int Stream, JobResumePoint? Point, bool RestartsMacro);
 
 /// <summary>
 /// How a sequence ended
@@ -133,17 +129,20 @@ internal abstract record JobCommand
     /// <summary>Stop the job, or put the machine down when there is none (M0, M1, M2)</summary>
     public sealed record Stop(CodeChannel Channel) : JobCommand;
 
-    /// <summary>Tear the job down because something went wrong</summary>
-    public sealed record Abort : JobCommand;
+    /// <summary>Tear the job down because something went wrong, with the macros on one of the file channels</summary>
+    public sealed record Abort(CodeChannel Channel) : JobCommand;
 
     /// <summary>Set where in the file the job starts or carries on from (M26)</summary>
     public sealed record SetFilePosition(int Stream, long Position) : JobCommand;
 
     /// <summary>Fork the job onto the second file channel (M606 S1)</summary>
-    public sealed record Fork : JobCommand;
+    public sealed record Fork(CodeFileState State) : JobCommand;
 
     /// <summary>A stream has stopped where it was told to stop</summary>
-    public sealed record ReaderStopped(int Stream, long Position) : JobCommand;
+    public sealed record ReaderStopped(int Stream) : JobCommand;
+
+    /// <summary>The macro a stream is in has come to rest where it was told to</summary>
+    public sealed record MacroHeld(int Stream) : JobCommand;
 
     /// <summary>A stream has run out of codes and the last of them has completed</summary>
     public sealed record ReaderFinished(int Stream) : JobCommand;

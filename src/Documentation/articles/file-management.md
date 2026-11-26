@@ -58,7 +58,7 @@ flowchart TD
 
     LOOP -- "pause" --> PAUSE["JobReader.Freeze()<br/>the controller works out where to rewind to"]
     PAUSE --> REW["JobReader.RewindAsync(point)"]
-    REW -- "resume" --> RUN["JobReader.RunAsync(point)"]
+    REW -- "resume" --> RUN["JobReader.RunAsync()"]
     RUN --> LOOP
 
     READ -- "M98, or a code that runs a macro" --> MAC["MacroRunner + ChannelProcessor.Push()"]
@@ -75,13 +75,9 @@ advances by `FilePosition + Length` per code and is published by the reader itse
 On **pause**, the reader is frozen, the controller works out where the machine will come to rest and
 tells the reader to rewind there; on **resume** the reader is told to read on from that point. Which
 position that is, and how a line the machine is half way through is finished rather than repeated, is
-[Pausing and resuming a job](pause-and-resume.md). Note that block state is not persisted across a
-pause - on resume the file seeks to the saved byte offset and re-parses any open blocks from there,
-so a `while` counter resets.
+[Pausing and resuming a job](pause-and-resume.md). The rewind puts back the open blocks, including the iteration count of a `while`, and the local variables as they were at that point.
 
-`M606 S1` **forks** the job (`ForkAsync`): the `CodeFile` state, including the block stack and parser
-buffer, is copied onto the [`File2` channel](gcode-flow.md#code-channels) so two motion systems can
-print in parallel.
+`M606 S1` **forks** the job (`ForkAsync`): a second stream on the [`File2` channel](gcode-flow.md#code-channels) reads on after the `M606`, with the open code blocks and local variables of that point, so two motion systems can print in parallel. `M26` seeks without either.
 
 ## Macros
 

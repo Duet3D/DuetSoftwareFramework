@@ -96,6 +96,7 @@ public readonly struct LockWrapper : IDisposable
             if (_isWriteLock)
             {
                 // It is safe to assume that the object model has been updated
+                _model.UpdateStatus();
                 _onUpdatedHandler?.Invoke();
 
                 // Clear the messages again if waiting clients could output this message

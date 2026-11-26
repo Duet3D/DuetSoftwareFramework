@@ -870,6 +870,13 @@ public partial class Code
         char c;
         do
         {
+            // Stop if another G/M/T code is coming up and this one is complete. Its first character is left in the reader
+            c = PeekChar();
+            if (StartsNextCode(state, result, c))
+            {
+                break;
+            }
+
             int b = ReadByte();
             c = (b < 0) ? '\n' : (char)b;
             result.Length++;
@@ -878,15 +885,6 @@ public partial class Code
             {
                 // Ignore CR
                 continue;
-            }
-
-            // Stop if another G/M/T code is coming up and this one is complete
-            if (StartsNextCode(state, result, c))
-            {
-                // The character belongs to the next code, so put it back and do not count it
-                pendingPointer--;
-                result.Length--;
-                break;
             }
 
             if (ProcessCharacter(state, result, c, PeekChar()))

@@ -16,7 +16,7 @@ The tests, not this document, say what is done.
 | Stage | Subject | Failing cases | Depends on |
 | --- | --- | --- | --- |
 | 0 | A baseline that can be trusted | 0 | |
-| 1 | Pause, resume and cancel | 3 | 0 |
+| 1 | Pause, resume and cancel | 0 | 0 |
 | 2 | Restore points and tools | 19 | 0 |
 | 3 | Drives | 74 | 0 |
 | 4 | M950 devices, heat and spindles | 62 | 0 |
@@ -33,11 +33,7 @@ Done.
 
 ### Stage 1: pause, resume and cancel
 
-1. `JobEdgeCaseTests.PauseInsideWhileLoop`: a job paused inside a `while` loop loses the iterations that were left, so part of the print is silently skipped. The rewind point has to carry the open code blocks.
-2. `CancelRestartTests.RestartFractionSchedulesOnlyThePartNotYetMade` (`M26 P`): the job re-runs the part of the line already made.
-3. `DeferredPauseTests.PauseDuringPlainMacroDefers`: the reply to a second `M25` while a pause is pending.
-
-`KNOWN_BUGS.md` also records that `Code.IsCurrentlyDeferred` is never cleared on a pooled code. No scenario shows its effect.
+Done.
 
 ### Stage 2: restore points and tools
 

@@ -1,4 +1,5 @@
 using DuetAPI;
+using DuetControlServer.Files;
 using DuetControlServer.Motion;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
@@ -20,6 +21,9 @@ public class JobResumePointTests
     /// <summary>A planner with only the state a resume point is taken from</summary>
     private static MovePlanner NewPlanner() => new(null!, null!, null!, NullLogger<MovePlanner>.Instance);
 
+    /// <summary>State the file was in when the code was read</summary>
+    private static readonly CodeFileState FileState = CodeFileState.At(100) with { EndPosition = 120 };
+
     /// <summary>A job code the interpreter is part-way through</summary>
     private static JobMoveOrigin NewOrigin(int segmentCount = 10, float fractionAtStart = 0.0f)
         => new()
@@ -29,6 +33,7 @@ public class JobResumePointTests
             GCommandNumber = 1,
             FeedRate = 3000.0f,
             FractionAtStart = fractionAtStart,
+            FileState = FileState,
             SegmentCount = segmentCount
         };
 
@@ -72,6 +77,11 @@ public class JobResumePointTests
         });
     }
 
+    [TestCase(4)]
+    [TestCase(10)]
+    public void TheFileIsRewoundInTheStateTheCodeWasReadIn(int segmentsMade)
+        => Assert.That(NewOrigin().PointAt(segmentsMade)!.Value.FileState, Is.EqualTo(FileState));
+
     [Test]
     public void ACodeWithNoFilePositionNamesNothing()
     {
@@ -114,6 +124,7 @@ public class JobResumePointTests
             FilePosition = 100,
             CodeLength = 20,
             GCommandNumber = -1,
+            FileState = FileState,
             SegmentCount = 4,
             IsMacroInvocation = true
         };
@@ -127,6 +138,7 @@ public class JobResumePointTests
                         "the invocation, not the code after it, however many of its moves were made");
             Assert.That(rewind.Point!.Value.ProportionDone, Is.Zero);
             Assert.That(rewind.RestartMacro, Is.True);
+            Assert.That(rewind.Point!.Value.FileState, Is.EqualTo(FileState));
         });
     }
 

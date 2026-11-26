@@ -125,6 +125,16 @@ public sealed class MacroFile : CodeFile, IDisposable
     internal Motion.JobMacroInvocation? InvokingJobCode { get; }
 
     /// <summary>
+    /// Whether a code of the channel started this macro stack, rather than DuetControlServer
+    /// </summary>
+    /// <remarks>
+    /// On the file channel that tells the macros of the job from those of a pause or a resume, which run while the job's
+    /// are held. <see cref="InvokingJobCode"/> is null for both a macro of a pause and one that a code without a position
+    /// in the job file called, such as a code a plugin inserted, and the latter is held too
+    /// </remarks>
+    private readonly bool _isStartedByCode;
+
+    /// <summary>
     /// Constructor of a macro started by a G/M/T-code
     /// </summary>
     /// <param name="filePath">Filename of the macro</param>
@@ -168,6 +178,7 @@ public sealed class MacroFile : CodeFile, IDisposable
         IsDsfConfig = filePath.Virtual == FilePathResolver.DsfConfigFile;
 
         MacroFile? parent = startCode.File as MacroFile;
+        _isStartedByCode = parent?._isStartedByCode ?? true;
         IsRunningConfig = parent?.IsRunningConfig == true;
         IsLoadingConfigOverride = IsConfigOverride || parent?.IsLoadingConfigOverride == true;
     }
@@ -207,43 +218,6 @@ public sealed class MacroFile : CodeFile, IDisposable
             IsConfig = true;
         }
         IsRunningConfig = IsConfig;
-    }
-
-    /// <summary>
-    /// Copy constructor
-    /// </summary>
-    /// <param name="copyFrom">File to copy from</param>
-    /// <param name="channel">Code channel to assign</param>
-    /// <param name="codeFactory">Code factory</param>
-    /// <param name="codeProcessor">Code processor</param>
-    /// <param name="expressions">Expression evaluator</param>
-    /// <param name="model">Object model</param>
-    /// <param name="lifetime">Host application lifetime</param>
-    /// <param name="loggerFactory">Logger factory</param>
-    /// <param name="settings">Settings</param>
-    public MacroFile(MacroFile copyFrom, CodeChannel channel,
-        CodeProcessor codeProcessor, CodeFactory codeFactory, Expressions expressions, Model.ObjectModel model,
-        IHostApplicationLifetime lifetime, ILoggerFactory loggerFactory, IOptions<Settings> settings)
-        : base(copyFrom, channel, codeFactory, codeProcessor, expressions, model, loggerFactory, settings)
-    {
-        SourceConnection = copyFrom.SourceConnection;
-        InvokingJobCode = copyFrom.InvokingJobCode;
-        IsNested = copyFrom.IsNested;
-        IsSystemMacro = copyFrom.IsSystemMacro;
-        IsConfig = copyFrom.IsConfig;
-        IsConfigOverride = copyFrom.IsConfigOverride;
-        IsDsfConfig = copyFrom.IsDsfConfig;
-        IsRunningConfig = copyFrom.IsRunningConfig;
-        IsLoadingConfigOverride = copyFrom.IsLoadingConfigOverride;
-        IsAborted = copyFrom.IsAborted;
-
-        _codeProcessor = copyFrom._codeProcessor;
-        _eventLogger = copyFrom._eventLogger;
-        _model = copyFrom._model;
-        _settings = copyFrom._settings;
-        _lifetime = copyFrom._lifetime;
-        _logger = loggerFactory.CreateLogger<MacroFile>();
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
     }
 
     /// <summary>
@@ -301,6 +275,10 @@ public sealed class MacroFile : CodeFile, IDisposable
         Close();
         return true;
     }
+
+    /// <inheritdoc/>
+    internal override ValueTask WaitWhileHeldAsync()
+        => (!_isStartedByCode || _disposed) ? ValueTask.CompletedTask : _codeProcessor.GetMacroHold(Channel).WaitAsync(CancellationToken);
 
     /// <summary>
     /// Internal TCS to resolve when the macro has finished
@@ -464,7 +442,8 @@ public sealed class MacroFile : CodeFile, IDisposable
                 }
                 else
                 {
-                    // No more codes to process, macro file has finished
+                    // No more codes to process, macro file has finished. A pause on its last line still holds it
+                    await WaitWhileHeldAsync();
                     _logger.LogDebug("{Channel}: Finished codes from macro file {File}", Channel, FilePath.Virtual);
                     break;
                 }

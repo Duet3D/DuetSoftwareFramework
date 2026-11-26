@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -82,9 +83,21 @@ internal sealed class JobSequences(
     {
         using (planner.Lock())
         {
+            ForgetRestartState();
+            planner.JobMoves.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Forget how the line the job starts on is to be read, and what the job before it was owed
+    /// </summary>
+    private void ForgetRestartState()
+    {
+        using (planner.Lock())
+        {
+            planner.State.MoveFractionToSkip = 0.0f;
             planner.State.RestartMoveFractionDone = 0.0f;
             planner.State.RestartGCommandNumber = -1;
-            planner.JobMoves.Clear();
         }
     }
 
@@ -110,6 +123,7 @@ internal sealed class JobSequences(
     /// Start a job that was only selected
     /// </summary>
     /// <param name="state">What the controller holds</param>
+    /// <param name="channel">Channel that started it</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What the sequence did</returns>
     /// <remarks>
@@ -117,9 +131,10 @@ internal sealed class JobSequences(
     /// is about to read from it, and it is awaited so that it has finished before the first code of
     /// the job does
     /// </remarks>
-    public async Task<SequenceOutcome> StartAsync(JobState state, CancellationToken cancellationToken)
+    public async Task<SequenceOutcome> StartAsync(JobState state, CodeChannel channel, CancellationToken cancellationToken)
     {
         jobMonitor.Start();
+        await jobMonitor.PublishAsync(cancellationToken);
 
         // RepRapFirmware's StartPrinting(fromStart): a fresh print runs start.g, but a restart from
         // a file offset - M26 set a position, which is what resurrect.g does - does not, because
@@ -134,14 +149,30 @@ internal sealed class JobSequences(
                 if (model.Inputs[stream.Channel] is InputChannel input)
                 {
                     input.CurrentFile = stream.Reader.File.FilePath.Virtual;
+                    if (fromStart)
+                    {
+                        // RepRapFirmware's StartPrinting
+                        input.Volumetric = false;
+                        input.SelectedPlane = 0;
+                        input.InverseTimeMode = false;
+                    }
+                    else if (model.Inputs[channel] is InputChannel starter)
+                    {
+                        // The codes that set the modes of the file come before the offset, so whoever set it has set them
+                        InterpreterStateStack.CopyState(starter, input);
+                    }
                 }
             }
         }
         if (fromStart)
         {
+            ForgetRestartState();
             await macroRunner.TryRunAsync(CodeChannel.File, "start.g", cancellationToken: cancellationToken);
         }
-        await ApplyRestartStateAsync(state, cancellationToken);
+        else
+        {
+            await ApplyRestartStateAsync(state, cancellationToken);
+        }
         logger.LogInformation("Starting file print");
         return new SequenceOutcome(new Message(), Failed: false);
     }
@@ -152,22 +183,20 @@ internal sealed class JobSequences(
     /// <param name="state">What the controller holds</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <remarks>
-    /// Only a job started from a file position has any of this to do: <c>resurrect.g</c> is the file
-    /// that writes it, and a job started from the beginning has nothing to put back. Applied here
-    /// rather than when M26 ran because <c>start.g</c> comes between the two and its own moves must
-    /// not spend the fraction. This is RepRapFirmware's M24, which copies
-    /// <c>restartMoveFractionDone</c> into <c>moveFractionToSkip</c> and puts the modal G command
-    /// back before <c>StartPrinting</c>
+    /// Only for a job started from a file position. Applied here rather than when M26 ran because the
+    /// moves <c>resurrect.g</c> makes between the two must not spend the fraction. This is
+    /// RepRapFirmware's M24, which copies <c>restartMoveFractionDone</c> into <c>moveFractionToSkip</c>
+    /// and puts the modal G command back
     /// </remarks>
     private async ValueTask ApplyRestartStateAsync(JobState state, CancellationToken cancellationToken)
     {
         int modalGCommand;
         using (planner.Lock())
         {
-            planner.State.MoveFractionToSkip = planner.State.RestartMoveFractionDone;
+            float fractionDone = planner.State.RestartMoveFractionDone;
             modalGCommand = planner.State.RestartGCommandNumber;
-            planner.State.RestartMoveFractionDone = 0.0f;
-            planner.State.RestartGCommandNumber = -1;
+            ForgetRestartState();
+            planner.State.MoveFractionToSkip = fractionDone;
         }
 
         if (modalGCommand >= 0 && state.Stream(0) is JobStream stream)
@@ -188,9 +217,6 @@ internal sealed class JobSequences(
     /// </summary>
     /// <param name="state">What the controller holds</param>
     /// <param name="request">What kind of pause, and why</param>
-    /// <param name="boundaryPosition">
-    /// Where the reader stopped, for a pause that asked the engine for nothing
-    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>What the sequence did, including where each stream carries on from</returns>
     /// <remarks>
@@ -207,8 +233,7 @@ internal sealed class JobSequences(
     /// known point and the machine has been told to stop
     /// </para>
     /// </remarks>
-    public async Task<SequenceOutcome> PauseAsync(JobState state, PauseRequest request, long? boundaryPosition,
-                                                  CancellationToken cancellationToken)
+    public async Task<SequenceOutcome> PauseAsync(JobState state, PauseRequest request, CancellationToken cancellationToken)
     {
         // The streams were frozen by the transition that started this sequence, so nothing more has
         // been read or dispatched since the pause was accepted. Waiting for the codes already in
@@ -219,6 +244,7 @@ internal sealed class JobSequences(
         // A synchronous pause asks for none: the job file has reached the pause point, so everything
         // queued ahead of it is what has to run and there is nothing to purge
         MovePlanner.FeedholdOutcome held = default;
+        bool abandonedMacros = false;
         if (!request.Synchronous)
         {
             held = await planner.StopEarlyAsync(plannedDeceleration: true, moveInterpreter, cancellationToken);
@@ -233,16 +259,29 @@ internal sealed class JobSequences(
             }
         }
 
-        // The machine is stopping somewhere the macros the job was inside did not expect, so what
-        // they had left to do is no longer meaningful. The job file itself stays, because the resume
-        // reads from it again. Whether anything was abandoned is RepRapFirmware's pausedInMacro
-        bool abandonedMacros = await codeProcessor.AbandonMacrosForPauseAsync(CodeChannel.File, cancellationToken);
+        if (state.Stream(0)?.Reader.IsHeldInMacro != true)
+        {
+            // The machine is stopping somewhere the macros the job was inside did not expect, so what
+            // they had left to do is no longer meaningful. The job file itself stays, because the resume
+            // reads from it again. Whether anything was abandoned is RepRapFirmware's pausedInMacro
+            abandonedMacros = await codeProcessor.AbandonMacrosAsync(CodeChannel.File, cancellationToken);
+        }
 
-        // Every code the streams started has now either completed or been cancelled, so where each
-        // reader says it is describes a boundary the machine has really reached
+        // Every code the streams started has then either completed or been cancelled, so where each
+        // reader says it is describes a boundary the machine has really reached. A stream held in a
+        // macro carries on in it, so nothing of it is dropped, and other inputs may move meanwhile, as
+        // RepRapFirmware releases the locks of a paused file in StartNextGCode
         foreach (JobStream stream in state.Streams)
         {
-            await stream.Reader.DrainAsync();
+            if (stream.Reader.IsHeldInMacro)
+            {
+                await stream.Reader.WaitUntilHeldAsync(cancellationToken);
+                stream.Reader.MacroHold.SuspendMovement();
+            }
+            else
+            {
+                await stream.Reader.DrainAsync();
+            }
         }
 
         // Where each stream carries on from. Only a pause that asked the engine to stop has anything
@@ -251,6 +290,12 @@ internal sealed class JobSequences(
         List<StreamRewind> rewinds = [];
         foreach (JobStream stream in state.Streams)
         {
+            if (stream.Reader.IsHeldInMacro)
+            {
+                logger.LogInformation("Job on {Channel} has been paused in a macro, reason {PauseReason}", stream.Channel, request.Reason);
+                continue;
+            }
+
             JobResumePoint? point = null;
             bool restartMacro = abandonedMacros;
             if (stream.Index == 0 && !request.Synchronous)
@@ -260,15 +305,13 @@ internal sealed class JobSequences(
                 restartMacro = abandonedMacros || rewind.RestartMacro;
             }
 
-            long position = point?.FilePosition
-                            ?? (stream.Index == 0 ? boundaryPosition : null)
-                            ?? stream.Reader.Position;
-            await stream.Reader.RewindAsync(position, cancellationToken);
+            long position = await stream.Reader.RewindAsync(point, cancellationToken);
             rewinds.Add(new StreamRewind(stream.Index, point, restartMacro));
 
             logger.LogInformation("Job on {Channel} has been paused at byte {Offset}, reason {PauseReason}",
                                   stream.Channel, position, request.Reason);
         }
+        await jobMonitor.PublishAsync(cancellationToken);
 
         // Through the code processor rather than the planner: the machine is not stopped while owed
         // deferred codes are still delivering their effects
@@ -420,12 +463,33 @@ internal sealed class JobSequences(
     /// <remarks>RepRapFirmware's <c>resuming1</c> to <c>resuming3</c></remarks>
     public async Task<SequenceOutcome> ResumeAsync(JobState state, bool runMacro, CancellationToken cancellationToken)
     {
+        foreach (JobStream stream in state.Streams)
+        {
+            await stream.Reader.ApplyPositionAsync(cancellationToken);
+        }
+
         if (runMacro && await AllAxesHomedAsync(cancellationToken))
         {
             await macroRunner.TryRunAsync(CodeChannel.File, "resume.g", cancellationToken: cancellationToken);
         }
 
-        await MoveBackToRestorePointAsync(cancellationToken);
+        try
+        {
+            // Before the head moves back, so that no other input moves it before the macro carries on. The move back
+            // is made on the channel of the first stream, so the lock of a second one is left until after it
+            await RestoreMovementAsync(state.Streams[..1], cancellationToken);
+            await MoveBackToRestorePointAsync(cancellationToken);
+            await RestoreMovementAsync(state.Streams[1..], cancellationToken);
+        }
+        catch
+        {
+            // The job stays paused
+            foreach (JobStream stream in state.Streams)
+            {
+                stream.Reader.MacroHold.SuspendMovement();
+            }
+            throw;
+        }
         await RestoreInterpreterStateAsync(cancellationToken);
 
         // What a line the machine is already part-way through is owed, spent by the first move the
@@ -438,6 +502,20 @@ internal sealed class JobSequences(
         logger.LogInformation("Printing resumed");
         await eventLogger.LogOutputAsync(MessageType.Warning, "Printing resumed");
         return new SequenceOutcome(new Message(), Failed: false);
+    }
+
+    /// <summary>
+    /// Take back the movement lock that the streams held in a macro gave up
+    /// </summary>
+    /// <param name="streams">Streams that may be held</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    private static async ValueTask RestoreMovementAsync(ImmutableArray<JobStream> streams, CancellationToken cancellationToken)
+    {
+        foreach (JobStream stream in streams)
+        {
+            await stream.Reader.MacroHold.RestoreMovementAsync(cancellationToken);
+        }
     }
 
     /// <summary>

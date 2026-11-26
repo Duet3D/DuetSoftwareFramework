@@ -35,7 +35,7 @@ internal static class ModelWaits
     private static async Task<(T Value, bool IsReady)> PollAsync<T>(DcsTestHost host, Func<ObjectModel, T> read,
                                                                     Func<T, bool> isReady, int timeoutMs)
     {
-        DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        long deadline = Environment.TickCount64 + timeoutMs;
         T value;
         do
         {
@@ -46,7 +46,7 @@ internal static class ModelWaits
             }
             await Task.Delay(PollIntervalMs);
         }
-        while (DateTime.UtcNow < deadline);
+        while (Environment.TickCount64 < deadline);
         return (value, false);
     }
 

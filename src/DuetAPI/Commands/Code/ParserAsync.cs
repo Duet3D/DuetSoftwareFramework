@@ -98,8 +98,9 @@ public partial class Code
             // Stop if another G/M/T code is coming up and this one is complete
             if (StartsNextCode(state, result, c))
             {
-                // The character belongs to the next code, so put it back
+                // The character belongs to the next code, so put it back and do not count it
                 buffer.Pointer--;
+                result.Length--;
                 break;
             }
 

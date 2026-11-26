@@ -163,39 +163,124 @@ public class CancelRestartTests : BenchFixture
     }
 
     /// <summary>
-    /// M26 P is the fraction of the resumed move already made, so only the remainder should be
-    /// scheduled - here the second half of the X0 to X65 move, 32.5 mm rather than the whole 65 mm
+    /// M26 P is the fraction of the line at the offset that has been made. What is left of an absolute
+    /// line is the way from where the head is to its target, and the rest of its extrusion: whoever sets
+    /// the fraction has moved the head to where the line was interrupted, as resurrect.g does
     /// </summary>
-    /// <remarks>
-    /// KnownGap: scheduling only the remainder needs the engine's committed position resynced to the
-    /// fractional point before the resumed move, which is what resurrect.g does after moving the head
-    /// there. That is the power-fail resume path (M916), which is not implemented, so the fraction
-    /// cannot yet be applied without the machine simply travelling the whole move. See
-    /// <see cref="RestartWithModalCommand"/> for the modal-command half, which does work
-    /// </remarks>
-    [Category("KnownGap")]
+    /// <remarks>GCodes::DoStraightMove scales relative words, and ReadMove the extrusion of the first segment</remarks>
     [Test]
     public async Task RestartFractionSchedulesOnlyThePartNotYetMade()
     {
-        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "M453", Machines.Xye.Homed)
-                                             .WithSd(sd =>
-        {
-            sd.WriteSys("start.g", StartWithMove);
-            sd.WriteGCode("job.gcode", SegmentsJob);
-        }).StartAsync();
+        const string job = "G91\nG1 X11 F6000\nG1 X65 E10\nG1 X81 E4\n";
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "M563 P0 D0", "T0", Machines.Xye.Homed)
+                                             .WithSd(sd => sd.WriteGCode("job.gcode", job)).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("G90 G1 X32.5 F6000");
+        await bench.Host.ExecuteCodeAsync("M83");
+        await bench.Host.ExecuteCodeAsync("M400");
+        bench.CanMaster.ClearCapture();
 
         await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
-        await bench.Host.ExecuteCodeAsync($"M26 S{SegmentsJob.IndexOf("X65")} P0.5 C1");
+        await bench.Host.ExecuteCodeAsync($"M26 S{job.IndexOf("G1 X65")} P0.5");
         await bench.Host.ExecuteCodeAsync("M24");
         await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
 
-        double[] distances = RoundedDistances(bench);
         Assert.Multiple(async () =>
         {
-            Assert.That(distances, Does.Contain(32.5),
-                        "P0.5 leaves only the second half of the X0 to X65 move to schedule");
-            Assert.That(distances, Does.Not.Contain(65.0), "the move was not scheduled whole");
+            Assert.That(RoundedDistances(bench), Is.EqualTo(new[] { 32.5, 16.0 }), "X32.5 to X65, and X65 to X81");
+            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo((5 + 4) * Machines.EStepsPerMm).Within(1e-2f),
+                        "half of E10, and all of E4: only the first move spends the fraction");
             Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1), "the restarted job ended normally");
+        });
+    }
+
+    /// <summary>
+    /// What is left of a relative line is the rest of its distance. The G91 above the offset is not read:
+    /// M24 gives the file the modes of the input that sends it (GCodeMachineState::CopyStateFrom)
+    /// </summary>
+    [Test]
+    public async Task RestartFractionScalesARelativeLine()
+    {
+        const string job = "G91\nG1 X20\nG1 X30\n";
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd => sd.WriteGCode("job.gcode", job)).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
+        await bench.Host.ExecuteCodeAsync($"M26 S{job.IndexOf("G1 X20")} P0.25");
+        await bench.Host.ExecuteCodeAsync("G91");
+        await bench.Host.ExecuteCodeAsync("G1 F4800");
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(RoundedDistances(bench), Is.EqualTo(new[] { 15.0, 30.0 }), "three quarters of X20, and all of X30");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[DuetAPI.CodeChannel.File]!.FeedRate),
+                        Is.EqualTo(4800.0f), "the file has the feed rate too");
+        });
+    }
+
+    /// <summary>What a job that made no move was owed is not taken from the next job</summary>
+    [Test]
+    public async Task RestartFractionThatWasNotUsedIsForgotten()
+    {
+        const string job = "G1 X10 F6000\nG4 P0\n";
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "M563 P0 D0", "T0", "M83", Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteGCode("job.gcode", job);
+            sd.WriteGCode("next.gcode", "M83\nG1 X20 E2 F6000\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
+        await bench.Host.ExecuteCodeAsync($"M26 S{job.IndexOf("G4")} P0.5");
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/next.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm).Within(1e-2f), "all of E2");
+    }
+
+    /// <summary>A job does not start in the inverse time mode the job before it ended in (GCodes::StartPrinting)</summary>
+    [Test]
+    public async Task AJobStartsOutOfInverseTimeMode()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, Machines.Xye.Homed)
+                                             .WithSd(sd =>
+        {
+            sd.WriteGCode("job.gcode", "G93\n");
+            sd.WriteGCode("next.gcode", "G1 X20 F6000\n");
+        }).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/job.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[DuetAPI.CodeChannel.File]!.InverseTimeMode), Is.True, "nothing resets it at the end");
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/next.gcode\"");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+        Assert.That(await bench.Host.ReadModelAsync(model => model.Inputs[DuetAPI.CodeChannel.File]!.InverseTimeMode), Is.False);
+    }
+
+    /// <summary>A job started from the beginning of its file makes the first line whole and in its own modes</summary>
+    /// <remarks>GCodes::StartPrinting clears restartMoveFractionDone if fromStart</remarks>
+    [Test]
+    public async Task RestartFractionIsIgnoredAtTheStartOfTheFile()
+    {
+        await using Bench bench = await Bench.With(Machines.Xye, JobMacros.Instrumented, "M563 P0 D0", "T0", Machines.Xye.Homed)
+                                             .WithSd(sd => sd.WriteGCode("job.gcode", "G1 X20 E2 F6000\nG1 X30\n")).StartAsync();
+
+        await bench.Host.ExecuteCodeAsync("M23 \"0:/gcodes/job.gcode\"");
+        await bench.Host.ExecuteCodeAsync("M26 S0 P0.5");
+        await bench.Host.ExecuteCodeAsync("G91");
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("startRan"), Is.EqualTo(1), "start.g ran");
+            Assert.That(RoundedDistances(bench), Is.EqualTo(new[] { 20.0, 10.0 }), "X0 to X20, and X20 to X30");
+            Assert.That(bench.CanMaster.ScheduledExtrusion(Machines.EDriver), Is.EqualTo(2 * Machines.EStepsPerMm).Within(1e-2f),
+                        "all of E2");
         });
     }
 }

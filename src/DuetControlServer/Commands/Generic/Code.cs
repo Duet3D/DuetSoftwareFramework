@@ -217,6 +217,26 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     internal Files.CodeFile? File { get; set; }
 
     /// <summary>
+    /// State to rewind the file to this code in, if it was read from one
+    /// </summary>
+    internal Files.CodeFileState FileState { get; set; }
+
+    /// <summary>
+    /// Record the local variables of the job file as they are now in <see cref="FileState"/>
+    /// </summary>
+    /// <remarks>
+    /// Must be called while no later code of the file can run. Macros are only run again from their start, so theirs are
+    /// not recorded
+    /// </remarks>
+    internal void SaveVariables()
+    {
+        if (File is not null and not Files.MacroFile)
+        {
+            FileState = FileState with { Variables = File.Variables.Snapshot() };
+        }
+    }
+
+    /// <summary>
     /// Whether the ProcessInternally worker is deferring this code: the channel continues past it,
     /// and its handler runs when its anchor move has retired
     /// </summary>
@@ -274,44 +294,6 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
     /// </summary>
     /// <returns>The declared class, or null if no handler implements the code</returns>
     internal Codes.CodeClass? ClassifyInternally() => InternalHandler?.Classify(this);
-
-    /// <summary>
-    /// Update the next file position in case we need to fork this file
-    /// </summary>
-    internal void UpdateNextFilePosition()
-    {
-        if (File is not null && FilePosition is not null)
-        {
-            using (File.Lock(CancellationToken))
-            {
-                long nextFilePosition = FilePosition.Value + (Length ?? 0L);
-                if (File.NextFilePosition < nextFilePosition)
-                {
-                    File.NextFilePosition = nextFilePosition;
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Update the next file position in case we need to fork this file
-    /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Asynchronous task</returns>
-    internal async ValueTask UpdateNextFilePositionAsync(CancellationToken cancellationToken)
-    {
-        if (File is not null && FilePosition is not null)
-        {
-            using (await File.LockAsync(cancellationToken))
-            {
-                long nextFilePosition = FilePosition.Value + (Length ?? 0L);
-                if (File.NextFilePosition < nextFilePosition)
-                {
-                    File.NextFilePosition = nextFilePosition;
-                }
-            }
-        }
-    }
 
     /// <summary>
     /// Indicates if this is a comment or empty code that is not interpreted by RepRapFirmware
@@ -662,6 +644,11 @@ public sealed class Code : DuetAPI.Commands.Code, IConnectionCommand
         Connection = null;
         Stage = Codes.PipelineStage.Start;
         File = null;
+        FileState = default;
+        IsCurrentlyDeferred = false;
+        DeferredRing = 0;
+        DeferredAnchor = 0;
+        DeferredPredecessor = null;
         _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         BinarySize = 0;
         ErrorColumn = DuetAPI.Commands.CodeParameter.NoColumn;

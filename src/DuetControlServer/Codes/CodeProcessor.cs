@@ -101,13 +101,23 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// </remarks>
     public async Task AbortAllFilesAsync(CodeChannel channel, CancellationToken cancellationToken = default)
     {
-        await Processors.Value[(int)channel].AbortAllFilesAsync(cancellationToken);
-
         if (channel is CodeChannel.File or CodeChannel.File2)
         {
-            await serviceProvider.GetRequiredService<Files.Job.JobController>().AbortAsync();
+            // The job and its macros are one thing to abort, so its controller does both
+            await serviceProvider.GetRequiredService<Files.Job.JobController>().AbortAsync(channel);
+            return;
         }
+        await AbortMacrosAsync(channel, cancellationToken);
     }
+
+    /// <summary>
+    /// Abort the macros running on a code channel, leaving the job to the caller
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Asynchronous task, which does not wait for the macros to end</returns>
+    public Task AbortMacrosAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+        => Processors.Value[(int)channel].AbortAllFilesAsync(cancellationToken);
 
     /// <summary>
     /// Whether every macro running on a channel can be restarted from its beginning
@@ -115,8 +125,8 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     /// <param name="channel">Code channel</param>
     /// <returns>True if no macro on the channel refuses to be interrupted</returns>
     /// <remarks>
-    /// A pause abandons the macros it unwinds, so one that cannot be restarted must not be interrupted part-way - the
-    /// pause waits until the channel is back out of it instead. <c>M98 R1</c> is what marks one restartable
+    /// A pause that stops the machine part-way through a move abandons the macros it unwinds, so one that cannot be
+    /// restarted must not be interrupted like that. <c>M98 R1</c> is what marks one restartable
     /// </remarks>
     public bool CanRestartMacros(CodeChannel channel) => stateStack.CanRestartMacros(channel);
 
@@ -148,13 +158,20 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
     public bool IsMacroRestarted(CodeChannel channel) => Processors.Value[(int)channel].IsMacroRestarted;
 
     /// <summary>
-    /// Abandon the macros a pause interrupts on a channel, leaving its job file in place
+    /// Abandon the macros of the job on a channel, leaving its job file in place
     /// </summary>
     /// <param name="channel">Code channel</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Whether any macro was abandoned</returns>
-    public Task<bool> AbandonMacrosForPauseAsync(CodeChannel channel, CancellationToken cancellationToken = default)
-        => Processors.Value[(int)channel].AbandonMacrosForPauseAsync(cancellationToken);
+    public Task<bool> AbandonMacrosAsync(CodeChannel channel, CancellationToken cancellationToken = default)
+        => Processors.Value[(int)channel].AbandonMacrosAsync(cancellationToken);
+
+    /// <summary>
+    /// Hold on the macros the job has called on a channel
+    /// </summary>
+    /// <param name="channel">Code channel</param>
+    /// <returns>The hold</returns>
+    public JobMacroHold GetMacroHold(CodeChannel channel) => Processors.Value[(int)channel].MacroHold;
 
     /// <summary>
     /// Assign the job file to the given channel. Only used by the job tasks!
@@ -211,12 +228,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         if (syncFileStreams && code.IsFromFileChannel)
         {
             // Wait for both file streams to reach the same position
-            if (await DoSyncAsync(code, cancellationToken))
-            {
-                await code.UpdateNextFilePositionAsync(cancellationToken);
-                return true;
-            }
-            return false;
+            return await DoSyncAsync(code, cancellationToken);
         }
         else if (ifExecuting && model.MultipleMotionSystemsConfigured)
         {
@@ -233,7 +245,6 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
         }
 
         // Done
-        await code.UpdateNextFilePositionAsync(cancellationToken);
         return true;
     }
 
@@ -565,6 +576,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
                 if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                 {
                     _syncRequests[item].TrySetResult(true);
+                    _syncRequests.Remove(item);
                     return true;
                 }
             }
@@ -573,7 +585,20 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             _syncRequests.Add(code, tcs);
             syncTask = tcs.Task;
         }
-        return await syncTask;
+
+        try
+        {
+            return await syncTask.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // A pause that stops this stream must not wait for the other one to get here
+            lock (_syncRequests)
+            {
+                _syncRequests.Remove(code);
+            }
+            return false;
+        }
     }
 
     /// <summary>

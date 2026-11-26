@@ -71,8 +71,9 @@ namespace Duet::Sbc
 
 		// --- Called from the managed side -------------------------------------------------------
 
-		// True if `ring` has room for another move. Advisory: by the time the caller acts the ring
-		// may have retired a move and made more room, which is the harmless direction to be wrong in.
+		// True if `ring` has room for another move, counting those submitted to it that the motion thread
+		// has not taken up. Advisory: by the time the caller acts the ring may have retired a move and
+		// made more room, which is the harmless direction to be wrong in.
 		// False until Init has built the rings.
 		[[nodiscard]] bool CanAddMove(unsigned int ring) const;
 
@@ -232,6 +233,9 @@ namespace Duet::Sbc
 		// is the whole queue in practice; when M596 gives a second motion system its own stop, this
 		// needs the same revisiting as the rest of the feedhold path.
 		void DiscardSubmissionsFor(unsigned int ring);
+
+		// Consume the submission just peeked at, once its ring has taken it up or it has been dropped
+		void ConsumeSubmission(const Motion::MoveParamsHeader& params);
 		void DrainForcedPositions();
 		void DrainFeedholds();
 		void PublishPositions();
@@ -240,6 +244,12 @@ namespace Duet::Sbc
 		// header's numDrives claims. Checked at both ends: on submission so the caller hears about
 		// it, and again on the motion thread so nothing reaches a DDA unvalidated.
 		[[nodiscard]] static bool IsWellFormedSubmission(std::span<const uint8_t> record) noexcept;
+
+		// The ring a move is queued on
+		[[nodiscard]] static unsigned int RingOf(const Motion::MoveParamsHeader& params) noexcept;
+
+		// The least time a move can take, up to what CanAddMove needs to know
+		[[nodiscard]] static uint32_t MinimumClocksFor(const Motion::MoveParamsHeader& params) noexcept;
 
 		static void OnMoveRetired(const DDA& dda, void *context) noexcept;
 
@@ -302,6 +312,10 @@ namespace Duet::Sbc
 		{
 			std::atomic<bool> shouldStartMove{false};
 			std::atomic<bool> waitingForEmpty{false};
+
+			// Submitted moves that the motion thread has not taken up, and how long they will take
+			std::atomic<uint32_t> pendingMoves{0};
+			std::atomic<uint32_t> pendingClocks{0};
 		};
 		RingState m_ringState[numRings];
 

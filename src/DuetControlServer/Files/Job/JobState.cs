@@ -81,19 +81,12 @@ internal sealed record NextSelection(JobFile File, bool Start);
 /// <param name="Index">Motion system this stream belongs to</param>
 /// <param name="Channel">Channel its codes go to</param>
 /// <param name="Reader">The reader that owns its file</param>
-/// <param name="RewindPoint">Where a resume carries this stream on from, if a pause found a point</param>
-/// <param name="AbandonedMacros">
-/// Whether the pause abandoned macros this stream was inside, which is RepRapFirmware's
-/// <c>pausedInMacro</c> and what the resume sets <c>firstCommandAfterRestart</c> from
+/// <param name="RestartsMacro">
+/// Whether the first code it reads is run again: the pause abandoned macros the stream was inside, RepRapFirmware's
+/// <c>pausedInMacro</c>, or the job starts from an offset. RepRapFirmware's <c>firstCommandAfterRestart</c>
 /// </param>
 /// <param name="Finished">Whether this stream has read its file to the end</param>
-/// <remarks>
-/// The rewind point is per stream because each stream reads its own copy of the file and stops
-/// somewhere of its own: the engine stops one ring, so the first stream rewinds to the move that
-/// survived and a forked one to the end of its last completed code
-/// </remarks>
-internal sealed record JobStream(int Index, CodeChannel Channel, JobReader Reader,
-                                 JobResumePoint? RewindPoint, bool AbandonedMacros, bool Finished);
+internal sealed record JobStream(int Index, CodeChannel Channel, JobReader Reader, bool RestartsMacro, bool Finished);
 
 /// <summary>
 /// Everything there is to know about the job, as one value
@@ -118,8 +111,14 @@ internal sealed record JobState
     /// <summary>Why the run that is ending ended, written once by the transition that ended it</summary>
     public PrintStoppedReason? StopReason { get; init; }
 
-    /// <summary>A pause asked for while the job was inside a macro it cannot be interrupted in</summary>
+    /// <summary>A pause that waits for the macro the job is in to end</summary>
     public PauseRequest? PendingPause { get; init; }
+
+    /// <summary>A pause that waits for the code the macro of the job is on to end</summary>
+    public PauseRequest? PendingPauseInMacro { get; init; }
+
+    /// <summary>Whether a pause has been asked for and not begun</summary>
+    public bool IsPausePending => PendingPause is not null || PendingPauseInMacro is not null;
 
     /// <summary>A file selected from inside the job, taken up once this run is torn down</summary>
     public NextSelection? NextFile { get; init; }

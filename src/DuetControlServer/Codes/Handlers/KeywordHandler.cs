@@ -362,20 +362,12 @@ public sealed class KeywordHandler(CodeProcessor codeProcessor, Expressions expr
                 }
                 else
                 {
-                    if (!variableStore.For(code).TryCreateVariable(varName, value))
+                    if (!variableStore.For(code).TryCreateVariable(varName, value, code.FileState.Block?.Depth ?? 0))
                     {
                         throw new CodeParserException($"variable '{varName}' already exists", code);
                     }
-
-                    // The block that created it is the block that deletes it again
-                    if (code.File is not null)
-                    {
-                        using (await code.File.LockAsync(cancellationToken))
-                        {
-                            code.File.AddLocalVariable(varName);
-                        }
-                    }
                 }
+                code.SaveVariables();
                 _logger.LogDebug("Set variable {Variable} to {Value}", fullVarName, value);
                 return new Message();
         }

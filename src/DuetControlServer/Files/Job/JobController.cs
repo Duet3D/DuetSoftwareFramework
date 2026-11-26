@@ -49,6 +49,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<JobController> _logger;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly Model.ObjectModel _model;
     private readonly Settings _settings;
 
     /// <summary>
@@ -63,6 +64,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="logger">Logger</param>
     /// <param name="loggerFactory">Logger factory, for the readers</param>
+    /// <param name="model">Object model, for the status of the machine</param>
     /// <param name="settings">Settings</param>
     public JobController(CodeFactory codeFactory,
         CodeProcessor codeProcessor,
@@ -73,6 +75,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         IHostApplicationLifetime lifetime,
         ILogger<JobController> logger,
         ILoggerFactory loggerFactory,
+        Model.ObjectModel model,
         IOptions<Settings> settings)
     {
         _codeFactory = codeFactory;
@@ -84,6 +87,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         _lifetime = lifetime;
         _logger = logger;
         _loggerFactory = loggerFactory;
+        _model = model;
         _settings = settings.Value;
     }
 
@@ -121,6 +125,12 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private CancellationTokenSource? _sequenceTokenSource;
     private JobCommand? _sequenceRequest;
     private int _sequenceId;
+
+    /// <summary>
+    /// The M25 that asked for the pending pause, answered when the pause begins or is dropped
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>doingDeferredPause</c></remarks>
+    private JobCommand? _heldPause;
 
     /// <inheritdoc/>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -215,18 +225,19 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         => PostAsync(new JobCommand.Stop(channel), cancellationToken);
 
     /// <summary>
-    /// Tear the job down because it cannot carry on
+    /// Tear the job down because it cannot carry on, and abort the macros of a file channel
     /// </summary>
+    /// <param name="channel">File channel whose macros to abort, whether or not there is a job</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
     /// A code error, an <c>abort</c> keyword, the link going down, a shutdown. Awaited only as far as
     /// the transition: what the machine does about it is a sequence like any other
     /// </remarks>
-    public async ValueTask AbortAsync()
+    public async ValueTask AbortAsync(CodeChannel channel)
     {
         try
         {
-            await PostAsync(new JobCommand.Abort(), CancellationToken.None);
+            await PostAsync(new JobCommand.Abort(channel), CancellationToken.None);
         }
         catch (OperationCanceledException)
         {
@@ -246,15 +257,16 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// the job has in flight. The command is queued like any other, so it is still ordered against
     /// everything else the job is asked to do
     /// </remarks>
-    public void Abort() => _commands.Writer.TryWrite(new JobCommand.Abort());
+    public void Abort() => _commands.Writer.TryWrite(new JobCommand.Abort(CodeChannel.File));
 
     /// <summary>
     /// Fork the job onto the second file channel
     /// </summary>
+    /// <param name="state">State of the job code that the second stream reads on after</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>The message to report</returns>
-    public ValueTask<Message> ForkAsync(CancellationToken cancellationToken)
-        => PostAsync(new JobCommand.Fork(), cancellationToken);
+    public ValueTask<Message> ForkAsync(CodeFileState state, CancellationToken cancellationToken)
+        => PostAsync(new JobCommand.Fork(state), cancellationToken);
 
     /// <summary>
     /// Set where in the file a stream starts or carries on from
@@ -294,7 +306,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             {
                 builder.Append(", simulating");
             }
-            if (state.PendingPause is not null)
+            if (state.IsPausePending)
             {
                 builder.Append(", pause pending");
             }
@@ -322,6 +334,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         JobCommand.SetFilePosition c => OnSetFilePositionAsync(c),
         JobCommand.Fork c => OnForkAsync(c),
         JobCommand.ReaderStopped c => OnReaderStoppedAsync(c),
+        JobCommand.MacroHeld c => OnMacroHeldAsync(c),
         JobCommand.ReaderFinished c => OnReaderFinishedAsync(c),
         JobCommand.ReaderFailed c => OnReaderFailedAsync(c),
         JobCommand.SequenceCompleted c => OnSequenceCompletedAsync(c),
@@ -351,7 +364,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 {
                     // M23 only selects, and the run it was read from carries on: RepRapFirmware
                     // queues the file the same way and leaves starting it to M24 or M32
-                    Publish(state with { NextFile = new NextSelection(command.File, Start: false) });
+                    await PublishAsync(state with { NextFile = new NextSelection(command.File, Start: false) });
                     command.Reply(new Message());
                     return;
                 }
@@ -360,7 +373,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 {
                     // M32 from inside stop.g: the run's own stop.g and teardown are already under
                     // way, so the file is stored and FinishAsync chains it once they complete
-                    Publish(state with { NextFile = new NextSelection(command.File, Start: true) });
+                    await PublishAsync(state with { NextFile = new NextSelection(command.File, Start: true) });
                     command.Reply(new Message());
                     return;
                 }
@@ -401,7 +414,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         JobState state = _state;
         await CloseStreamsAsync(state);
 
-        Publish(new JobState
+        await PublishAsync(new JobState
         {
             Phase = JobPhase.Selected,
             File = file,
@@ -419,21 +432,21 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <summary>
     /// M24, M32 and M37: start what was selected, or resume what was paused
     /// </summary>
-    private ValueTask OnStartOrResumeAsync(JobCommand.StartOrResume command)
+    private async ValueTask OnStartOrResumeAsync(JobCommand.StartOrResume command)
     {
         JobState state = _state;
         switch (state.Phase)
         {
             case JobPhase.Selected:
-                Publish(state with { Phase = JobPhase.Starting, StopReason = null });
+                await PublishAsync(state with { Phase = JobPhase.Starting, StopReason = null });
                 _runTokenSource = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.ApplicationStopping);
-                StartSequence(command, token => _sequences.StartAsync(_state, token));
-                return ValueTask.CompletedTask;
+                StartSequence(command, token => _sequences.StartAsync(_state, command.Channel, token));
+                return;
 
             case JobPhase.Paused:
-                Publish(state with { Phase = JobPhase.Resuming });
+                await PublishAsync(state with { Phase = JobPhase.Resuming });
                 StartSequence(command, token => _sequences.ResumeAsync(_state, command.RunMacro, token));
-                return ValueTask.CompletedTask;
+                return;
 
             case JobPhase.Starting:
             case JobPhase.Running:
@@ -443,19 +456,19 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 // has moved fileToPrint into the file reader, so M24 is refused "Cannot print, because no file is selected!"
                 // RepRapFirmware ignores a resume of a job that is already going where it was asked
                 command.Reply(new Message());
-                return ValueTask.CompletedTask;
+                return;
 
             default:
                 // Idle, Cancelling, Finishing and Aborting: the file is closed in every one of them
                 command.Refuse("Cannot print, because no file is selected!");
-                return ValueTask.CompletedTask;
+                return;
         }
     }
 
     /// <summary>
     /// M25, M226, M600, M601 and the events that pause a job
     /// </summary>
-    private ValueTask OnPauseAsync(JobCommand.Pause command)
+    private async ValueTask OnPauseAsync(JobCommand.Pause command)
     {
         JobState state = _state;
         PauseRequest request = command.Request;
@@ -463,12 +476,20 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         if (state.Phase is JobPhase.Pausing or JobPhase.Paused or JobPhase.Resuming)
         {
             command.Refuse("Printing is already paused!");
-            return ValueTask.CompletedTask;
+            return;
         }
         if (state.Phase != JobPhase.Running)
         {
             command.Refuse("Cannot pause print, because no file is being printed!");
-            return ValueTask.CompletedTask;
+            return;
+        }
+
+        bool inMacro = _codeProcessor.IsDoingMacro(CodeChannel.File), canRestart = _codeProcessor.CanRestartMacros(CodeChannel.File);
+        if (inMacro && request.Synchronous && (canRestart || request.InAnyMacro))
+        {
+            // The macro has reached the pause point itself, so the job stops in it as it is
+            await BeginPauseAsync(command, request, inMacro: true);
+            return;
         }
 
         // A job inside a macro that has not said it can be restarted must not be interrupted
@@ -476,25 +497,44 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         // Read here, inside the loop, so there is one decision point - a macro that ends before the
         // barrier arms leaves a boundary pause at the code that follows it, which is a pause either
         // way. RepRapFirmware's deferredPauseCommandPending
-        if (_codeProcessor.IsDoingMacro(CodeChannel.File) && !_codeProcessor.CanRestartMacros(CodeChannel.File))
+        if (inMacro && !canRestart)
         {
+            if (request.InAnyMacro)
+            {
+                // Answered now, as the events that follow wait for the reply
+                command.Reply(new Message());
+                await PublishAsync(state with { PendingPauseInMacro = (state.PendingPauseInMacro ?? request).Serving(request) });
+                if (state.PendingPauseInMacro is null)
+                {
+                    state.Stream(0)?.Reader.HoldMacroOrFreezeAtBoundary();
+                }
+                return;
+            }
+
             if (state.PendingPause is PauseRequest held &&
                 (held.Macro == PauseMacro.FilamentChange || request.Macro != PauseMacro.FilamentChange))
             {
                 // A filament change takes priority over an ordinary pause and replaces it; anything
                 // else is refused rather than stacked
-                command.Reply(new Message(MessageType.Warning, "Pausing is already pending"));
-                return ValueTask.CompletedTask;
+                command.Reply(request.Synchronous ? new Message() : new Message(MessageType.Success, "Pausing is already pending"));
+                return;
             }
 
-            Publish(state with { PendingPause = request });
+            await PublishAsync(state with { PendingPause = request });
             state.Stream(0)?.Reader.FreezeAtBoundary();
-            command.Reply(new Message());
-            return ValueTask.CompletedTask;
+            if (request.Synchronous)
+            {
+                // The macro the pause has to wait for is running the code that asked
+                command.Reply(new Message());
+            }
+            else
+            {
+                _heldPause = command;
+            }
+            return;
         }
 
-        BeginPause(command, request);
-        return ValueTask.CompletedTask;
+        await BeginPauseAsync(command, request);
     }
 
     /// <summary>
@@ -502,10 +542,8 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// </summary>
     /// <param name="command">The request, or null for a pause the reader reported a boundary for</param>
     /// <param name="request">What kind of pause</param>
-    /// <param name="boundaryPosition">
-    /// Where the reader stopped, for a pause that asked the engine for nothing
-    /// </param>
-    private void BeginPause(JobCommand? command, PauseRequest request, long? boundaryPosition = null)
+    /// <param name="inMacro">Whether the job stops in the macro it is in and carries on there</param>
+    private async ValueTask BeginPauseAsync(JobCommand? command, PauseRequest request, bool inMacro = false)
     {
         // The finish a pause landed on top of is dropped: the reader reports Finished again once the
         // job resumes and runs out of codes a second time
@@ -517,9 +555,29 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         // dispatch one more line - which the machine would then make, past the point being recorded
         foreach (JobStream stream in _state.Streams)
         {
-            stream.Reader.Freeze();
+            if (inMacro && (stream.Index == 0 || _codeProcessor.IsDoingMacro(stream.Channel)))
+            {
+                stream.Reader.HoldMacro();
+            }
+            else
+            {
+                stream.Reader.Freeze();
+                stream.Reader.MacroHold.Release();
+            }
         }
-        Publish(_state with { Phase = JobPhase.Pausing, PendingPause = null });
+
+        request = request.Serving(_state.PendingPauseInMacro);
+
+        // This pause serves every request made before it, except that a filament change asked for in the macro the
+        // job stops in has still to be made when the macro ends
+        bool keepPending = inMacro && _state.PendingPause?.Macro == PauseMacro.FilamentChange;
+        await PublishAsync(_state with
+        {
+            Phase = JobPhase.Pausing,
+            PendingPause = keepPending ? _state.PendingPause : null,
+            PendingPauseInMacro = null
+        });
+        AnswerHeldPause();
 
         // A pause commanded from the job file itself is answered now rather than when the sequence
         // settles: the sequence has to wait for the code that asked to complete, and a reply held
@@ -530,7 +588,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             command?.Reply(new Message());
             command = null;
         }
-        StartSequence(command, token => _sequences.PauseAsync(_state, request, boundaryPosition, token));
+        StartSequence(command, token => _sequences.PauseAsync(_state, request, token));
     }
 
     /// <summary>
@@ -559,7 +617,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         switch (state.Phase)
         {
             case JobPhase.Paused:
-                Publish(state with { Phase = JobPhase.Cancelling, StopReason = PrintStoppedReason.UserCancelled });
+                await PublishAsync(state with { Phase = JobPhase.Cancelling, StopReason = PrintStoppedReason.UserCancelled });
                 StopReading(_state);
                 StartSequence(command, async token =>
                 {
@@ -580,6 +638,12 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private async ValueTask OnAbortAsync(JobCommand.Abort command)
     {
         JobState state = _state;
+
+        // In one step, so that no macro carries on in the job and no other job starts under the abort. The reading
+        // stops first, because the code that called an aborted macro ends with it
+        StopReading(state);
+        await _codeProcessor.AbortMacrosAsync(command.Channel);
+
         switch (state.Phase)
         {
             case JobPhase.Idle:
@@ -590,16 +654,21 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 // Nothing was printing, so nothing is switched off. RepRapFirmware guards StopPrint's
                 // heater switch-off with IsPrinting for the same reason
                 await CloseStreamsAsync(state);
-                Publish(new JobState());
+                await PublishAsync(new JobState());
                 command.Reply(new Message());
                 return;
 
             case JobPhase.Finishing:
                 // The stop macro is cut short and never runs again; what is left is the teardown,
-                // which the run cannot end without
+                // which the run cannot end without. The sequence that ran the macro unwinds first, so
+                // that the next job does not start on top of it
+                Task stopping = _sequence ?? Task.CompletedTask;
                 CancelSequence();
-                StopReading(state);
-                StartSequence(null, token => _sequences.TeardownAsync(_state, token));
+                StartSequence(null, async token =>
+                {
+                    await stopping;
+                    return await _sequences.TeardownAsync(_state, token);
+                });
                 command.Reply(new Message());
                 return;
 
@@ -608,9 +677,8 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 return;
 
             default:
-                Publish(state with { Phase = JobPhase.Aborting, PendingPause = null });
+                await PublishAsync(state with { Phase = JobPhase.Aborting, PendingPause = null, PendingPauseInMacro = null });
                 await DropPendingPauseAsync(state);
-                StopReading(_state);
                 if (_sequence is null)
                 {
                     await EndRunAsync(PrintStoppedReason.Abort);
@@ -646,6 +714,11 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         if (state.Stream(command.Stream) is JobStream stream)
         {
             await stream.Reader.SetPositionAsync(command.Position, _lifetime.ApplicationStopping);
+            if (stream.Index == 0 && state.IsPausePending)
+            {
+                // A filament change that waits for the end of the macro the job is moved out of
+                await PublishAsync(state with { PendingPause = null });
+            }
         }
         command.Reply(new Message());
     }
@@ -671,52 +744,80 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         CodeFile forked;
         using (await first.Reader.File.LockAsync(_lifetime.ApplicationStopping))
         {
-            // The copy constructor reads NextFilePosition
-            forked = _fileFactory.Create(first.Reader.File, CodeChannel.File2);
+            forked = _fileFactory.Fork(first.Reader.File, command.State, CodeChannel.File2);
         }
 
         JobStream stream = NewStream(1, forked);
-        Publish(state with { Streams = state.Streams.Add(stream) });
-        await stream.Reader.RunAsync(null, restartMacro: false, RunToken, _lifetime.ApplicationStopping);
+        await PublishAsync(state with { Streams = state.Streams.Add(stream) });
+        await stream.Reader.RunAsync(restartMacro: false, RunToken, _lifetime.ApplicationStopping);
         command.Reply(new Message());
     }
 
     /// <summary>
-    /// A stream has come to rest at the boundary a held pause was waiting for
+    /// A stream has come to rest at the boundary it was told to stop at
     /// </summary>
-    private ValueTask OnReaderStoppedAsync(JobCommand.ReaderStopped command)
+    private async ValueTask OnReaderStoppedAsync(JobCommand.ReaderStopped command)
     {
-        JobState state = _state;
-        if (state.Phase == JobPhase.Running && state.PendingPause is PauseRequest request)
+        if (_state.Phase == JobPhase.Running && _state.Stream(command.Stream) is { Reader.IsStoppedAtBoundary: true } stream)
+        {
+            await CarryOnFromBoundaryAsync(stream);
+        }
+        command.Reply(new Message());
+    }
+
+    /// <summary>
+    /// Make the pause that waited for a stream to stop at the boundary, or let the stream read on
+    /// </summary>
+    /// <param name="stream">Stream that has stopped</param>
+    /// <returns>Asynchronous task</returns>
+    private async ValueTask CarryOnFromBoundaryAsync(JobStream stream)
+    {
+        if (stream.Index == 0 && (_state.PendingPause ?? _state.PendingPauseInMacro) is PauseRequest request)
         {
             // The macro was let finish, so the File channel is inside none by construction and
             // nothing was submitted past the last code's moves. The ring drains to rest at the
-            // boundary, so the pause makes no stop and rewinds to where the reader says it is
-            BeginPause(null, request with { Synchronous = true }, command.Position);
+            // boundary, so the pause makes no stop and rewinds to where the reader says it is.
+            // RepRapFirmware runs the pause as an M226 of the file's own
+            await BeginPauseAsync(null, request with { Channel = CodeChannel.File, Synchronous = true });
+            return;
+        }
+
+        // The job was paused in the macro that has ended, and the codes read ahead of it were dropped
+        await stream.Reader.RewindAsync(null, _lifetime.ApplicationStopping);
+        await stream.Reader.RunAsync(restartMacro: false, RunToken, _lifetime.ApplicationStopping);
+    }
+
+    /// <summary>
+    /// The macro of a stream has come to rest where a pause was waiting for it to
+    /// </summary>
+    private async ValueTask OnMacroHeldAsync(JobCommand.MacroHeld command)
+    {
+        if (_state.Phase == JobPhase.Running && _state.PendingPauseInMacro is PauseRequest request)
+        {
+            await BeginPauseAsync(null, request with { Channel = CodeChannel.File, Synchronous = true }, inMacro: true);
         }
         command.Reply(new Message());
-        return ValueTask.CompletedTask;
     }
 
     /// <summary>
     /// A stream has run out of codes
     /// </summary>
-    private ValueTask OnReaderFinishedAsync(JobCommand.ReaderFinished command)
+    private async ValueTask OnReaderFinishedAsync(JobCommand.ReaderFinished command)
     {
         command.Reply(new Message());
 
         JobState state = _state;
         if (state.Phase != JobPhase.Running)
         {
-            return ValueTask.CompletedTask;
+            return;
         }
 
-        Publish(state with { Streams = [.. MarkFinished(state.Streams, command.Stream)] });
+        await PublishAsync(state with { Streams = [.. MarkFinished(state.Streams, command.Stream)] });
         foreach (JobStream stream in _state.Streams)
         {
             if (!stream.Finished)
             {
-                return ValueTask.CompletedTask;
+                return;
             }
         }
 
@@ -724,7 +825,6 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         // have. The phase stays Running while they run, so a pause may still land: RepRapFirmware
         // waits for standstill at this same point, before it closes the file
         StartSequence(null, _sequences.WaitForLastMovesAsync);
-        return ValueTask.CompletedTask;
     }
 
     /// <summary>
@@ -734,9 +834,9 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     {
         command.Reply(new Message());
         _logger.LogError(command.Error, "Job stream {Stream} failed", command.Stream);
-        if (_state.IsProcessing)
+        if (_state.IsProcessing || _state.IsPaused)
         {
-            await OnAbortAsync(new JobCommand.Abort());
+            await OnAbortAsync(new JobCommand.Abort(CodeChannel.File));
         }
     }
 
@@ -775,7 +875,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                     await EndRunAsync(PrintStoppedReason.Abort);
                     return;
                 }
-                await BeginRunningAsync(state);
+                await BeginRunningAsync(state with { Streams = [.. Starting(state.Streams)] });
                 request?.Reply(outcome.Reply);
                 return;
 
@@ -783,7 +883,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 // Every outcome settles to Paused, as RepRapFirmware's PauseSequenceAborted does:
                 // the steps that cannot be cancelled have already run, so the machine is stopped and
                 // must say so however the rest of the sequence ended
-                Publish(_state with
+                await PublishAsync(_state with
                 {
                     Phase = JobPhase.Paused,
                     Streams = [.. WithRewinds(_state.Streams, outcome.Rewinds)]
@@ -794,7 +894,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             case JobPhase.Resuming:
                 if (outcome.Failed)
                 {
-                    Publish(_state with { Phase = JobPhase.Paused });
+                    await PublishAsync(_state with { Phase = JobPhase.Paused });
                     request?.Reply(outcome.Reply);
                     return;
                 }
@@ -812,7 +912,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             case JobPhase.Cancelling:
                 // cancel.g has replaced stop.g, so the finish has only the teardown left
                 request?.Reply(outcome.Reply);
-                Publish(_state with { Phase = JobPhase.Finishing });
+                await PublishAsync(_state with { Phase = JobPhase.Finishing });
                 StartSequence(null, token => _sequences.TeardownAsync(_state, token));
                 return;
 
@@ -852,16 +952,32 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// </remarks>
     private async ValueTask BeginRunningAsync(JobState state)
     {
-        Publish(state with { Phase = JobPhase.Running });
+        await PublishAsync(state with { Phase = JobPhase.Running });
         foreach (JobStream stream in state.Streams)
         {
-            await stream.Reader.RunAsync(stream.RewindPoint, stream.AbandonedMacros, RunToken,
-                                         _lifetime.ApplicationStopping);
+            if (stream.Reader.IsReading)
+            {
+                // It is inside the macro it was paused in
+                stream.Reader.MacroHold.Release();
+            }
+            else if (!stream.Reader.IsStoppedAtBoundary)
+            {
+                await stream.Reader.RunAsync(stream.RestartsMacro, RunToken, _lifetime.ApplicationStopping);
+            }
         }
-        Publish(_state with
+        await PublishAsync(_state with
         {
-            Streams = [.. ClearRewindPoints(_state.Streams)]
+            Streams = [.. Restarted(_state.Streams)]
         });
+
+        // The macro a stream was paused in may have ended in the meantime
+        foreach (JobStream stream in state.Streams)
+        {
+            if (_state.Phase == JobPhase.Running && stream.Reader is { IsReading: false, IsStoppedAtBoundary: true })
+            {
+                await CarryOnFromBoundaryAsync(stream);
+            }
+        }
     }
 
     /// <summary>
@@ -873,7 +989,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     {
         JobState state = _state;
         await DropPendingPauseAsync(state);
-        Publish(state with { Phase = JobPhase.Finishing, StopReason = reason, PendingPause = null });
+        await PublishAsync(state with { Phase = JobPhase.Finishing, StopReason = reason, PendingPause = null, PendingPauseInMacro = null });
         StopReading(_state);
 
         _logger.LogInformation(reason switch
@@ -920,11 +1036,12 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private async ValueTask ChainToNextFileAsync(JobState state, JobFile next)
     {
         await DropPendingPauseAsync(state);
-        Publish(state with
+        await PublishAsync(state with
         {
             Phase = JobPhase.Finishing,
             StopReason = PrintStoppedReason.NormalCompletion,
             PendingPause = null,
+            PendingPauseInMacro = null,
             NextFile = new NextSelection(next, Start: true)
         });
         StopReading(_state);
@@ -951,7 +1068,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         _runTokenSource = null;
 
         NextSelection? next = state.NextFile;
-        Publish(new JobState());
+        await PublishAsync(new JobState());
 
         if (next is not null)
         {
@@ -1061,17 +1178,33 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <param name="state">State the run is ending from</param>
     /// <returns>Asynchronous task</returns>
     /// <remarks>
-    /// The request itself was answered when it was taken, because a held pause is a promise rather
-    /// than an operation. The run ending breaks that promise, and the operator asked for a pause
-    /// rather than for the job to finish, so it is said out loud
+    /// The operator asked for a pause rather than for the job to finish, so it is said out loud
     /// </remarks>
     private async ValueTask DropPendingPauseAsync(JobState state)
     {
-        if (state.PendingPause is not null)
+        AnswerHeldPause();
+        if (state.PendingPauseInMacro is not null)
+        {
+            // Nor does it hold the macros any longer
+            foreach (JobStream stream in state.Streams)
+            {
+                stream.Reader.MacroHold.Release();
+            }
+        }
+        if (state.IsPausePending)
         {
             await _eventLogger.LogOutputAsync(MessageType.Warning,
                                               "Pause request dropped because the job ended before it could be actioned");
         }
+    }
+
+    /// <summary>
+    /// Answer the M25 that asked for the pending pause
+    /// </summary>
+    private void AnswerHeldPause()
+    {
+        _heldPause?.Reply(new Message());
+        _heldPause = null;
     }
 
     /// <summary>
@@ -1092,7 +1225,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     {
         JobReader reader = new(index, file, _commands.Writer, _codeFactory, _codeProcessor, _eventLogger,
                                _loggerFactory.CreateLogger<JobReader>(), _settings.BufferedPrintCodes);
-        return new JobStream(index, file.Channel, reader, null, false, false);
+        return new JobStream(index, file.Channel, reader, RestartsMacro: false, Finished: false);
     }
 
     /// <summary>
@@ -1107,13 +1240,25 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     }
 
     /// <summary>
-    /// The streams with the rewind points a resume has just spent taken back off
+    /// The streams as a run that has not begun starts them
     /// </summary>
-    private static IEnumerable<JobStream> ClearRewindPoints(ImmutableArray<JobStream> streams)
+    /// <remarks>RepRapFirmware's <c>StartPrinting</c> takes a start from an offset for a restart</remarks>
+    private static IEnumerable<JobStream> Starting(ImmutableArray<JobStream> streams)
     {
         foreach (JobStream stream in streams)
         {
-            yield return stream with { RewindPoint = null, AbandonedMacros = false, Finished = false };
+            yield return stream with { RestartsMacro = stream.Reader.Position > 0 };
+        }
+    }
+
+    /// <summary>
+    /// The streams with what a resume has just spent taken back off
+    /// </summary>
+    private static IEnumerable<JobStream> Restarted(ImmutableArray<JobStream> streams)
+    {
+        foreach (JobStream stream in streams)
+        {
+            yield return stream with { RestartsMacro = false, Finished = false };
         }
     }
 
@@ -1132,7 +1277,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 {
                     if (rewind.Stream == stream.Index)
                     {
-                        result = stream with { RewindPoint = rewind.Point, AbandonedMacros = rewind.AbandonedMacros };
+                        result = stream with { RestartsMacro = rewind.RestartsMacro };
                         break;
                     }
                 }
@@ -1158,9 +1303,25 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private CancellationToken RunToken => _runTokenSource?.Token ?? _lifetime.ApplicationStopping;
 
     /// <summary>
-    /// Make a new state visible
+    /// Make a new state visible, along with what <c>state.status</c> reads while the job is in it
     /// </summary>
-    private void Publish(JobState state) => _state = state;
+    /// <param name="state">The state</param>
+    /// <returns>Asynchronous task</returns>
+    /// <remarks>Not cancelled by a shutdown, which the job still has to be torn down for</remarks>
+    private async ValueTask PublishAsync(JobState state)
+    {
+        if (state.Status == _state.Status)
+        {
+            _state = state;
+            return;
+        }
+
+        using (await _model.AccessReadWriteAsync(CancellationToken.None))
+        {
+            _state = state;
+            _model.JobStatus = state.Status;
+        }
+    }
 
     #endregion
 }

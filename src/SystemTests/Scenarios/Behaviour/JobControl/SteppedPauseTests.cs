@@ -156,8 +156,8 @@ public class SteppedPauseTests : BenchFixture
             await RunToAsync(timeline, bench, 100);
             await PauseAsync(timeline, bench);
 
-            double rest = await bench.Host.MachinePositionAsync(0);
             (double pausedX, _) = await bench.Host.RestorePointAsync(1);
+            double rest = await bench.Host.SettledNumberAsync(model => model.Move.Axes[0].MachinePosition, pausedX, tolerance: 0.05);
             Assert.Multiple(() =>
             {
                 Assert.That(pausedX, Is.EqualTo(rest).Within(0.05), "the restore point is where the head stopped");
