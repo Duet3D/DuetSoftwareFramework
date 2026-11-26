@@ -31,10 +31,10 @@ public class M606Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ExecuteCodeAsync("M606 S1"),
-                        Does.Contain("this command is valid only when running a job from a stored file"),
+                        Reply.IsWarning("this command is valid only when running a job from a stored file"),
                         "M606 S1 outside a job file is refused (GCodes5.cpp ForkInputReader)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M606"),
-                        Does.Contain("File reader is running in standard mode"),
+                        Reply.IsSuccess("File reader is running in standard mode"),
                         "M606 with no S reports the reader mode (GCodes5.cpp ForkInputReader)");
         });
     }

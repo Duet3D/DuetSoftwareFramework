@@ -38,7 +38,7 @@ public class M562Tests : BenchFixture
                     "a fault report sets heat.heaters[0].state to fault (RRF Heater.cpp GetStatus)");
 
         string reply = await bench.Host.ExecuteCodeAsync("M562 P0");
-        Assert.That(reply, Does.Not.Contain("Error"),
+        Assert.That(reply, Reply.IsNotError,
                     "M562 P accepts the fault reset (RRF GCodes2.cpp case 562, Tool::ClearTemperatureFault)");
 
         // The board acknowledges the reset by reporting the heater off again

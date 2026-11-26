@@ -38,9 +38,9 @@ public class G10Tests : BenchFixture
         string reply = (await host.ExecuteCodeAsync("G10 P0")).Trim();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain("Tool 0: offsets"), "bare G10 P reports the offsets (RRF SetOrReportOffsets)");
-            Assert.That(reply, Does.Contain("X5.000"), "the reported X offset matches the model (RRF SetOrReportOffsets)");
-            Assert.That(reply, Does.Contain("Y-2.000"), "the reported Y offset matches the model (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0: offsets"), "bare G10 P reports the offsets (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("X5.000"), "the reported X offset matches the model (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Y-2.000"), "the reported Y offset matches the model (RRF SetOrReportOffsets)");
         });
     }
 
@@ -80,7 +80,7 @@ public class G10Tests : BenchFixture
         float[] offsets = await bench.Host.ReadModelAsync(model => model.Tools[0]!.Offsets.Take(3).ToArray());
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "G10 L1 replies with nothing");
+            Assert.That(reply, Reply.IsEmpty, "G10 L1 replies with nothing");
             Assert.That(offsets, Is.EqualTo(new[] { -2.5f, 3.25f, 0.75f }).Within(1e-6f), "tools[0].offsets");
         });
     }
@@ -106,7 +106,7 @@ public class G10Tests : BenchFixture
         float[] first = await ReadWorkplaceAsync(bench.Host, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "G10 L2 replies with nothing");
+            Assert.That(reply, Reply.IsEmpty, "G10 L2 replies with nothing");
             Assert.That(origin, Is.EqualTo(new[] { 10f, 10f, -1.5f }).Within(1e-6f), "move.axes[*].workplaceOffsets[1]");
             Assert.That(first, Is.EqualTo(new[] { 0f, 0f, 0f }), "workplace 1 is untouched");
         });
@@ -135,7 +135,7 @@ public class G10Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
         await bench.Host.ExecuteCodeAsync("G92 X20 Y5 Z0");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("G10 L20 P2 X0 Y0 Z0")).Trim(), Is.Empty, "G10 L20 replies with nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("G10 L20 P2 X0 Y0 Z0"), Reply.IsEmpty, "G10 L20 replies with nothing");
         Assert.That((await bench.Host.ExecuteCodeAsync("G10 L2 P2")).Trim(), Is.EqualTo("Origin of workplace 2: X20.00 Y5.00 Z0.00"),
                     "the origin is where the machine is, less the coordinates given");
     }
@@ -172,7 +172,7 @@ public class G10Tests : BenchFixture
         float[] current = await ReadWorkplaceAsync(bench.Host, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "P10 names no workplace");
+            Assert.That(reply, Reply.IsError(), "P10 names no workplace");
             Assert.That(current, Is.EqualTo(new[] { 0f, 0f, 0f }), "and the current workplace is not set in its place");
         });
     }
@@ -184,12 +184,12 @@ public class G10Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xyze, "M563 P0 D0");
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G10 L3 P0 X1")).TrimEnd();
+        string reply = await bench.Host.ExecuteCodeAsync("G10 L3 P0 X1");
         float[] workplace = await ReadWorkplaceAsync(bench.Host, 1);
         float toolOffset = await bench.Host.ReadModelAsync(model => model.Tools[0]!.Offsets.FirstOrDefault());
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.EndWith("Bad or missing parameter"), "L3 is no form of G10");
+            Assert.That(reply, Reply.IsError("Bad or missing parameter"), "L3 is no form of G10");
             Assert.That(workplace, Is.EqualTo(new[] { 0f, 0f, 0f }), "no workplace was set");
             Assert.That(toolOffset, Is.Zero, "nor tool 0's offset");
         });

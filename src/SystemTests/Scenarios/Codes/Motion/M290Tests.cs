@@ -53,9 +53,9 @@ public class M290Tests : BenchFixture
         string report = await host.ExecuteCodeAsync("M290");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.Contain("Baby stepping offsets (mm)"),
+            Assert.That(report, Reply.IsSuccess("Baby stepping offsets (mm)"),
                         "M290 without parameters reports the offsets (RRF GCodes2.cpp case 290)");
-            Assert.That(report, Does.Contain("Z:0.010"),
+            Assert.That(report, Reply.IsSuccess("Z:0.010"),
                         "the M290 report is consistent with move.axes[2].babystep (RRF GCodes2.cpp case 290)");
         });
     }

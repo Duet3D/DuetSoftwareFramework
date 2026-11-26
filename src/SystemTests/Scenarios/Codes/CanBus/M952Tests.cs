@@ -2,7 +2,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
-using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.CanBus;
@@ -33,7 +32,7 @@ public class M952Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M952");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"),
+            Assert.That(reply, Reply.IsError(),
                         "M952 with no B is an error (CanInterface.cpp ChangeAddressAndNormalTiming, MustSee)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageSetAddressAndNormalTiming>(), Is.Empty,
                         "and nothing goes to the bus for a code that named no board");
@@ -59,7 +58,7 @@ public class M952Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M952 B200 A200");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"), "an address past the maximum is refused");
+            Assert.That(reply, Reply.IsError(), "an address past the maximum is refused");
             Assert.That(bench.CanMaster.CanMessages<CanMessageSetAddressAndNormalTiming>(), Is.Empty,
                         "and no board is addressed, least of all whatever 200 truncates to");
         });
@@ -105,11 +104,11 @@ public class M952Tests : BenchFixture
     public async Task M952ConfiguresExpansionBoardCanTiming()
     {
         await using Bench bench = await Bench.StartAsync();
-        int sendsBefore = bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage).Count;
+        int sendsBefore = bench.CanMaster.CanMessages().Count;
 
         string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Machines.DriverBoard} S500");
-        Assert.That(reply, Does.Not.Contain("Error"), "M952 B1 S500 accepts the new timing (RRF CanInterface::ChangeAddressAndNormalTiming)");
-        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage).Count > sendsBefore,
+        Assert.That(reply, Reply.IsNotError, "M952 B1 S500 accepts the new timing (RRF CanInterface::ChangeAddressAndNormalTiming)");
+        await bench.CanMaster.WaitUntilAsync(() => bench.CanMaster.CanMessages().Count > sendsBefore,
                                              what: "M952's timing message leaving for the board");
     }
 
@@ -152,7 +151,7 @@ public class M952Tests : BenchFixture
 
         bench.CanMaster.ScriptCanSendStatus(CanStatus.Ok);
         string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Machines.DriverBoard} S500", timeoutMs: 5_000);
-        Assert.That(reply, Does.Not.Contain("Error"), "an accepted send completes the code without a reply from the bus");
+        Assert.That(reply, Reply.IsNotError, "an accepted send completes the code without a reply from the bus");
     }
 
     /// <summary>
@@ -170,13 +169,9 @@ public class M952Tests : BenchFixture
 
         bench.CanMaster.ScriptCanSendStatus(CanStatus.DispatchTimeout);
         string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Machines.DriverBoard}", timeoutMs: 5_000);
-        Assert.Multiple(() =>
-        {
-            Assert.That(reply, Does.StartWith("Error:"),
-                        "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout)");
-            Assert.That(reply, Does.Contain($"CAN response timeout: board {Machines.DriverBoard}"),
-                        "and says so in RepRapFirmware's wording, which names the board rather than a result code");
-        });
+        Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(Machines.DriverBoard)),
+                    "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout), "
+                    + "in RepRapFirmware's wording, which names the board rather than a result code");
     }
 
     /// <summary>
@@ -218,12 +213,8 @@ public class M952Tests : BenchFixture
 
         bench.CanMaster.ScriptCanSendStatus(CanStatus.ResponseTimeout);
         string reply = await bench.Host.ExecuteCodeAsync($"M952 B{Machines.DriverBoard}", timeoutMs: 5_000);
-        Assert.Multiple(() =>
-        {
-            Assert.That(reply, Does.StartWith("Error:"),
-                        "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout)");
-            Assert.That(reply, Does.Contain($"CAN response timeout: board {Machines.DriverBoard}"),
-                        "and says so in RepRapFirmware's wording, which names the board rather than a result code");
-        });
+        Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(Machines.DriverBoard)),
+                    "a board that did not answer is reported as an error, not thrown (CanResponse.FromTimeout), "
+                    + "in RepRapFirmware's wording, which names the board rather than a result code");
     }
 }

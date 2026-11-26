@@ -27,6 +27,6 @@ public class M552Tests : BenchFixture
     public async Task M552IsLeftToTheManagementPlugin(string code)
     {
         await using Bench bench = await Bench.StartAsync();
-        Assert.That((await bench.Host.ExecuteCodeAsync(code)).Trim(), Is.EqualTo("Warning: M552: reserved - requires DuetPiManagementPlugin"));
+        Assert.That(await bench.Host.ExecuteCodeAsync(code), Reply.IsWarning("reserved - requires DuetPiManagementPlugin"));
     }
 }

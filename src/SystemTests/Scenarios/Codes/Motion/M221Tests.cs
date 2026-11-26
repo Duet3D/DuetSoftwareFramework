@@ -35,16 +35,16 @@ public class M221Tests : BenchFixture
                     "M221 S50 D0 sets move.extruders[0].factor to 0.5 (RRF GCodes2.cpp case 221)");
 
         string report = await bench.Host.ExecuteCodeAsync("M221 D0");
-        Assert.That(report, Does.Contain("Extrusion factor for extruder 0: 50.0%"),
+        Assert.That(report, Reply.IsSuccess("Extrusion factor for extruder 0: 50.0%"),
                     "M221 D0 reports the percentage consistent with move.extruders[0].factor (RRF GCodes2.cpp case 221)");
 
         string noTool = await bench.Host.ExecuteCodeAsync("M221 S120");
-        Assert.That(noTool, Does.Contain("No tool selected"),
+        Assert.That(noTool, Reply.IsError("No tool selected"),
                     "M221 without D needs a current tool (RRF GCodes2.cpp case 221)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Factor), Is.EqualTo(0.5).Within(1e-3),
                     "a refused M221 leaves move.extruders[0].factor alone (RRF GCodes2.cpp case 221)");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M221 S120 D9"), Does.Contain("Invalid extruder number"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M221 S120 D9"), Reply.IsError("Invalid extruder number"),
                     "a D past the last extruder is refused (RRF GetLimitedUIValue against numExtruders)");
     }
 
@@ -67,7 +67,7 @@ public class M221Tests : BenchFixture
                     "M221 S75 with a tool selected reaches the tool's extruder (RRF Tool::IterateExtruders)");
 
         string report = await bench.Host.ExecuteCodeAsync("M221");
-        Assert.That(report, Does.Contain("Extrusion factor(s) for current tool: 75.0%"),
+        Assert.That(report, Reply.IsSuccess("Extrusion factor(s) for current tool: 75.0%"),
                     "and a bare M221 reports them together (RRF GCodes2.cpp case 221)");
     }
 }

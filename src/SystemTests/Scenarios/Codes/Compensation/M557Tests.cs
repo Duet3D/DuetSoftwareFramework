@@ -119,11 +119,7 @@ public class M557Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M557");
-        Assert.Multiple(() =>
-        {
-            Assert.That(reply, Does.Not.StartWith("Error").And.Not.StartWith("Warning"), "the report succeeds");
-            Assert.That(reply, Does.Contain("grid is not defined").IgnoreCase, "and says there is no grid");
-        });
+        Assert.That(reply, Reply.IsSuccess("Grid is not defined"), "the report succeeds and says there is no grid");
     }
 
     /// <summary>
@@ -140,13 +136,13 @@ public class M557Tests : BenchFixture
         await using Bench bench = await StartXyzAsync();
         DcsTestHost host = bench.Host;
 
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:100 Y0:120 S50:60")).Trim(), Is.Empty, "M557 with a spacing pair succeeds silently");
+        Assert.That(await host.ExecuteCodeAsync("M557 X0:100 Y0:120 S50:60"), Reply.IsEmpty, "M557 with a spacing pair succeeds silently");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'Y', 0, 100, 0, 120, 50, 60, -1)),
                     "S50:60 sets spacings[0] to 50 and spacings[1] to 60");
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: X0.0:100.0, Y0.0:120.0, radius -1.0, X spacing 50.0, Y spacing 60.0, 9 points"));
 
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:100 Y0:100")).Trim(), Is.Empty, "M557 with ranges alone succeeds");
+        Assert.That(await host.ExecuteCodeAsync("M557 X0:100 Y0:100"), Reply.IsEmpty, "M557 with ranges alone succeeds");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'Y', 0, 100, 0, 100, 20, 20, -1)),
                     "with neither S nor P the spacing is RRF's DefaultGridSpacing of 20mm");
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
@@ -216,12 +212,12 @@ public class M557Tests : BenchFixture
         DcsTestHost host = bench.Host;
 
         string reply = await host.ExecuteCodeAsync("M557 X0:300 Y0:300 S10");
-        Assert.That(reply.Trim(), Is.Empty, "31 x 31 = 961 points is within RRF's MB6HC limit");
+        Assert.That(reply, Reply.IsEmpty, "31 x 31 = 961 points is within RRF's MB6HC limit");
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: X0.0:300.0, Y0.0:300.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 961 points"));
         
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P41:2")).Trim(), Is.Empty, "max points in axis0 is accepted");
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P2:41")).Trim(), Is.Empty, "max points in axis1 is accepted");
+        Assert.That(await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P41:2"), Reply.IsEmpty, "max points in axis0 is accepted");
+        Assert.That(await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P2:41"), Reply.IsEmpty, "max points in axis1 is accepted");
     }
 
     /// <summary>
@@ -239,7 +235,7 @@ public class M557Tests : BenchFixture
         await using Bench bench = await StartXyzAsync();
         DcsTestHost host = bench.Host;
 
-        Assert.That((await host.ExecuteCodeAsync("M557 R50 S25")).Trim(), Is.Empty, "M557 R S succeeds silently");
+        Assert.That(await host.ExecuteCodeAsync("M557 R50 S25"), Reply.IsEmpty, "M557 R S succeeds silently");
         GridSnapshot withSpacing = await ReadGridAsync(host);
         Assert.Multiple(() =>
         {
@@ -255,7 +251,7 @@ public class M557Tests : BenchFixture
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: X-25.0:25.1, Y-25.0:25.1, radius 50.0, X spacing 25.0, Y spacing 25.0, 9 points"));
 
-        Assert.That((await host.ExecuteCodeAsync("M557 R50")).Trim(), Is.Empty, "M557 R alone succeeds");
+        Assert.That(await host.ExecuteCodeAsync("M557 R50"), Reply.IsEmpty, "M557 R alone succeeds");
         GridSnapshot withoutSpacing = await ReadGridAsync(host);
         Assert.Multiple(() =>
         {
@@ -285,7 +281,7 @@ public class M557Tests : BenchFixture
         await using Bench bench = await StartXyzAsync();
         DcsTestHost host = bench.Host;
 
-        Assert.That((await host.ExecuteCodeAsync("M557 R50 P5:4")).Trim(), Is.Empty, "M557 R P succeeds silently");
+        Assert.That(await host.ExecuteCodeAsync("M557 R50 P5:4"), Reply.IsEmpty, "M557 R P succeeds silently");
         float narrowed = 49.9f * MathF.Sqrt(1.0f - 1.0f / 9.0f);
         GridSnapshot grid = await ReadGridAsync(host);
         Assert.Multiple(() =>
@@ -317,7 +313,7 @@ public class M557Tests : BenchFixture
         await using Bench bench = await StartXyzAsync();
         DcsTestHost host = bench.Host;
 
-        Assert.That((await host.ExecuteCodeAsync("M557 X0:100 Y0:100 R50 S20")).Trim(), Is.Empty, "M557 with ranges and R succeeds");
+        Assert.That(await host.ExecuteCodeAsync("M557 X0:100 Y0:100 R50 S20"), Reply.IsEmpty, "M557 with ranges and R succeeds");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'Y', 0, 100, 0, 100, 20, 20, 50)),
                     "the ranges are kept as given and the radius recorded");
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
@@ -340,13 +336,13 @@ public class M557Tests : BenchFixture
         await using Bench bench = await StartWithExtraAxesAsync("UVW");
         DcsTestHost host = bench.Host;
 
-        Assert.That((await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax} S{BaselineSpacing}")).Trim(), Is.Empty,
+        Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "a U/V grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('U', 'V', 0, BaselineMax, 0, BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: U0.0:20.0, V0.0:20.0, radius -1.0, U spacing 10.0, V spacing 10.0, 9 points"));
 
-        Assert.That((await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} W0:{BaselineMax} S{BaselineSpacing}")).Trim(), Is.Empty,
+        Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} W0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "a U/W grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('U', 'W', 0, BaselineMax, 0, BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
@@ -370,18 +366,18 @@ public class M557Tests : BenchFixture
         await using Bench bench = await StartWithExtraAxesAsync("ABC");
         DcsTestHost host = bench.Host;
 
-        Assert.That((await host.ExecuteCodeAsync($"M557 A0:{BaselineMax} B0:{BaselineMax} S{BaselineSpacing}")).Trim(), Is.Empty,
+        Assert.That(await host.ExecuteCodeAsync($"M557 A0:{BaselineMax} B0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "an A/B grid is accepted");
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: A0.0:20.0, B0.0:20.0, radius -1.0, A spacing 10.0, B spacing 10.0, 9 points"));
 
-        Assert.That((await host.ExecuteCodeAsync($"M557 A0:{BaselineMax} C0:{BaselineMax} S{BaselineSpacing}")).Trim(), Is.Empty,
+        Assert.That(await host.ExecuteCodeAsync($"M557 A0:{BaselineMax} C0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "an A/C grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('A', 'C', 0, BaselineMax, 0, BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
         Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
                     Is.EqualTo("Grid: A0.0:20.0, C0.0:20.0, radius -1.0, A spacing 10.0, C spacing 10.0, 9 points"));
 
-        Assert.That((await host.ExecuteCodeAsync($"M557 X0:{BaselineMax} A0:{2 * BaselineMax} S{BaselineSpacing}")).Trim(), Is.Empty,
+        Assert.That(await host.ExecuteCodeAsync($"M557 X0:{BaselineMax} A0:{2 * BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "an X/A grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'A', 0, BaselineMax, 0, 2 * BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
     }
@@ -424,7 +420,7 @@ public class M557Tests : BenchFixture
 
         Assert.That((await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax}")).Trim(), Is.EqualTo(BaselineReport),
                     "with no other parameter it reports the grid");
-        Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax} S{BaselineSpacing}"), Does.StartWith("Error"),
+        Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax} S{BaselineSpacing}"), Reply.IsError(),
                     "with S it is refused, having no ranges");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(before), "neither touches the grid");
     }
@@ -530,7 +526,7 @@ public class M557Tests : BenchFixture
     /// </summary>
     private static async Task AssertRefusedAndGridIntactAsync(DcsTestHost host, string code, string why)
     {
-        Assert.That((await host.ExecuteCodeAsync($"M557 X0:{BaselineMax} Y0:{BaselineMax} S{BaselineSpacing}")).Trim(), Is.Empty,
+        Assert.That(await host.ExecuteCodeAsync($"M557 X0:{BaselineMax} Y0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "the baseline grid is accepted");
         GridSnapshot before = await ReadGridAsync(host);
 
@@ -539,7 +535,7 @@ public class M557Tests : BenchFixture
         string report = await host.ExecuteCodeAsync("M557");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"), $"{code} is refused: {why}");
+            Assert.That(reply, Reply.IsError(), $"{code} is refused: {why}");
             Assert.That(after, Is.EqualTo(before), "move.compensation.probeGrid keeps the grid it had");
             Assert.That(report.Trim(), Is.EqualTo(BaselineReport), "and M557 still reports it");
         });

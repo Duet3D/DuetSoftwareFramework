@@ -54,7 +54,7 @@ public class M950SpindleTests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(reply, Does.StartWith("Spindle 0"), "bare M950 R reports the spindle (RRF Spindle::Configure)");
-            Assert.That(reply, Does.Contain("rpm min 4000, max 12000"), "the reported range matches the model (RRF Spindle::Configure)");
+            Assert.That(reply, Reply.IsSuccess("rpm min 4000, max 12000"), "the reported range matches the model (RRF Spindle::Configure)");
         });
     }
 
@@ -72,10 +72,10 @@ public class M950SpindleTests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
         bench.CanMaster.ReportWith<CanMessageM950Gpio>("out6 is shared with a fan", CodeResult.Warning);
 
-        string reply = (await bench.Host.ExecuteCodeAsync($"M950 R0 C\"{Expansion.Out(Machines.DriverBoard, 6)}\"")).TrimEnd();
+        string reply = await bench.Host.ExecuteCodeAsync($"M950 R0 C\"{Expansion.Out(Machines.DriverBoard, 6)}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo("Warning: M950: out6 is shared with a fan"),
+            Assert.That(reply, Reply.IsWarning("out6 is shared with a fan"),
                         "the board took the port and warned about it, and the warning is the code's result");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Spindles[0]!.State),
                         Is.EqualTo(SpindleState.Stopped),
@@ -106,7 +106,7 @@ public class M950SpindleTests : BenchFixture
         var sent = bench.CanMaster.CanMessages<CanMessageM950Gpio>();
         Assert.Multiple(() =>
         {
-            Assert.That(created.Trim(), Is.Empty);
+            Assert.That(created, Reply.IsEmpty);
             Assert.That(spindle?.Frequency, Is.EqualTo(100), "Q sets spindles[0].frequency");
             Assert.That(spindle?.Min, Is.EqualTo(1000), "L's first value sets spindles[0].min");
             Assert.That(spindle?.Max, Is.EqualTo(12000), "and its second spindles[0].max");
@@ -204,8 +204,8 @@ public class M950SpindleTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Spindles[0]!.Type), Is.EqualTo(SpindleType.FwdRev));
-            Assert.That(report, Does.Contain("type fwdRev, forward pin out5, reverse pin out6"));
-            Assert.That(await bench.Host.ExecuteCodeAsync("M950 R0 T2"), Does.StartWith("Error:"));
+            Assert.That(report, Reply.IsSuccess("type fwdRev, forward pin out5, reverse pin out6"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M950 R0 T2"), Reply.IsError());
         });
     }
 
@@ -232,7 +232,7 @@ public class M950SpindleTests : BenchFixture
             $"M950 R{SpindleManager.MaxSpindles} C\"{Expansion.Out(Machines.DriverBoard, 4)}\"");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty, "and no pin is claimed");
         });
     }
@@ -254,7 +254,7 @@ public class M950SpindleTests : BenchFixture
         var sent = bench.CanMaster.CanMessages<CanMessageM950Gpio>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("is not free"));
+            Assert.That(reply, Reply.IsError("is not free"));
             Assert.That(sent.Select(m => m.Message.C), Is.EqualTo(new[] { "out4", "out5", "nil" }),
                         "the first port is released again once the second is refused");
             Assert.That(await bench.Host.ReadModelAsync(model => model.State.GpOut.Count(port => port is not null)),
@@ -283,7 +283,7 @@ public class M950SpindleTests : BenchFixture
         var sent = bench.CanMaster.CanMessages<CanMessageM950Gpio>();
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(sent.Select(m => m.Message.C), Is.EqualTo(new[] { "nil", "nil" }), "both ports are released");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Spindles[0]!.Port), Is.Null, "spindles[0].port is empty");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Spindles[0]!.State), Is.EqualTo(SpindleState.Stopped));

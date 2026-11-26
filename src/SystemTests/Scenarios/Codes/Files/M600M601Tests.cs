@@ -44,10 +44,10 @@ public class M600M601Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ExecuteCodeAsync("M600"),
-                        Does.Contain("use M226/600/601 only within a file being printed"),
+                        Reply.IsError("use M226/600/601 only within a file being printed"),
                         "M600 outside a job file is refused (GCodes2.cpp case 600)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M601"),
-                        Does.Contain("use M226/600/601 only within a file being printed"),
+                        Reply.IsError("use M226/600/601 only within a file being printed"),
                         "M601 outside a job file is refused (GCodes2.cpp case 601)");
         });
 

@@ -163,17 +163,17 @@ public class ObjectModelLimitsTests : BenchFixture
         Limits limits = await bench.Host.ReadModelAsync(model => model.Limits);
 
         string tooHigh = await bench.Host.ExecuteCodeAsync($"M950 F{limits.Fans} C\"{Expansion.Out(Machines.DriverBoard, 3)}\"");
-        Assert.That(tooHigh, Does.Contain("Error:"),
+        Assert.That(tooHigh, Reply.IsError(),
                     "M950 refuses a fan number at limits.fans");
 
         string highest = await bench.Host.ExecuteCodeAsync($"M950 F{limits.Fans - 1} C\"{Expansion.Out(Machines.DriverBoard, 3)}\"");
-        Assert.That(highest.Trim(), Is.Empty, "M950 accepts the highest fan number limits.fans allows");
+        Assert.That(highest, Reply.IsEmpty, "M950 accepts the highest fan number limits.fans allows");
 
         tooHigh = await bench.Host.ExecuteCodeAsync($"M950 P{limits.GpOutPorts} C\"{Expansion.Out(Machines.DriverBoard, 4)}\"");
-        Assert.That(tooHigh, Does.Contain("Error:"),
+        Assert.That(tooHigh, Reply.IsError(),
                     "M950 refuses an output number at limits.gpOutPorts");
 
         highest = await bench.Host.ExecuteCodeAsync($"M950 P{limits.GpOutPorts - 1} C\"{Expansion.Out(Machines.DriverBoard, 4)}\"");
-        Assert.That(highest.Trim(), Is.Empty, "M950 accepts the highest output number limits.gpOutPorts allows");
+        Assert.That(highest, Reply.IsEmpty, "M950 accepts the highest output number limits.gpOutPorts allows");
     }
 }

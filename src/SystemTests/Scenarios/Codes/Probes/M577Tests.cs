@@ -39,7 +39,7 @@ public class M577Tests : BenchFixture
 
         bench.CanMaster.InjectInputChange(Machines.DriverBoard, RemoteEndstops.HandleFor(0), active: true);
         string reply = await wait;
-        Assert.That(reply.Trim(), Is.Empty, "M577 X completed once the endstop triggered");
+        Assert.That(reply, Reply.IsEmpty, "M577 X completed once the endstop triggered");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Endstops[0]!.Triggered), Is.True,
                     "the state M577 waited for is sensors.endstops[0].triggered (RRF GCodes::WaitForPin)");
     }

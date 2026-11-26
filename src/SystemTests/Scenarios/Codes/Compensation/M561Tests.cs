@@ -43,7 +43,7 @@ public class M561Tests : BenchFixture
                     "M375 loads the map M561 clears (RRF GCodes::LoadHeightMap)");
 
         string clearReply = await host.ExecuteCodeAsync("M561");
-        Assert.That(clearReply.Trim(), Is.Empty, "M561 answers silently (RRF GCodes2.cpp case 561)");
+        Assert.That(clearReply, Reply.IsEmpty, "M561 answers silently (RRF GCodes2.cpp case 561)");
         (MoveCompensationType type, string? file, bool hasLiveGrid, bool hasDeviation) = await host.ReadModelAsync(model =>
             (model.Move.Compensation.Type, model.Move.Compensation.File,
              model.Move.Compensation.LiveGrid is not null, model.Move.Compensation.MeshDeviation is not null));
@@ -103,7 +103,7 @@ public class M561Tests : BenchFixture
         await host.ExecuteCodeAsync($"G1 X{MoveXy} Y{MoveXy} Z{MoveZ} F{Machines.XySpeed}");
         await bench.WaitForMachinePositionAsync(ZAxis, MoveZ + HeightMapError);
 
-        Assert.That((await host.ExecuteCodeAsync("M561")).Trim(), Is.Empty, "M561 succeeds silently");
+        Assert.That(await host.ExecuteCodeAsync("M561"), Reply.IsEmpty, "M561 succeeds silently");
         float? userZ = await ReadUserZAsync(host);
         double machineZ = await host.MachinePositionAsync(ZAxis);
         Assert.Multiple(() =>
@@ -152,7 +152,7 @@ public class M561Tests : BenchFixture
         DcsTestHost host = bench.Host;
         float? before = await ReadUserZAsync(host);
 
-        Assert.That((await host.ExecuteCodeAsync("M561")).Trim(), Is.Empty, "M561 succeeds silently");
+        Assert.That(await host.ExecuteCodeAsync("M561"), Reply.IsEmpty, "M561 succeeds silently");
         (MoveCompensationType type, string? file) = await host.ReadModelAsync(model => (model.Move.Compensation.Type, model.Move.Compensation.File));
         float? after = await ReadUserZAsync(host);
         Assert.Multiple(() =>

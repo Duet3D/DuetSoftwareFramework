@@ -70,7 +70,7 @@ public class M119Tests : BenchFixture
         await bench.Host.WaitForModelAsync(model => model.Sensors.Endstops.FirstOrDefault()?.Triggered, true, "sensors.endstops[0].triggered");
 
         string report = await bench.Host.ExecuteCodeAsync("M119");
-        Assert.That(report, Does.Contain("X: at max stop"),
+        Assert.That(report, Reply.IsSuccess("X: at max stop"),
                     "M119 reports a triggered high-end endstop as at max stop (RRF TranslateEndStopResult)");
     }
 }

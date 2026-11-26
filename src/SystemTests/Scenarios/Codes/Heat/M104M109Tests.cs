@@ -67,7 +67,7 @@ public class M104M109Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(ToolConfig);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M104 S40")).Trim(), Is.Empty, "M104 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M104 S40"), Reply.IsEmpty, "M104 replies nothing");
         Heater heater = await ReadHeaterAsync(bench, 3);
         Tool tool = await ReadToolAsync(bench, 0);
         Assert.Multiple(async () =>
@@ -134,11 +134,11 @@ public class M104M109Tests : BenchFixture
         {
             if (error is null)
             {
-                Assert.That(reply.Trim(), Is.Empty, "accepted");
+                Assert.That(reply, Reply.IsEmpty, "accepted");
             }
             else
             {
-                Assert.That(reply, Does.StartWith("Error").And.Contain(error), "refused");
+                Assert.That(reply, Reply.IsError(error), "refused");
             }
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
             Assert.That(tool.Active[0], Is.EqualTo(-273.15f), "the tool is unchanged");
@@ -224,7 +224,7 @@ public class M104M109Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(ToolConfig);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M109 S0")).Trim(), Is.Empty, "M109 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M109 S0"), Reply.IsEmpty, "M109 replies nothing");
         Assert.Multiple(async () =>
         {
             Assert.That(TemperatureMessages(bench), Is.EqualTo(new[] { ((byte)3, CanMessageSetHeaterTemperatureV1.CommandOn, (byte)HeaterFunction.Tool, 0.0f) }),
@@ -263,7 +263,7 @@ public class M104M109Tests : BenchFixture
         });
 
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 50.0f);
-        Assert.That((await waiting).Trim(), Is.Empty, "reaching the target ends the wait");
+        Assert.That(await waiting, Reply.IsEmpty, "reaching the target ends the wait");
     }
 
     /// <summary>M109 S waits for the selected tool to come up to temperature, and not for it to cool down</summary>
@@ -280,10 +280,10 @@ public class M104M109Tests : BenchFixture
         await bench.ReportHeaterAsync(3, HeaterMode.Heating, 48.0f);
         Assert.That(waiting.IsCompleted, Is.False, "2C short is still waited for");
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 49.0f);
-        Assert.That((await waiting).Trim(), Is.Empty, "within 1.5C ends the wait");
+        Assert.That(await waiting, Reply.IsEmpty, "within 1.5C ends the wait");
 
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 80.0f);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M109 S50")).Trim(), Is.Empty, "a heater above an S target is not waited for");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M109 S50"), Reply.IsEmpty, "a heater above an S target is not waited for");
     }
 
     /// <summary>M109 R waits for the selected tool to cool down to the target as well</summary>
@@ -299,7 +299,7 @@ public class M104M109Tests : BenchFixture
         await bench.CanMaster.WaitUntilAsync(() => heat.IsWaitingForTemperatures, what: "M109 R waiting");
         Assert.That(waiting.IsCompleted, Is.False, "a heater above an R target is waited for");
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 51.0f);
-        Assert.That((await waiting).Trim(), Is.Empty, "within 1.5C ends the wait");
+        Assert.That(await waiting, Reply.IsEmpty, "within 1.5C ends the wait");
     }
 
     /// <summary>M109 T for a tool other than the selected one puts it on standby and waits for the selected tool</summary>
@@ -310,7 +310,7 @@ public class M104M109Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(ToolConfig + "\nT0");
         await bench.ReportHeaterAsync(4, HeaterMode.Heating, 25.0f);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M109 T1 S50")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M109 T1 S50"), Reply.IsEmpty,
                     "tool 1 is cold but tool 0, at 0C, is what is waited for");
         Assert.That((await ReadToolAsync(bench, 1)).State, Is.EqualTo(ToolState.Standby), "tool 1 is on standby");
     }

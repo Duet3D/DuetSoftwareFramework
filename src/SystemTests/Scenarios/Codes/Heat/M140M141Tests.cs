@@ -47,8 +47,8 @@ public class M140M141Tests : BenchFixture
         bench.CanMaster.ReportWith<CanMessageSetHeaterTemperatureV1>("heater 0 is still tuning",
                                                                      CodeResult.Warning);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M140 S60")).TrimEnd();
-        Assert.That(reply, Is.EqualTo("Warning: M140: heater 0 is still tuning"),
+        string reply = await bench.Host.ExecuteCodeAsync("M140 S60");
+        Assert.That(reply, Reply.IsWarning("heater 0 is still tuning"),
                     "the board took the setpoint and warned about it, and the warning is the code's result");
     }
 
@@ -65,7 +65,7 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M140 H3")).Trim(), Is.Empty, "assigning a bed heater replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M140 H3"), Reply.IsEmpty, "assigning a bed heater replies nothing");
 
         (byte board, CanMessageSetDefaultHeaterModel request) = bench.CanMaster.LastCanMessage<CanMessageSetDefaultHeaterModel>();
         Heater heater = await ReadHeaterAsync(bench, 3);
@@ -107,7 +107,7 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M141 H3")).Trim(), Is.Empty, "assigning a chamber heater replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M141 H3"), Reply.IsEmpty, "assigning a chamber heater replies nothing");
 
         CanMessageSetDefaultHeaterModel request = bench.CanMaster.LastCanMessage<CanMessageSetDefaultHeaterModel>().Message;
         Heater heater = await ReadHeaterAsync(bench, 3);
@@ -139,7 +139,7 @@ public class M140M141Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M140 P1 H4");
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M140 H3:4")).Trim(), Is.Empty, "M140 H3:4 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M140 H3:4"), Reply.IsEmpty, "M140 H3:4 replies nothing");
         CanMessageSetHeaterTemperatureV1[] off = TemperatureMessages(bench);
         CanMessageSetDefaultHeaterModel[] defaults = bench.CanMaster.CanMessages<CanMessageSetDefaultHeaterModel>().Select(m => m.Message).ToArray();
         Assert.Multiple(async () =>
@@ -222,7 +222,7 @@ public class M140M141Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain(error), "the assignment is refused");
+            Assert.That(reply, Reply.IsError(error), "the assignment is refused");
             Assert.That(await ReadMappingAsync(bench, chamber: false), Is.EqualTo(new[] { System.Array.Empty<int>(), new[] { 4 } }), "heat.bedHeaterMapping is unchanged");
             Assert.That(await ReadMappingAsync(bench, chamber: true), Is.Empty, "heat.chamberHeaterMapping is unchanged");
         });
@@ -235,12 +235,12 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code} H7")).Trim(), Is.Empty, "an undefined heater is accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code} H7"), Reply.IsEmpty, "an undefined heater is accepted");
         Assert.Multiple(async () =>
         {
             Assert.That(await ReadMappingAsync(bench, chamber), Is.EqualTo(new[] { new[] { 7 } }), "the slot mapping");
             Assert.That(bench.CanMaster.CanMessages<CanMessageSetDefaultHeaterModel>(), Is.Empty, "nothing is sent for it");
-            Assert.That(await bench.Host.ExecuteCodeAsync($"{code} S50"), Does.StartWith("Error").And.Contain("Heater 7 not found"),
+            Assert.That(await bench.Host.ExecuteCodeAsync($"{code} S50"), Reply.IsError("Heater 7 not found"),
                         "switching it on is refused (RRF Heat::SetActiveOrStandby)");
         });
     }
@@ -253,7 +253,7 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync($"{code} H3");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code} S35")).Trim(), Is.Empty, "S replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code} S35"), Reply.IsEmpty, "S replies nothing");
         Heater heater = await ReadHeaterAsync(bench, 3);
         Assert.Multiple(() =>
         {
@@ -293,7 +293,7 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync($"{code} H3");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code} R40")).Trim(), Is.Empty, "R replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code} R40"), Reply.IsEmpty, "R replies nothing");
         Heater heater = await ReadHeaterAsync(bench, 3);
         Assert.Multiple(() =>
         {
@@ -351,7 +351,7 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync($"{code} H3\n{code} S35");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code} S-273.1")).Trim(), Is.Empty, "switching off replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code} S-273.1"), Reply.IsEmpty, "switching off replies nothing");
         Heater heater = await ReadHeaterAsync(bench, 3);
         Assert.Multiple(() =>
         {
@@ -379,7 +379,7 @@ public class M140M141Tests : BenchFixture
         Heater heater = await ReadHeaterAsync(bench, 3);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain(error), "the temperature is refused");
+            Assert.That(reply, Reply.IsError(error), "the temperature is refused");
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
             Assert.That(heater.Active, Is.EqualTo(0.0f), "active is unchanged");
             Assert.That(heater.Standby, Is.EqualTo(0.0f), "standby is unchanged");
@@ -401,7 +401,7 @@ public class M140M141Tests : BenchFixture
         Heater heater = await ReadHeaterAsync(bench, 3);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("Can't turn heater 3 on while in fault state"), "switching on is refused");
+            Assert.That(reply, Reply.IsError("Can't turn heater 3 on while in fault state"), "switching on is refused");
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
             Assert.That(heater.Active, Is.EqualTo(50.0f), "active is still set");
         });
@@ -441,11 +441,11 @@ public class M140M141Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         if (error is null)
         {
-            Assert.That(reply.Trim(), Is.Empty, "accepted");
+            Assert.That(reply, Reply.IsEmpty, "accepted");
         }
         else
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain(error), "refused");
+            Assert.That(reply, Reply.IsError(error), "refused");
         }
     }
 

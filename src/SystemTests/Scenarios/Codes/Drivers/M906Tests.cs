@@ -25,7 +25,7 @@ public class M906Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 X600 Y600 Z600")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 X600 Y600 Z600"), Reply.IsEmpty,
                     "the boards took the currents");
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>();
@@ -71,7 +71,7 @@ public class M906Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 E650 I40 T20")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 E650 I40 T20"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>();
         Assert.That(sent, Has.Count.EqualTo(1), "only the extruder was named, so only it is sent");
@@ -126,7 +126,7 @@ public class M906Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M906 T0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Idle.Timeout), Is.EqualTo(before),
                         "and move.idle.timeout keeps the value it had");
         });
@@ -148,7 +148,7 @@ public class M906Tests : BenchFixture
             $"M584 E{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)}:{DriversRig.MainDriver(5)}",
             $"M584 Y{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(1)}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 X500 Y500 Z500 E500")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 X500 Y500 Z500 E500"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>();
         Assert.That(sent.Select(m => (m.Board, (int)m.Message.DriversToUpdate)),
@@ -193,8 +193,7 @@ public class M906Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
-            Assert.That(reply, Does.Contain(refusal), "the board's reason is carried back");
+            Assert.That(reply, Reply.IsError(refusal), "the board's reason is carried back");
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>().Select(m => m.Board),
                         Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
                         "the refusal for X does not stop the extruder being told");
@@ -226,7 +225,7 @@ public class M906Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Current), Is.EqualTo(400));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Current), Is.EqualTo(800));
@@ -255,7 +254,7 @@ public class M906Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Current), Is.EqualTo(x));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Current), Is.EqualTo(400),
                         "Y was never applied");
@@ -305,7 +304,7 @@ public class M906Tests : BenchFixture
             message => message.Values[0].Mode == DriverStateControl.DriverIdle, timeoutMs: 5_000);
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 I50")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 I50"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestDriverStateControl>();
         Assert.That(sent, Is.Not.Empty, "the idle drivers are told the new factor");
@@ -332,7 +331,7 @@ public class M906Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 X600.4")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 X600.4"), Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {

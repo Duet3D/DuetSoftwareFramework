@@ -31,7 +31,7 @@ public class M915Tests : BenchFixture
 
         // T, the coolStep register, is the one parameter the references leave alone: the datasheet
         // warns that a wrong value silently reduces motor current, so no case sends it to the rig
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{Expansion.Driver(board, 0)} S5 F1 H300 T100 R{StallAction.Log:D}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{Expansion.Driver(board, 0)} S5 F1 H300 T100 R{StallAction.Log:D}"), Reply.IsEmpty);
 
         (byte sentTo, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         Assert.Multiple(() =>
@@ -72,8 +72,8 @@ public class M915Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M915 X Y Z S5 F1 H150 R0")).Trim(), Is.Empty);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M915 E0 S4 F0 H200 R0")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M915 X Y Z S5 F1 H150 R0"), Reply.IsEmpty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M915 E0 S4 F0 H200 R0"), Reply.IsEmpty,
                     "an extruder is named by number, which is a drive as much as a letter is");
 
         var sent = bench.CanMaster.CanMessages<CanMessageM915>();
@@ -90,7 +90,7 @@ public class M915Tests : BenchFixture
     }
 
     /// <summary>
-    /// A bare E is refused rather than standing for every extruder, quoting where it stood
+    /// A bare E is refused rather than standing for every extruder
     /// </summary>
     /// <remarks>
     /// <c>testcases/drivers/error-missing-parameters-drivers.yaml</c>: Move::ConfigureStallDetection
@@ -105,7 +105,7 @@ public class M915Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M915 E");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: at column 7: M915: expected number after 'E'"));
+            Assert.That(reply, Reply.IsError(CodeErrors.ExpectedNumber('E')));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>(), Is.Empty,
                         "and nothing is sent, so no driver is configured from a default nobody named");
         });
@@ -158,7 +158,7 @@ public class M915Tests : BenchFixture
         expected[0] = expected[2] = 5;
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(sent.Select(message => message.Board),
                         Is.EqualTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }));
             Assert.That(sent.Select(message => message.Message.d), Is.EqualTo(new ushort?[] { 0b101, 0b1 }),
@@ -183,8 +183,8 @@ public class M915Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(3)} X E0 S5")).Trim(), Is.Empty);
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} X S6")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(3)} X E0 S5"), Reply.IsEmpty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} X S6"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageM915>();
         Assert.That(sent, Has.Count.EqualTo(3));
@@ -221,7 +221,7 @@ public class M915Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config,
                                                          $"M584 X{DriversRig.MainDriver(0)}:{DriversRig.MainDriver(3)}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M915 X S5 F1 H150")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M915 X S5 F1 H150"), Reply.IsEmpty);
 
         (byte board, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         Assert.Multiple(async () =>
@@ -269,7 +269,7 @@ public class M915Tests : BenchFixture
                                              .StartAsync();
         int xThreshold = (await ThresholdsAsync(bench, DriversRig.MainDriverBoard))[0];
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 {letters} S5 F1 H150 R{StallAction.None:D}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 {letters} S5 F1 H150 R{StallAction.None:D}"), Reply.IsEmpty);
         (byte board, CanMessageM915 set) = bench.CanMaster.LastCanMessage<CanMessageM915>();
 
         string report = await bench.Host.ExecuteCodeAsync($"M915 {letters}");
@@ -312,13 +312,13 @@ public class M915Tests : BenchFixture
         string driver = DriversRig.MainDriver(0);
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, $"M915 P{driver} S3 F0 H200 T100 R{StallAction.None:D}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} S5 F1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{driver} S5 F1"), Reply.IsEmpty);
         (_, CanMessageM915 first) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         DriverStallDetection afterFirst = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
         (int, bool, int, int, bool) firstModel = (afterFirst.Threshold, afterFirst.Filter, afterFirst.MinimumSpeed,
                                                   afterFirst.CoolStep, afterFirst.RaiseEvent);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{StallAction.Log:D} H300")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{StallAction.Log:D} H300"), Reply.IsEmpty);
         (_, CanMessageM915 second) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         DriverStallDetection afterSecond = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
 
@@ -360,7 +360,7 @@ public class M915Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} S{threshold} T{coolStep} R{action:D}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{DriversRig.MainDriver(0)} S{threshold} T{coolStep} R{action:D}"), Reply.IsEmpty);
 
         (_, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         DriverStallDetection stall = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
@@ -406,8 +406,7 @@ public class M915Tests : BenchFixture
         DriverStallDetection after = await StallAsync(bench, DriversRig.MainDriverBoard, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
-            Assert.That(reply, Does.Contain($"'{parameter ?? values[0]}'"), "naming the parameter");
+            Assert.That(reply, Reply.IsError($"'{parameter ?? values[0]}'"), "naming the parameter");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>(), Is.Empty, "nothing reaches the board");
             Assert.That((after.Threshold, after.Filter, after.CoolStep, after.RaiseEvent), Is.EqualTo(expected));
         });
@@ -434,7 +433,7 @@ public class M915Tests : BenchFixture
         StallAction other = action == StallAction.None ? StallAction.Log : StallAction.None;
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, $"M915 P{driver} R{other:D}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{action:D}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M915 P{driver} R{action:D}"), Reply.IsEmpty);
 
         (_, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         Assert.Multiple(async () =>
@@ -495,7 +494,7 @@ public class M915Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error:").And.Not.StartWith("Warning:"));
+            Assert.That(reply, Reply.IsSuccess());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>(), Is.Empty);
         });
     }
@@ -516,7 +515,7 @@ public class M915Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M915 P{Expansion.Driver(0, 1)} S5");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[0].Drivers?.Count ?? 0), Is.Zero,
                         "and board 0 does not gain a driver");
@@ -539,7 +538,7 @@ public class M915Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M915 E1 S5");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>(), Is.Empty);
         });
     }
@@ -566,7 +565,7 @@ public class M915Tests : BenchFixture
         (byte board, CanMessageM915 sent) = bench.CanMaster.LastCanMessage<CanMessageM915>();
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(board, Is.EqualTo(DriversRig.MainDriverBoard));
             Assert.That(sent.d, Is.EqualTo(1 << drivers));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Boards[DriversRig.MainDriverBoard].Drivers!.Count),
@@ -595,8 +594,7 @@ public class M915Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
-            Assert.That(reply, Does.Contain(StallDetectionNotSupported), "with the board's own words");
+            Assert.That(reply, Reply.IsError(StallDetectionNotSupported), "with the board's own words");
             Assert.That(bench.CanMaster.CanMessages<CanMessageM915>().Select(message => message.Board),
                         Is.EqualTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }));
         });
@@ -641,8 +639,7 @@ public class M915Tests : BenchFixture
         bench.CanMaster.NeverAnswer<CanMessageM915>();
 
         string reply = await bench.Host.ExecuteCodeAsync("M915 X S5");
-        Assert.That(reply.TrimEnd(), Does.StartWith(
-            $"Error: M915: CAN response timeout: board {DriversRig.MainDriverBoard}, req type {(int)CanMessageType.M915}"));
+        Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(DriversRig.MainDriverBoard, CanMessageType.M915)));
     }
 
     /// <summary>

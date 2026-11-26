@@ -309,7 +309,7 @@ public class M106Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M106 R{DuetControlServer.Motion.RestorePoint.NumVisible}");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"),
+            Assert.That(reply, Reply.IsError(),
                         "a restore point number at NumVisibleRestorePoints is refused (GCodes2.cpp case 106)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageSetFanSpeed>(), Is.Empty,
                         "and the refusal drove no fan");
@@ -336,9 +336,9 @@ public class M106Tests : BenchFixture
         string past = await bench.Host.ExecuteCodeAsync($"M106 P{FanManager.MaxFans * 2} S0.5");
         await Assert.MultipleAsync(async () =>
         {
-            Assert.That(legal, Does.StartWith("Error:"),
+            Assert.That(legal, Reply.IsError(),
                         "a fan number no M950 has created is refused (FansManager.cpp ConfigureFan, FindFan)");
-            Assert.That(past, Does.StartWith("Error:"),
+            Assert.That(past, Reply.IsError(),
                         "a fan number past MaxFans takes the same path, because M106 does not range-check P "
                         + "(GCodes2.cpp case 106)");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Fans.Count), Is.Zero,
@@ -371,7 +371,7 @@ public class M106Tests : BenchFixture
         Fan? fan = await bench.Host.ReadModelAsync(model => model.Fans[0]);
         Assert.Multiple(() =>
         {
-            Assert.That(inverted, Does.Not.StartWith("Error:"),
+            Assert.That(inverted, Reply.IsNotError,
                         "I and F are not rejected either: Fan::Configure does not know them, so the line is "
                         + "answered as a query (Fan.cpp)");
             Assert.That(fan!.Frequency, Is.EqualTo(500),
@@ -571,10 +571,10 @@ public class M106Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M106")).Trim(), Is.Empty,
+            Assert.That(await bench.Host.ExecuteCodeAsync("M106"), Reply.IsEmpty,
                         "a bare M106 is a no-op rather than a report of fan 0: with no P, case 106 never calls "
                         + "ConfigureFan (GCodes2.cpp)");
-            Assert.That((await bench.Host.ExecuteCodeAsync("M106 P0 R3")).Trim(), Is.Empty,
+            Assert.That(await bench.Host.ExecuteCodeAsync("M106 P0 R3"), Reply.IsEmpty,
                         "and an M106 whose only other parameter is an R it will not read reports nothing either, "
                         + "because Fan::Configure reports only when there is no R (Fan.cpp)");
         });
@@ -649,8 +649,8 @@ public class M106Tests : BenchFixture
         bench.CanMaster.ReportWith<CanMessageSetFanSpeed>("fan 0 is thermostatic, speed ignored",
                                                           CodeResult.Warning);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M106 P0 S0.5")).TrimEnd();
-        Assert.That(reply, Is.EqualTo("Warning: M106: fan 0 is thermostatic, speed ignored"),
+        string reply = await bench.Host.ExecuteCodeAsync("M106 P0 S0.5");
+        Assert.That(reply, Reply.IsWarning("fan 0 is thermostatic, speed ignored"),
                     "the board took the speed and warned about it, and the warning is the code's result");
     }
 
@@ -665,8 +665,8 @@ public class M106Tests : BenchFixture
         bench.CanMaster.ReportWith<CanMessageFanParameters>("minimum PWM raised to the board's floor",
                                                             CodeResult.Warning);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M106 P0 L0.25")).TrimEnd();
-        Assert.That(reply, Is.EqualTo("Warning: M106: minimum PWM raised to the board's floor"),
+        string reply = await bench.Host.ExecuteCodeAsync("M106 P0 L0.25");
+        Assert.That(reply, Reply.IsWarning("minimum PWM raised to the board's floor"),
                     "M106's configuration form carries the board's warning back the same way");
     }
 }

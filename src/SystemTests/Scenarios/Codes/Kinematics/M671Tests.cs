@@ -31,7 +31,7 @@ public class M671Tests : BenchFixture
 
         await host.ExecuteCodeAsync("M669 K0");
         string configureReply = await host.ExecuteCodeAsync("M671 X10:190 Y5:195 S2.5 P0.7 F1.2");
-        Assert.That(configureReply.Trim(), Is.Empty,
+        Assert.That(configureReply, Reply.IsEmpty,
                     "cartesian kinematics accepts M671 silently (RRF ZLeadscrewKinematics::Configure)");
 
         double screwX0 = await host.ReadModelAsync(model => ((ZLeadscrewKinematics)model.Move.Kinematics).TiltCorrection.ScrewX[0]);

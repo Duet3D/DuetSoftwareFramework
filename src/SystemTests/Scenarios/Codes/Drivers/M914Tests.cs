@@ -26,7 +26,7 @@ public class M914Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M914")).TrimEnd(),
-                    Is.EqualTo("Warning: M914: Command is not supported"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M914"),
+                    Reply.IsWarning(CodeErrors.NotSupported));
     }
 }

@@ -40,14 +40,14 @@ public class M550Tests : BenchFixture
         string accepted = await bench.Host.ExecuteCodeAsync($"M550 P\"{spaced}\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(accepted.Trim(), Is.Empty, "only letters and digits are compared");
+            Assert.That(accepted, Reply.IsEmpty, "only letters and digits are compared");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Network.Name), Is.EqualTo(spaced), "network.name is the name as given");
         });
 
         string refused = await bench.Host.ExecuteCodeAsync($"M550 P\"{Environment.MachineName}2\"");
         Assert.Multiple(async () =>
         {
-            Assert.That(refused, Does.StartWith("Error:").And.Contain("hostname"));
+            Assert.That(refused, Reply.IsError("hostname"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Network.Name), Is.EqualTo(spaced), "a refused name changes nothing");
         });
     }

@@ -64,7 +64,7 @@ public class M115Tests : BenchFixture
         bench.CanMaster.ClearCapture();
         string reply = await bench.Host.ExecuteCodeAsync(code);
 
-        string[] lines = reply.TrimEnd().Split('\n');
+        string[] lines = Reply.Lines(reply);
         Assert.That(lines, Has.Length.EqualTo(2), "one line for the controller and one for DSF");
         Assert.Multiple(() =>
         {
@@ -96,8 +96,8 @@ public class M115Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain($"DSF_VERSION: {dsfVersion} "));
-            Assert.That(reply, Does.Contain("FIRMWARE_NAME: unknown FIRMWARE_VERSION: unknown ELECTRONICS: unknown FIRMWARE_DATE: unknown"));
+            Assert.That(reply, Reply.IsSuccess($"DSF_VERSION: {dsfVersion} "));
+            Assert.That(reply, Reply.IsSuccess("FIRMWARE_NAME: unknown FIRMWARE_VERSION: unknown ELECTRONICS: unknown FIRMWARE_DATE: unknown"));
         });
     }
 }

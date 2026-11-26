@@ -85,7 +85,7 @@ public class M572Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, TwoExtruders, "M572 D0:1 S0");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0 S0.1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0 S0.1"), Reply.IsEmpty);
         (byte board, CanMessageMultipleDrivesRequestShortPressureAdvanceParameters sent) =
             bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>();
         Assert.Multiple(() =>
@@ -106,7 +106,7 @@ public class M572Tests : BenchFixture
                     "D is ignored by the report, which lists every extruder");
 
         bench.CanMaster.ClearCapture();
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0 S0.9:0.1 L5.0")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0 S0.9:0.1 L5.0"), Reply.IsEmpty);
         (board, sent) = bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>();
         Assert.Multiple(async () =>
         {
@@ -137,7 +137,7 @@ public class M572Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config,
             $"M584 E{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(4)}:{DriversRig.MainDriver(3)}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0:1:2 S0.05")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0:1:2 S0.05"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>();
         Assert.That(sent.Select(m => (m.Board, (int)m.Message.DriversToUpdate)),
@@ -170,13 +170,13 @@ public class M572Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M572 S0.1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain("No tool selected"));
+            Assert.That(reply, Reply.IsError("No tool selected"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.K0), Is.Zero);
         });
 
         await bench.Host.ExecuteCodeAsync("T0");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 S0.1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 S0.1"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.K0), Is.EqualTo(0.1f));
@@ -213,7 +213,7 @@ public class M572Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.K0), Is.Zero);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.K1), Is.Zero);
@@ -231,7 +231,7 @@ public class M572Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0 S0.1 L5")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0 S0.1 L5"), Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {
@@ -258,7 +258,7 @@ public class M572Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0 S0:0.1 L5")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0 S0:0.1 L5"), Reply.IsEmpty);
 
         CanMessageMultipleDrivesRequestShortPressureAdvanceParameters sent =
             bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>().Message;
@@ -299,7 +299,7 @@ public class M572Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:").And.Contain(refusal));
+            Assert.That(reply, Reply.IsError(refusal));
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestShortPressureAdvanceParameters>().Select(m => m.Board),
                         Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, DriversRig.ClosedLoopBoard }),
                         "one board's refusal does not stop the other being told");

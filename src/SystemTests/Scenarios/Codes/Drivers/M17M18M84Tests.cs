@@ -90,7 +90,7 @@ public class M17M18M84Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M17");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "M17 succeeds silently (RRF GCodes2.cpp case 17)");
+            Assert.That(reply, Reply.IsEmpty, "M17 succeeds silently (RRF GCodes2.cpp case 17)");
             Assert.That(axis0.Homed, Is.False,
                         "M17 does not mark an axis homed (RRF GCodes2.cpp case 17 only enables drivers)");
         });

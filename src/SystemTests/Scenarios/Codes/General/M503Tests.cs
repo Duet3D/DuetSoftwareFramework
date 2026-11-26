@@ -24,6 +24,6 @@ public class M503Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye);
         string reply = await bench.Host.ExecuteCodeAsync("M503");
-        Assert.That(reply, Does.Contain($"M584 X{Expansion.Driver(Machines.DriverBoard, Machines.XDriver)} Y{Expansion.Driver(Machines.DriverBoard, Machines.YDriver)} E{Expansion.Driver(Machines.DriverBoard, Machines.EDriver)}"), "M503 echoes config.g's content (RRF GCodes2.cpp case 503)");
+        Assert.That(reply, Reply.IsSuccess($"M584 X{Expansion.Driver(Machines.DriverBoard, Machines.XDriver)} Y{Expansion.Driver(Machines.DriverBoard, Machines.YDriver)} E{Expansion.Driver(Machines.DriverBoard, Machines.EDriver)}"), "M503 echoes config.g's content (RRF GCodes2.cpp case 503)");
     }
 }

@@ -56,7 +56,7 @@ public class JobEdgeCaseTests : BenchFixture
         });
 
         // A pause is still possible, which is the point of staying in the job until the motion ends
-        Assert.That(await bench.Host.ExecuteCodeAsync("M25"), Does.Not.Contain("no file is being printed"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M25"), Reply.IsNotError,
                     "the job is there to be paused");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
 

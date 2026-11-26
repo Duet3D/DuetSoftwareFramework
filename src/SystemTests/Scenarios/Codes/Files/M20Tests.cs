@@ -40,17 +40,17 @@ public class M20Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(gcodes, Does.Contain("GCode files:"),
+            Assert.That(gcodes, Reply.IsSuccess("GCode files:"),
                         "M20 heads the list with GCode files: (GCodes2.cpp case 20)");
-            Assert.That(gcodes, Does.Contain("\"first.gcode\""),
+            Assert.That(gcodes, Reply.IsSuccess("\"first.gcode\""),
                         "M20 lists first.gcode, which the virtual SD card holds");
-            Assert.That(gcodes, Does.Contain("\"second.gcode\""),
+            Assert.That(gcodes, Reply.IsSuccess("\"second.gcode\""),
                         "M20 lists second.gcode, which the virtual SD card holds");
             Assert.That(gcodes, Does.Not.Contain("config.g"),
                         "M20 lists the G-code directory, not the system directory");
-            Assert.That(sys, Does.Contain("\"config.g\""),
+            Assert.That(sys, Reply.IsSuccess("\"config.g\""),
                         "M20 P lists the named directory (GCodes2.cpp case 20, the P parameter)");
-            Assert.That(sys, Does.Contain("\"pause.g\""),
+            Assert.That(sys, Reply.IsSuccess("\"pause.g\""),
                         "M20 P\"0:/sys\" lists every file the system directory holds");
         });
     }

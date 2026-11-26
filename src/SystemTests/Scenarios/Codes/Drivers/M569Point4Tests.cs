@@ -29,7 +29,7 @@ public class M569Point4Tests : BenchFixture
         await bench.ReportClosedLoopAsync(DriversRig.ClosedLoopBoard);
         const byte board = DriversRig.ClosedLoopBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.4 P{Expansion.Driver(board, 0)} T0.001 V50")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.4 P{Expansion.Driver(board, 0)} T0.001 V50"), Reply.IsEmpty,
                     "the board took the torque");
 
         (byte sentTo, CanMessageM569Point4 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point4>();
@@ -68,7 +68,7 @@ public class M569Point4Tests : BenchFixture
         await bench.ReportClosedLoopAsync(DriversRig.ClosedLoopBoard);
 
         string reply = await bench.Host.ExecuteCodeAsync($"M569.4 P{DriversRig.ClosedLoopDriver(0)}{parameters}");
-        Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569.4: {refusal}"));
+        Assert.That(reply, Reply.IsError(refusal));
     }
 
     /// <summary>
@@ -84,7 +84,7 @@ public class M569Point4Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M569.4 P{DriversRig.MainDriver(0)} T0.5");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.4: not supported by this driver"));
+            Assert.That(reply, Reply.IsError("not supported by this driver"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point4>(), Is.Empty);
         });
     }
@@ -105,7 +105,7 @@ public class M569Point4Tests : BenchFixture
         await bench.ReportClosedLoopAsync(DriversRig.ClosedLoopBoard);
         await bench.ReportClosedLoopAsync(DriversRig.MainDriverBoard);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.4 P{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)} T0.5")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.4 P{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)} T0.5"), Reply.IsEmpty);
 
         Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point4>().Select(sent => (sent.Board, sent.Message.P, sent.Message.T)),
                     Is.EquivalentTo(new (byte, byte?, float?)[] { (DriversRig.ClosedLoopBoard, 0, 0.5f), (DriversRig.MainDriverBoard, 3, 0.5f) }),
@@ -129,7 +129,7 @@ public class M569Point4Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M569.4 P{DriversRig.ClosedLoopDriver(0)}:{DriversRig.MainDriver(3)} T0.5");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.4: cannot enter torque mode while moving"));
+            Assert.That(reply, Reply.IsError("cannot enter torque mode while moving"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point4>(), Has.Count.EqualTo(1), "the second driver is not asked");
         });
     }
@@ -143,7 +143,7 @@ public class M569Point4Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M569.4 T0.5")).TrimEnd(), Is.EqualTo("Error: M569.4: missing parameter 'P'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M569.4 T0.5"), Reply.IsError(CodeErrors.MissingParameter('P')));
         Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point4>(), Is.Empty);
     }
 }

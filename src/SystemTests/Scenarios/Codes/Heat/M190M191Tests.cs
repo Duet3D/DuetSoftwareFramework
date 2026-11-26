@@ -38,8 +38,8 @@ public class M190M191Tests : BenchFixture
     {
         await using Bench bench = await StartAsync(TwoSlotsConfig(SetCode(code)));
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code}{slot} S0")).Trim(), Is.Empty, "S replies nothing");
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code}{slot} R0")).Trim(), Is.Empty, "R replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code}{slot} S0"), Reply.IsEmpty, "S replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code}{slot} R0"), Reply.IsEmpty, "R replies nothing");
         Heater heater = await ReadHeaterAsync(bench, heaterNumber);
         Assert.Multiple(() =>
         {
@@ -62,7 +62,7 @@ public class M190M191Tests : BenchFixture
     {
         await using Bench bench = await StartAsync(TwoSlotsConfig(setCode));
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(code)).Trim(), Is.Empty, "accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync(code), Reply.IsEmpty, "accepted");
         Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
     }
 
@@ -76,13 +76,13 @@ public class M190M191Tests : BenchFixture
         HeatManager heat = bench.Host.Services.GetRequiredService<HeatManager>();
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 80.0f);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"{code} S60")).Trim(), Is.Empty, "a heater above an S target is not waited for");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"{code} S60"), Reply.IsEmpty, "a heater above an S target is not waited for");
 
         Task<string> waiting = bench.Host.ExecuteCodeAsync($"{code} R60");
         await bench.CanMaster.WaitUntilAsync(() => heat.IsWaitingForTemperatures, what: $"{code} R waiting");
         Assert.That(waiting.IsCompleted, Is.False, "a heater above an R target is waited for");
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 61.0f);
-        Assert.That((await waiting).Trim(), Is.Empty, "within 1.5C ends the wait");
+        Assert.That(await waiting, Reply.IsEmpty, "within 1.5C ends the wait");
     }
 
     /// <summary>M190 and M191 refuse a faulted heater, and from a channel that is not a file do not wait for it</summary>
@@ -95,7 +95,7 @@ public class M190M191Tests : BenchFixture
         await bench.ReportHeaterAsync(3, HeaterMode.Fault, 25.0f);
 
         string reply = await bench.Host.ExecuteCodeAsync($"{code} S60");
-        Assert.That(reply, Does.StartWith("Error").And.Contain("Can't turn heater 3 on while in fault state"), "the fault is reported");
+        Assert.That(reply, Reply.IsError("Can't turn heater 3 on while in fault state"), "the fault is reported");
     }
 
     /// <summary>
@@ -122,7 +122,7 @@ public class M190M191Tests : BenchFixture
         await bench.ReportHeaterAsync(3, HeaterMode.Stable, 50.0f);
         Assert.That(waiting.IsCompleted, Is.False, "heater 4 is still cold");
         await bench.ReportHeaterAsync(4, HeaterMode.Stable, 50.0f);
-        Assert.That((await waiting).Trim(), Is.Empty, "both at the target ends the wait");
+        Assert.That(await waiting, Reply.IsEmpty, "both at the target ends the wait");
     }
 
     /// <summary>M190 and M191 refuse a temperature above the heater's limit, send nothing and wait for nothing</summary>
@@ -137,7 +137,7 @@ public class M190M191Tests : BenchFixture
         Heater heater = await ReadHeaterAsync(bench, 3);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("Temperature too high for heater 3"), "the temperature is refused");
+            Assert.That(reply, Reply.IsError("Temperature too high for heater 3"), "the temperature is refused");
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
             Assert.That(heater.Active, Is.EqualTo(0.0f), "active is unchanged");
             Assert.That(heater.State, Is.EqualTo(HeaterState.Off), "state");
@@ -154,7 +154,7 @@ public class M190M191Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.ExecuteCodeAsync($"{code} P{slot} S50"), Does.StartWith("Error"), "the slot is refused");
+            Assert.That(await bench.Host.ExecuteCodeAsync($"{code} P{slot} S50"), Reply.IsError(), "the slot is refused");
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
         });
     }

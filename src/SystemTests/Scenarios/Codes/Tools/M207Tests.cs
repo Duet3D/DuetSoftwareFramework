@@ -63,9 +63,6 @@ public class M207Tests : BenchFixture
     /// <summary>What <see cref="ConfigureTool0"/> sets</summary>
     private static readonly Retraction Configured = new(3.0f, 0.5f, 30.0f, 15.0f, 0.25f);
 
-    /// <summary>The non-empty lines of a reply</summary>
-    private static string[] Lines(string reply) => reply.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-
     /// <summary>M207 P sets every parameter of that tool only, P0 included: P0 names a tool, it does not mean "no P"</summary>
     /// <remarks>
     /// S, R and Z are stored as given; F and T are mm/min, reported in mm/s (Tool objectModelTable
@@ -80,14 +77,14 @@ public class M207Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
         int other = 1 - tool;
-        string reply = (await bench.Host.ExecuteCodeAsync($"M207 P{tool} S3.5 R0.25 F2400 T1200 Z0.4")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync($"M207 P{tool} S3.5 R0.25 F2400 T1200 Z0.4");
         Retraction set = await ReadRetractionAsync(bench, tool), untouched = await ReadRetractionAsync(bench, other);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(set, new Retraction(3.5f, 0.25f, 40.0f, 20.0f, 0.4f), $"tools[{tool}]");
             AssertRetraction(untouched, Defaults, $"tools[{other}] is untouched");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -102,15 +99,15 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M207 S1.5 Z0.2")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M207 S1.5 Z0.2");
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Retraction expected = Defaults with { Length = 1.5f, ZHop = 0.2f };
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(first, expected, "tools[0]");
             AssertRetraction(second, expected, "tools[1]");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -130,13 +127,13 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "clamping is silent");
+            Assert.That(reply, Reply.IsEmpty, "clamping is silent");
             AssertRetraction(retraction, new Retraction(length, extraRestart, speed, unretractSpeed, 0.0f), "tools[0]");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -150,13 +147,13 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(retraction, Defaults with { Speed = speed, UnretractSpeed = unretractSpeed }, "tools[0]");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -172,12 +169,12 @@ public class M207Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
         await bench.Host.ExecuteCodeAsync("G20");
-        string set = (await bench.Host.ExecuteCodeAsync("M207 S1 R0.5 F600 T300 Z0.1")).Trim();
+        string set = await bench.Host.ExecuteCodeAsync("M207 S1 R0.5 F600 T300 Z0.1");
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
         Assert.Multiple(() =>
         {
-            Assert.That(set, Is.Empty, "setting succeeds silently");
+            Assert.That(set, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(retraction, new Retraction(1.0f, 0.5f, 10.0f, 5.0f, 0.1f), "tools[0] in mm and mm/s");
             Assert.That(report, Is.EqualTo("Tool 0 retract/reprime: length 1.00/1.50mm, speed 10.0/5.0mm/sec, Z hop 0.10mm"), "the report is in mm too");
         });
@@ -199,12 +196,12 @@ public class M207Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M207");
         Assert.Multiple(() =>
         {
-            Assert.That(Lines(reply), Is.EqualTo(new[]
+            Assert.That(Reply.Lines(reply), Is.EqualTo(new[]
             {
                 "Tool 0 retract/reprime: length 2.00/2.00mm, speed 16.7/16.7mm/sec, Z hop 0.00mm",
                 "Tool 1 retract/reprime: length 3.00/3.50mm, speed 30.0/15.0mm/sec, Z hop 0.25mm"
             }), "one line per tool, in tool order");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -217,7 +214,7 @@ public class M207Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M207 P1 S3 R0.5 F1800 T900 Z0.25");
         string reply = await bench.Host.ExecuteCodeAsync("M207 P1");
-        Assert.That(Lines(reply), Is.EqualTo(new[] { "Tool 1 retract/reprime: length 3.00/3.50mm, speed 30.0/15.0mm/sec, Z hop 0.25mm" }), "only tool 1 is reported");
+        Assert.That(Reply.Lines(reply), Is.EqualTo(new[] { "Tool 1 retract/reprime: length 3.00/3.50mm, speed 30.0/15.0mm/sec, Z hop 0.25mm" }), "only tool 1 is reported");
     }
 
     /// <summary>With no tools, M207 succeeds, has nothing to report and reads none of its parameters</summary>
@@ -231,17 +228,17 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
-        string set = (await bench.Host.ExecuteCodeAsync("M207 S3")).Trim();
-        string negativeZ = (await bench.Host.ExecuteCodeAsync("M207 Z-1")).Trim();
-        string bareLetter = (await bench.Host.ExecuteCodeAsync("M207 S")).Trim();
+        string report = await bench.Host.ExecuteCodeAsync("M207");
+        string set = await bench.Host.ExecuteCodeAsync("M207 S3");
+        string negativeZ = await bench.Host.ExecuteCodeAsync("M207 Z-1");
+        string bareLetter = await bench.Host.ExecuteCodeAsync("M207 S");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Is.Empty, "the report is empty");
-            Assert.That(set, Is.Empty, "setting with no tools succeeds silently");
-            Assert.That(negativeZ, Is.Empty, "a negative Z is never read");
-            Assert.That(bareLetter, Is.Empty, "a letter without a number is never read");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(report, Reply.IsEmpty, "the report is empty");
+            Assert.That(set, Reply.IsEmpty, "setting with no tools succeeds silently");
+            Assert.That(negativeZ, Reply.IsEmpty, "a negative Z is never read");
+            Assert.That(bareLetter, Reply.IsEmpty, "a letter without a number is never read");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -253,14 +250,14 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M207 P5 S3")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M207 P5 S3");
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             AssertRetraction(first, Defaults, "tools[0] is untouched");
             AssertRetraction(second, Defaults, "tools[1] is untouched");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -283,13 +280,13 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(OneToolConfig, ConfigureTool0);
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "setting succeeds silently, without a report");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently, without a report");
             AssertRetraction(retraction, expected, "tools[0]");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "nothing is sent");
         });
     }
 
@@ -302,11 +299,11 @@ public class M207Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
         await bench.Host.ExecuteCodeAsync("M207 T600");
-        string reply = (await bench.Host.ExecuteCodeAsync("M207 F1200")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M207 F1200");
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(retraction, Defaults with { Speed = 20.0f, UnretractSpeed = 20.0f }, "tools[0]: F replaced the earlier T");
         });
     }
@@ -325,22 +322,22 @@ public class M207Tests : BenchFixture
             M563 P1 S"One"
             """);
 
-        string setOne = (await bench.Host.ExecuteCodeAsync("M207 P3 S3")).Trim();
+        string setOne = await bench.Host.ExecuteCodeAsync("M207 P3 S3");
         Retraction one = await ReadRetractionAsync(bench, 1), three = await ReadRetractionAsync(bench, 3);
         string report = await bench.Host.ExecuteCodeAsync("M207");
-        string setAll = (await bench.Host.ExecuteCodeAsync("M207 Z0.3")).Trim();
+        string setAll = await bench.Host.ExecuteCodeAsync("M207 Z0.3");
         Retraction oneAfter = await ReadRetractionAsync(bench, 1), threeAfter = await ReadRetractionAsync(bench, 3);
         Assert.Multiple(() =>
         {
-            Assert.That(setOne, Is.Empty, "M207 P3 succeeds silently");
+            Assert.That(setOne, Reply.IsEmpty, "M207 P3 succeeds silently");
             AssertRetraction(three, Defaults with { Length = 3.0f }, "M207 P3 sets tools[3]");
             AssertRetraction(one, Defaults, "and leaves tools[1] untouched");
-            Assert.That(Lines(report), Is.EqualTo(new[]
+            Assert.That(Reply.Lines(report), Is.EqualTo(new[]
             {
                 "Tool 1 retract/reprime: length 2.00/2.00mm, speed 16.7/16.7mm/sec, Z hop 0.00mm",
                 "Tool 3 retract/reprime: length 3.00/3.00mm, speed 16.7/16.7mm/sec, Z hop 0.00mm"
             }), "the report lists tool 1 before tool 3");
-            Assert.That(setAll, Is.Empty, "M207 without P succeeds silently");
+            Assert.That(setAll, Reply.IsEmpty, "M207 without P succeeds silently");
             AssertRetraction(oneAfter, Defaults with { ZHop = 0.3f }, "M207 without P sets tools[1]");
             AssertRetraction(threeAfter, Defaults with { Length = 3.0f, ZHop = 0.3f }, "and tools[3]");
         });
@@ -354,8 +351,8 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M207 P5")).Trim();
-        Assert.That(reply, Does.StartWith("Error:"));
+        string reply = await bench.Host.ExecuteCodeAsync("M207 P5");
+        Assert.That(reply, Reply.IsError());
     }
 
     /// <summary>A negative P is not a number M207 accepts, so it is refused before any tool is looked up</summary>
@@ -369,11 +366,11 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
-        string literal = (await bench.Host.ExecuteCodeAsync("M207 P-1 S3")).Trim();
+        string literal = await bench.Host.ExecuteCodeAsync("M207 P-1 S3");
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(literal, Does.StartWith("Error:"), "P-1");
+            Assert.That(literal, Reply.IsError(), "P-1");
             AssertRetraction(first, Defaults, "tools[0] is untouched");
             AssertRetraction(second, Defaults, "tools[1] is untouched");
         });
@@ -387,11 +384,11 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync("M207 S50 R20 F30000 T30000 Z10")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("M207 S50 R20 F30000 T30000 Z10");
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(retraction, new Retraction(50.0f, 20.0f, 500.0f, 500.0f, 10.0f), "tools[0]");
         });
     }
@@ -412,11 +409,11 @@ public class M207Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(OneToolConfig);
 
-        string reply = (await bench.Host.ExecuteCodeAsync($"M207 {letter}")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync($"M207 {letter}");
         Retraction retraction = await ReadRetractionAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             AssertRetraction(retraction, Defaults, "tools[0] is untouched");
         });
     }
@@ -456,11 +453,11 @@ public class M207Tests : BenchFixture
 
         // Let the move finish, which also releases an M207 that wrongly waits for it
         await timeline.WhileRunningAsync(() => bench.Host.ExecuteCodeAsync("M400"));
-        string reply = (await m207).Trim();
+        string reply = await m207;
         Assert.Multiple(() =>
         {
             Assert.That(completed, Is.True, "M207 completes while the X move is held by the frozen timeline");
-            Assert.That(reply, Is.Empty, "setting succeeds silently");
+            Assert.That(reply, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(retraction, Defaults with { Length = 7.5f }, "tools[0] is set before the move finishes");
         });
     }

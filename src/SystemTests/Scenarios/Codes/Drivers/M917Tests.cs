@@ -26,7 +26,7 @@ public class M917Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M917 X60 Y60 Z60")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M917 X60 Y60 Z60"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStandstillCurrentFactor>();
         Assert.That(sent, Has.Count.EqualTo(3), "one request per axis named");

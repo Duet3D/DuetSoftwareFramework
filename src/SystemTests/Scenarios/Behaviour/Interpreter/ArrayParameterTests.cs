@@ -47,7 +47,7 @@ public class ArrayParameterTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: at column 19: M906: array too long for parameter 'E'"));
+            Assert.That(reply, Reply.IsError(CodeErrors.ArrayTooLong('E')).AtColumn(19));
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>(), Is.Empty,
                         "a refused code sends nothing, where taking the first three would have sent three requests");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Current), Is.EqualTo(300));
@@ -69,7 +69,7 @@ public class ArrayParameterTests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, ThreeExtruders);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 E700")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 E700"), Reply.IsEmpty);
 
         Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>(), Has.Count.EqualTo(3),
                     "every extruder is set, so every one of their drivers is told");
@@ -90,7 +90,7 @@ public class ArrayParameterTests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, ThreeExtruders + "\nM906 E300:310:200");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 E400:410:420")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 E400:410:420"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Current), Is.EqualTo(400));
@@ -98,7 +98,7 @@ public class ArrayParameterTests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[2].Current), Is.EqualTo(420));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 E500:510")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 E500:510"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].Current), Is.EqualTo(500));
@@ -126,10 +126,8 @@ public class ArrayParameterTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M17 E")).TrimEnd(),
-                        Is.EqualTo("Error: at column 6: M17: array too long for parameter 'E'"));
-            Assert.That((await bench.Host.ExecuteCodeAsync("M906 E800")).TrimEnd(),
-                        Is.EqualTo("Error: at column 7: M906: array too long for parameter 'E'"),
+            Assert.That(await bench.Host.ExecuteCodeAsync("M17 E"), Reply.IsError(CodeErrors.ArrayTooLong('E')).AtColumn(6));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M906 E800"), Reply.IsError(CodeErrors.ArrayTooLong('E')).AtColumn(7),
                         "and so is a value there is no drive to apply it to");
         });
     }
@@ -149,15 +147,13 @@ public class ArrayParameterTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M557 X20 Y20:180")).TrimEnd(),
-                        Is.EqualTo("Error: M557: Wrong number of values in array, expected 2"),
+            Assert.That(await bench.Host.ExecuteCodeAsync("M557 X20 Y20:180"), Reply.IsError(CodeErrors.WrongArrayLength(2)),
                         "one value is half a range");
-            Assert.That((await bench.Host.ExecuteCodeAsync("M557 X20:180:200 Y20:180")).TrimEnd(),
-                        Is.EqualTo("Error: at column 14: M557: array too long for parameter 'X'"),
+            Assert.That(await bench.Host.ExecuteCodeAsync("M557 X20:180:200 Y20:180"), Reply.IsError(CodeErrors.ArrayTooLong('X')).AtColumn(14),
                         "and three is refused where the third stands, the length being checked as it is read");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M557 X20:180 Y20:180 S40")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M557 X20:180 Y20:180 S40"), Reply.IsEmpty,
                     "a pair for each axis is what it asks for");
     }
 
@@ -173,7 +169,7 @@ public class ArrayParameterTests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M557 X20:180 Y20:180 P5")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M557 X20:180 Y20:180 P5"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Compensation.ProbeGrid.Spacings[0]),

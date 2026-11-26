@@ -37,7 +37,7 @@ public class M569Point7Tests : BenchFixture
                                              .WithController(canMaster => canMaster.ReportWith<CanMessageM569Point7>(
                 message => message.C is null && message.V is null && message.S is null ? report : string.Empty)).StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)} C\"{port}\" S20")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)} C\"{port}\" S20"), Reply.IsEmpty,
                     "the board took the binding");
 
         (byte sentTo, CanMessageM569Point7 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point7>();
@@ -132,7 +132,7 @@ public class M569Point7Tests : BenchFixture
             $"M569.7 P{DriversRig.ClosedLoopDriver(0)} C\"{Expansion.Out(DriversRig.MainDriverBoard, 0)}\" S20");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.7: Brake port must be on same board as driver"));
+            Assert.That(reply, Reply.IsError("Brake port must be on same board as driver"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point7>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.FindBoard(DriversRig.ClosedLoopBoard)!.Drivers![0].Config.Brake.Port),
                         Is.Null);
@@ -156,7 +156,7 @@ public class M569Point7Tests : BenchFixture
         DriverBrake brake = await bench.Host.ReadModelAsync(model => model.FindBoard(DriversRig.MainDriverBoard)!.Drivers![2].Config.Brake);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569.7: {refusal}"));
+            Assert.That(reply, Reply.IsError(refusal));
             Assert.That(brake.Port, Is.Null);
             Assert.That(brake.Voltage, Is.Null);
         });
@@ -171,7 +171,7 @@ public class M569Point7Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M569.7 S20")).TrimEnd(), Is.EqualTo("Error: M569.7: missing parameter 'P'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M569.7 S20"), Reply.IsError(CodeErrors.MissingParameter('P')));
         Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point7>(), Is.Empty);
     }
 }

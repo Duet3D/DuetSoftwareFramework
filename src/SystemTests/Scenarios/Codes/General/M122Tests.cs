@@ -31,7 +31,7 @@ public class M122Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M122 B{Machines.DriverBoard}");
-        Assert.That(reply, Does.Not.StartWith("Error:"), "a board's diagnostics are fetched, not refused");
+        Assert.That(reply, Reply.IsNotError, "a board's diagnostics are fetched, not refused");
 
         (byte board, CanMessageReturnInfo sent) = bench.CanMaster.LastCanMessage<CanMessageReturnInfo>();
         Assert.Multiple(() =>
@@ -55,8 +55,8 @@ public class M122Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(reply, Does.StartWith("=== Diagnostics ==="));
-            Assert.That(reply, Does.Contain("=== Duet Control Server ==="));
-            Assert.That(reply, Does.Contain("=== Move ==="), "M122 contains the Move section (RRF Move::Diagnostics)");
+            Assert.That(reply, Reply.IsSuccess("=== Duet Control Server ==="));
+            Assert.That(reply, Reply.IsSuccess("=== Move ==="), "M122 contains the Move section (RRF Move::Diagnostics)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageReturnInfo>(), Is.Empty, "board 0 is answered here, not asked for over CAN");
         });
     }

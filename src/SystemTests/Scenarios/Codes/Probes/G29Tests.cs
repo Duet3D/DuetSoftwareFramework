@@ -39,7 +39,7 @@ public class G29Tests : BenchFixture
         DcsTestHost host = bench.Host;
 
         string loadReply = await host.ExecuteCodeAsync("G29 S1");
-        Assert.That(loadReply.Trim(), Is.Empty, "G29 S1 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
+        Assert.That(loadReply, Reply.IsEmpty, "G29 S1 loads the map silently with no probe configured (RRF GCodes::LoadHeightMap)");
         Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.Type), Is.EqualTo(MoveCompensationType.Mesh),
                     "G29 S1 sets move.compensation.type to mesh (RRF Move::GetCompensationTypeString)");
         Assert.That(await host.ReadModelAsync(model => model.Move.Compensation.File), Does.EndWith("heightmap.csv"),

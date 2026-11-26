@@ -34,8 +34,8 @@ public class M569Point3Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.3: Command is not supported"));
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "and no board is asked anything");
+            Assert.That(reply, Reply.IsError(CodeErrors.NotSupported));
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "and no board is asked anything");
         });
     }
 
@@ -49,6 +49,6 @@ public class M569Point3Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M569.3")).TrimEnd(), Is.EqualTo("Error: M569.3: missing parameter 'P'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M569.3"), Reply.IsError(CodeErrors.MissingParameter('P')));
     }
 }

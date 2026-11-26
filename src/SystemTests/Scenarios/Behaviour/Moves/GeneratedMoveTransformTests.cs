@@ -90,7 +90,7 @@ public class GeneratedMoveTransformTests : BenchFixture
         """;
 
     /// <summary>What every probing code here replies, since nothing triggers the probe</summary>
-    private static string NotTriggered(string code) => $"Error: {code}: Probe was not triggered during probing move";
+    private const string NotTriggered = "Probe was not triggered during probing move";
 
     /// <summary>Run each line of a block of codes in turn</summary>
     private static async Task RunAsync(Bench bench, string lines)
@@ -107,7 +107,7 @@ public class GeneratedMoveTransformTests : BenchFixture
         int before = bench.CanMaster.ScheduledMoves().Count;
         string reply = await bench.Host.ExecuteCodeAsync(code);
         await bench.Host.ExecuteCodeAsync("M400");
-        return (reply.Trim(), bench.CanMaster.ScheduledMoves().Skip(before).ToArray());
+        return (reply, bench.CanMaster.ScheduledMoves().Skip(before).ToArray());
     }
 
     /// <summary>Steps one move gives a driver, zero for a driver it does not name</summary>
@@ -156,7 +156,7 @@ public class GeneratedMoveTransformTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(NotTriggered("G30")));
+            Assert.That(reply, Reply.IsError(NotTriggered));
             Assert.That(moves.Select(FlagsOf), Is.EqualTo(new[] { (ScheduleMoveFlags)0, ScheduleMoveFlags.CheckEndstops }),
                         "the move to the dive height, which moves Z alone and watches nothing, and one dive");
             Assert.That(moves.Select(ArmedOnTheProbe), Is.EqualTo(new[] { false, true }), "the dive watches the probe on every driver");
@@ -197,7 +197,7 @@ public class GeneratedMoveTransformTests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(NotTriggered("G30")));
+            Assert.That(reply, Reply.IsError(NotTriggered));
             Assert.That(moves.Select(FlagsOf), Is.EqualTo(new[] { ScheduleMoveFlags.UseInputShaping, ScheduleMoveFlags.CheckEndstops }),
                         "the move to the dive height moves X and Y with Z, so it is XY movement and shaped; the dive is isolated");
             Assert.That(moves.Select(ArmedOnTheProbe), Is.EqualTo(new[] { false, true }), "the dive watches the probe on every driver");
@@ -245,7 +245,7 @@ public class GeneratedMoveTransformTests : BenchFixture
         ScheduledMove[] dive = moves.Where(move => move.Has(ScheduleMoveFlags.CheckEndstops)).ToArray();
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(NotTriggered("G29")));
+            Assert.That(reply, Reply.IsError(NotTriggered));
             Assert.That(travel, Has.Length.EqualTo(1), "one move to the point");
             Assert.That(dive, Has.Length.EqualTo(1), "and one dive");
             Assert.That(StepsOf(travel[0], XDriver), Is.EqualTo(40), "X by tanXY × 50 mm of Y");
@@ -316,7 +316,7 @@ public class GeneratedMoveTransformTests : BenchFixture
         float alongU = 15.0f / MathF.Sqrt(15.0f * 15.0f + 1.0f);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(NotTriggered("G29")));
+            Assert.That(reply, Reply.IsError(NotTriggered));
             Assert.That(travel, Has.Length.EqualTo(1), "one move to the point");
             Assert.That(dive, Has.Length.EqualTo(1), "and one dive");
             Assert.That(StepsOf(travel[0], UBoard, UDriver), Is.EqualTo(15 * XyuStepsPerMm),
@@ -574,7 +574,7 @@ public class GeneratedMoveTransformTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(moves.Sum(move => StepsOf(move, XDriver)), Is.Zero, "X stays at 20");
             Assert.That(moves.Sum(move => StepsOf(move, UBoard, UDriver)), Is.EqualTo(10 * XyuStepsPerMm), "and U goes to the 10 asked for");
         });
@@ -766,7 +766,7 @@ public class GeneratedMoveTransformTests : BenchFixture
 
         (string reply, IReadOnlyList<ScheduledMove> moves) = await RunCodeAsync(bench, "G30 P0 X0 Y50 Z-99999");
 
-        Assert.That(reply, Is.EqualTo(NotTriggered("G30")));
+        Assert.That(reply, Reply.IsError(NotTriggered));
         Assert.That(moves, Has.Count.EqualTo(4), "lift, travel, dive and return");
         Assert.Multiple(async () =>
         {
@@ -793,7 +793,7 @@ public class GeneratedMoveTransformTests : BenchFixture
 
         (string reply, IReadOnlyList<ScheduledMove> moves) = await RunCodeAsync(bench, "G30 P0 X20 Y0 Z-99999");
 
-        Assert.That(reply, Is.EqualTo(NotTriggered("G30")));
+        Assert.That(reply, Reply.IsError(NotTriggered));
         Assert.That(moves, Has.Count.EqualTo(4), "lift, travel, dive and return");
         Assert.Multiple(() =>
         {
@@ -822,7 +822,7 @@ public class GeneratedMoveTransformTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.EqualTo(NotTriggered("G30")));
+            Assert.That(reply, Reply.IsError(NotTriggered));
             Assert.That(moves, Has.Count.EqualTo(1), "one move");
             Assert.That(moves.Select(move => move.Has(ScheduleMoveFlags.CheckEndstops)), Has.All.True, "the dive");
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { -40400 }));

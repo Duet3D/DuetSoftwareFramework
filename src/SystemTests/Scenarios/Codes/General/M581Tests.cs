@@ -53,7 +53,7 @@ public class M581Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M581.1 T2 P\"global.fireTrigger\" R0");
-        Assert.That(reply, Does.Not.Contain("Error"), "M581.1 accepts an expression trigger (RRF TriggerItem::Configure fraction 1)");
+        Assert.That(reply, Reply.IsNotError, "M581.1 accepts an expression trigger (RRF TriggerItem::Configure fraction 1)");
 
         await bench.Host.ExecuteCodeAsync("set global.fireTrigger = true");
         await bench.Host.WaitForGlobalAsync("trigRan", 1, timeoutMs: 5_000);

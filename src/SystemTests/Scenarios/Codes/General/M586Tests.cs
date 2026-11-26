@@ -27,17 +27,17 @@ public class M586Tests : BenchFixture
     public async Task M586ConfiguresTheCorsSite()
     {
         await using Bench bench = await Bench.StartAsync();
-        Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Does.Contain("CORS disabled"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Reply.IsSuccess("CORS disabled"),
                     "M586 without C reports no CORS site (RRF Network::ConfigureNetworkProtocol)");
 
         await bench.Host.ExecuteCodeAsync("M586 C\"example.com\"");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Network.CorsSite), Is.EqualTo("example.com"),
                     "M586 C sets network.corsSite (RRF Network::SetCorsSite; OM Network.cpp corsSite)");
-        Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Does.Contain("CORS enabled for site 'example.com'"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Reply.IsSuccess("CORS enabled for site 'example.com'"),
                     "M586's report names the configured site (RRF Network::ConfigureNetworkProtocol)");
 
         await bench.Host.ExecuteCodeAsync("M586 C\"\"");
-        Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Does.Contain("CORS disabled"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M586"), Reply.IsSuccess("CORS disabled"),
                     "M586 C\"\" clears the CORS site (RRF Network::SetCorsSite with an empty string)");
     }
 
@@ -55,6 +55,6 @@ public class M586Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M586.4 C\"benchclient\" U\"user\" K\"pass\"");
-        Assert.That(reply.Trim(), Is.Empty, "M586.4 configures the MQTT client without a report (RRF MqttClient::Configure)");
+        Assert.That(reply, Reply.IsEmpty, "M586.4 configures the MQTT client without a report (RRF MqttClient::Configure)");
     }
 }

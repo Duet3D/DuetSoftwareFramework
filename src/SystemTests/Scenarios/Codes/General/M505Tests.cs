@@ -35,7 +35,7 @@ public class M505Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M470 P\"0:/sys2\"");
         string reply = await bench.Host.ExecuteCodeAsync("M505 P\"0:/sys2\"");
-        Assert.That(reply, Does.Not.Contain("Error"), "M505 P accepts an existing directory (RRF Platform::SetSysDir)");
+        Assert.That(reply, Reply.IsNotError, "M505 P accepts an existing directory (RRF Platform::SetSysDir)");
 
         omSys = await bench.Host.ReadModelAsync(model => model.Directories.System);
         Assert.That(omSys, Does.StartWith("0:/sys2"), "M505 P sets directories.system (RRF Platform::SetSysDir)");
@@ -62,7 +62,7 @@ public class M505Tests : BenchFixture
 
         await bench.Host.ExecuteCodeAsync("M470 P\"0:/www2\"");
         string reply = await bench.Host.ExecuteCodeAsync("M505.1 P\"0:/www2\"");
-        Assert.That(reply, Does.Not.Contain("Error"), "M505.1 P accepts an existing directory (RRF Platform::SetWebDir)");
+        Assert.That(reply, Reply.IsNotError, "M505.1 P accepts an existing directory (RRF Platform::SetWebDir)");
 
         omWeb = await bench.Host.ReadModelAsync(model => model.Directories.Web);
         Assert.That(omWeb, Does.StartWith("0:/www2"), "M505.1 P sets directories.web (RRF Platform::SetWebDir)");

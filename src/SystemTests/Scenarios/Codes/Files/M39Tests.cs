@@ -42,7 +42,7 @@ public class M39Tests : BenchFixture
                         "a mounted volume reports volumes[0].capacity in bytes (MassStorage.cpp OBJECT_MODEL capacity)");
             Assert.That(await bench.Host.ReadNumberAsync(model => model.Volumes[0].FreeSpace), Is.GreaterThan(0.0),
                         "a mounted volume reports volumes[0].freeSpace in bytes (MassStorage.cpp OBJECT_MODEL freeSpace)");
-            Assert.That(report, Does.Contain("SD card in slot 0: capacity"),
+            Assert.That(report, Reply.IsSuccess("SD card in slot 0: capacity"),
                         "M39 reports the slot and its capacity (GCodes2.cpp case 39)");
             Assert.That(info.TryGetProperty("present", out JsonElement present) ? present.GetInt32() : 0, Is.EqualTo(1),
                         "M39 S2 reports the mounted card as present (GCodes2.cpp case 39, format 2)");

@@ -85,7 +85,7 @@ public class M307Tests : BenchFixture
         await using Bench bench = await StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync("M307 H2 R2.5 K0.35:0.15 D5.5 E1.35 S1.0 B0");
-        Assert.That(reply.Trim(), Is.Empty, "setting a valid model replies nothing (regression m307-set-heater-model)");
+        Assert.That(reply, Reply.IsEmpty, "setting a valid model replies nothing (regression m307-set-heater-model)");
 
         (byte board, CanMessageHeaterModelV3 message) = bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>();
         Assert.Multiple(() =>
@@ -276,7 +276,7 @@ public class M307Tests : BenchFixture
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.Inverted, Is.EqualTo(inverted), "message inverted");
             Assert.That((await ReadHeaterModelAsync(bench)).Inverted, Is.EqualTo(inverted), "model.inverted");
             Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"),
-                        inverted ? Does.Contain("mode PID, reverse control, calibrated") : Does.Not.Contain("reverse control"),
+                        inverted ? Reply.IsSuccess("mode PID, reverse control, calibrated") : Does.Not.Contain("reverse control"),
                         "the report says reverse control when inverted (regression m307-inverse-temperature-control)");
         });
 
@@ -309,7 +309,7 @@ public class M307Tests : BenchFixture
         {
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.BasicModel.StandardVoltage,
                         Is.EqualTo(0.0).Within(1e-6), "V0 is sent");
-            Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Does.Contain("calibrated at 0.0V"), "V0 clears the voltage");
+            Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess("calibrated at 0.0V"), "V0 clears the voltage");
         });
     }
 
@@ -357,7 +357,7 @@ public class M307Tests : BenchFixture
         HeaterModel heaterModel = await ReadHeaterModelAsync(bench);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain($"bad model parameters: {reason}"), "the reason is given");
+            Assert.That(reply, Reply.IsError($"bad model parameters: {reason}"), "the reason is given");
             Assert.That(bench.CanMaster.CanMessages<CanMessageHeaterModelV3>(), Is.Empty, "nothing is sent");
             Assert.That(heaterModel.Enabled, Is.False, "the model stays disabled");
             Assert.That(heaterModel.HeatingRate, Is.EqualTo(2.43).Within(1e-4), "heatingRate is unchanged");
@@ -374,7 +374,7 @@ public class M307Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2 R0"), Does.StartWith("Error"), "R0 is refused");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2 R0"), Reply.IsError(), "R0 is refused");
         Assert.That(bench.CanMaster.CanMessages<CanMessageHeaterModelV3>(), Is.Empty, "nothing is sent");
     }
 
@@ -384,7 +384,7 @@ public class M307Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H5 B0"), Does.StartWith("Error").And.Contain("Heater 5 not found"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H5 B0"), Reply.IsError("Heater 5 not found"),
                     "an undefined heater is refused");
     }
 
@@ -402,7 +402,7 @@ public class M307Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M307 H2 R2.5 K0.35 D5.5");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("bad model parameters: PWM out of range"), "the board's refusal is the reply");
+            Assert.That(reply, Reply.IsError("bad model parameters: PWM out of range"), "the board's refusal is the reply");
             Assert.That((await ReadHeaterModelAsync(bench)).HeatingRate, Is.EqualTo(2.5).Within(1e-4), "the model was still set");
             Assert.That((await ReadHeaterModelAsync(bench)).Enabled, Is.True, "the model was still enabled");
         });
@@ -422,10 +422,10 @@ public class M307Tests : BenchFixture
         await using Bench bench = await StartAsync();
 
         await bench.Host.ExecuteCodeAsync("M143 H2 S100");
-        string reply = (await bench.Host.ExecuteCodeAsync("M307 H2 B0")).TrimEnd();
+        string reply = await bench.Host.ExecuteCodeAsync("M307 H2 B0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Warning").And.EndWith("Heater 2 predicted maximum temperature at full power is 321°C"),
+            Assert.That(reply, Reply.IsWarning("Heater 2 predicted maximum temperature at full power is 321°C"),
                         "the predicted maximum is a warning");
             Assert.That((await ReadHeaterModelAsync(bench)).Enabled, Is.True, "the model was set");
         });

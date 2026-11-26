@@ -137,7 +137,7 @@ public class M997MainBoardTests : BenchFixture
                                  .Where(request => request is SbcRequest.WriteIap or SbcRequest.StartIap)];
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
 
             Assert.That(IapSent(bench), Is.EqualTo(Iap));
             Assert.That(bench.CanMaster.SbcPackets(SbcRequest.WriteIap).Select(packet => packet.Data.Length),
@@ -243,7 +243,7 @@ public class M997MainBoardTests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync("M997 B0");
 
-        Assert.That(reply, Does.Contain(error));
+        Assert.That(reply, Reply.IsError(error));
         AssertNothingSent(bench);
     }
 
@@ -258,7 +258,7 @@ public class M997MainBoardTests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync("M997 B0");
 
-        Assert.That(reply, Does.Contain("Cannot update firmware because IAP and firmware filenames are unknown"));
+        Assert.That(reply, Reply.IsError("Cannot update firmware because IAP and firmware filenames are unknown"));
         AssertNothingSent(bench);
     }
 
@@ -272,7 +272,7 @@ public class M997MainBoardTests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync("M997 B0 S2");
 
-        Assert.That(reply, Does.Contain("S0 required to update DuetCANMaster"));
+        Assert.That(reply, Reply.IsError("S0 required to update DuetCANMaster"));
         AssertNothingSent(bench);
     }
 
@@ -289,7 +289,7 @@ public class M997MainBoardTests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(bench.CanMaster.FlashVerifications, Has.Count.EqualTo(2));
             Assert.That(bench.CanMaster.FlashedSegments.SelectMany(segment => segment),
                         Is.EqualTo(Padded(Firmware).Concat(Padded(Firmware))));

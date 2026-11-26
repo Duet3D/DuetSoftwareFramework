@@ -27,6 +27,6 @@ public class M551Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M551 P\"benchpass\"");
-        Assert.That(reply.Trim(), Is.Empty, "M551 P sets the password without a report (RRF GCodes2.cpp case 551)");
+        Assert.That(reply, Reply.IsEmpty, "M551 P sets the password without a report (RRF GCodes2.cpp case 551)");
     }
 }

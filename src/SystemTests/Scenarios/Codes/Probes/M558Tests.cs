@@ -56,7 +56,7 @@ public class M558Tests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync(
             $"M558 K0 P8 C\"{ProbePort()}\" H5:2 F600:300 T5000 R0.2 S0.05 A3 B1");
-        Assert.That(reply.Trim(), Is.Empty, "M558 was accepted");
+        Assert.That(reply, Reply.IsEmpty, "M558 was accepted");
 
         Probe? probe = await bench.Host.ReadModelAsync(model => ProbeAt(model, 0));
         Assert.That(probe, Is.Not.Null, "M558 P8 creates sensors.probes[0] (RRF EndstopsManager::HandleM558)");
@@ -85,14 +85,14 @@ public class M558Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M558 K0");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.Contain("Z Probe 0: type 8"),
+            Assert.That(report, Reply.IsSuccess("Z Probe 0: type 8"),
                         "M558 with no parameters reports the probe (RRF ZProbe::Configure report)");
-            Assert.That(report, Does.Contain("dive heights 5.0,2.0mm"), "the report includes the dive heights");
-            Assert.That(report, Does.Contain("probe speeds 600,300mm/min"), "the report includes the probing speeds in mm/min");
-            Assert.That(report, Does.Contain("travel speed 5000mm/min"), "the report includes the travel speed");
-            Assert.That(report, Does.Contain("recovery time 0.20 sec"), "the report includes the recovery time");
-            Assert.That(report, Does.Contain("heaters suspended"), "the report says B1 suspends the heaters");
-            Assert.That(report, Does.Contain("max taps 3, max diff 0.05"), "the report includes the tap limit and tolerance");
+            Assert.That(report, Reply.IsSuccess("dive heights 5.0,2.0mm"), "the report includes the dive heights");
+            Assert.That(report, Reply.IsSuccess("probe speeds 600,300mm/min"), "the report includes the probing speeds in mm/min");
+            Assert.That(report, Reply.IsSuccess("travel speed 5000mm/min"), "the report includes the travel speed");
+            Assert.That(report, Reply.IsSuccess("recovery time 0.20 sec"), "the report includes the recovery time");
+            Assert.That(report, Reply.IsSuccess("heaters suspended"), "the report says B1 suspends the heaters");
+            Assert.That(report, Reply.IsSuccess("max taps 3, max diff 0.05"), "the report includes the tap limit and tolerance");
         });
     }
 
@@ -114,7 +114,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(ProbeOfType(8))).Trim(), Is.Empty, "M558 P8 C was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync(ProbeOfType(8)), Reply.IsEmpty, "M558 P8 C was accepted");
 
         Probe probe = (await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)))!;
         Assert.Multiple(() =>
@@ -215,7 +215,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await Bench.With(Machines.Xyz).WithController(c => AnswerReadInputs(c, 0)).StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(ProbeOfType(type) + f)).Trim(), Is.Empty, "M558 was accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync(ProbeOfType(type) + f), Reply.IsEmpty, "M558 was accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)!.Speeds.ToArray()),
                     Is.EqualTo(speeds).Within(1e-3f),
                     "sensors.probes[0].speeds in mm/min, three for a scanning probe and two otherwise (RRF ZProbe::Configure, OM array 1)");
@@ -235,7 +235,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine + " H3 F300");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 {parameter}"), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 {parameter}"), Reply.IsError(),
                     "one value too many is an error (RRF StringParser::CheckArrayLength)");
 
         Probe probe = (await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)))!;
@@ -243,7 +243,7 @@ public class M558Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(probe.DiveHeights, Is.EqualTo(new[] { 3.0f, 3.0f }).Within(1e-4f), "the dive heights are unchanged");
-            Assert.That(report, Does.Contain("probe speeds 300,300mm/min"), "the probing speeds are unchanged");
+            Assert.That(report, Reply.IsSuccess("probe speeds 300,300mm/min"), "the probing speeds are unchanged");
         });
     }
 
@@ -277,7 +277,7 @@ public class M558Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync(ProbeOfType(type));
-        Assert.That(reply.Trim(), Is.Empty, $"M558 P{type} was accepted");
+        Assert.That(reply, Reply.IsEmpty, $"M558 P{type} was accepted");
 
         var creates = bench.CanMaster.CanMessages<CanMessageCreateInputMonitorV1>();
         Assert.That(creates, Has.Count.EqualTo(1), "one input monitor is created (RRF RemoteZProbe::Create)");
@@ -321,7 +321,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await Bench.With(Machines.Xyz).WithController(c => AnswerReadInputs(c, 0)).StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(ProbeOfType(11) + " F1000:200:600")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync(ProbeOfType(11) + " F1000:200:600"), Reply.IsEmpty,
                     "M558 P11 was accepted");
 
         var reads = bench.CanMaster.CanMessages<CanMessageReadInputsRequest>();
@@ -362,7 +362,7 @@ public class M558Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(ProbeLine + " H5 F600 T3000");
 
         string reply = await bench.Host.ExecuteCodeAsync($"M558 K1 P8 C\"{ProbePort(OtherProbeIo)}\" H3 F400 T2000");
-        Assert.That(reply.Trim(), Is.Empty, "M558 K1 was accepted");
+        Assert.That(reply, Reply.IsEmpty, "M558 K1 was accepted");
 
         (byte board, CanMessageCreateInputMonitorV1 sent) = bench.CanMaster.LastCanMessage<CanMessageCreateInputMonitorV1>();
         Assert.Multiple(() =>
@@ -389,10 +389,10 @@ public class M558Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ExecuteCodeAsync("M558 K1"),
-                        Does.Contain("Z Probe 1: type 8").And.Contain("dive heights 3.0,3.0mm").And.Contain("travel speed 2000mm/min"),
+                        Reply.IsSuccess("Z Probe 1: type 8", "dive heights 3.0,3.0mm", "travel speed 2000mm/min"),
                         "M558 K1 reports probe 1");
             Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0"),
-                        Does.Contain("Z Probe 0: type 8").And.Contain("dive heights 5.0,5.0mm").And.Contain("travel speed 3000mm/min"),
+                        Reply.IsSuccess("Z Probe 0: type 8", "dive heights 5.0,5.0mm", "travel speed 3000mm/min"),
                         "M558 K0 reports probe 0");
         });
     }
@@ -427,7 +427,7 @@ public class M558Tests : BenchFixture
             Assert.That(asked[0].Message.Action, Is.EqualTo(CanMessageChangeInputMonitorV1.ActionReturnPinName), "action ReturnPinName");
             Assert.That(asked[0].Message.Param, Is.Zero, "param 0");
             Assert.That(asked[0].Message.Handle.All, Is.EqualTo(RemoteProbes.HandleFor(0).All), "the probe's handle");
-            Assert.That(report, Does.Contain($", input pin {description}"), "the report quotes what the board said");
+            Assert.That(report, Reply.IsSuccess($", input pin {description}"), "the report quotes what the board said");
         });
     }
 
@@ -448,7 +448,7 @@ public class M558Tests : BenchFixture
                                              .StartAsync();
 
         string report = await bench.Host.ExecuteCodeAsync("M558 K0");
-        Assert.That(report, Does.StartWith("Error:").And.Contain(refusal),
+        Assert.That(report, Reply.IsError(refusal),
                     "the board's refusal is the reply (RRF RemoteZProbe::AppendPinNames)");
     }
 
@@ -468,10 +468,10 @@ public class M558Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(await bench.Host.ExecuteCodeAsync("M558 K1 H5"), Does.StartWith("Error:").And.Contain("not found"),
+            Assert.That(await bench.Host.ExecuteCodeAsync("M558 K1 H5"), Reply.IsError("not found"),
                         "configuring probe 1, which does not exist, is refused (RRF \"Z probe %u not found\")");
             Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 C\"{ProbePort(OtherProbeIo)}\""),
-                        Does.StartWith("Error:").And.Contain("Missing Z probe type"),
+                        Reply.IsError("Missing Z probe type"),
                         "a port without a type is refused (RRF \"Missing Z probe type number\")");
         });
 
@@ -504,7 +504,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(existingType == 0 ? "M558 K0 P0" : ProbeLine);
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0 P9"), Does.StartWith("Error:").And.Contain("pin name"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0 P9"), Reply.IsError("pin name"),
                     "a type that needs a port is refused without one (RRF \"Missing Z probe pin name(s)\")");
         Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)), Is.Null,
                     "the probe the code would have replaced is deleted (RRF EndstopsManager::HandleM558, DeleteObject)");
@@ -536,7 +536,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine + " H3");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 P{type} C\"{ProbePort(OtherProbeIo)}\""), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 P{type} C\"{ProbePort(OtherProbeIo)}\""), Reply.IsError(),
                     $"type {type} is refused (RRF EndstopsManager::HandleM558)");
 
         Probe? probe = await bench.Host.ReadModelAsync(model => ProbeAt(model, 0));
@@ -575,7 +575,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That(await bench.Host.ExecuteCodeAsync(line), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync(line), Reply.IsError(),
                     "the line is refused (RRF RemoteZProbe::Create)");
         Assert.Multiple(async () =>
         {
@@ -613,11 +613,11 @@ public class M558Tests : BenchFixture
                                              .StartAsync();
         if (replacing)
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync(ProbeLine)).Trim(), Is.Empty, "the first probe is accepted");
+            Assert.That(await bench.Host.ExecuteCodeAsync(ProbeLine), Reply.IsEmpty, "the first probe is accepted");
         }
 
         string reply = await bench.Host.ExecuteCodeAsync($"M558 K0 P8 C\"{ProbePort(OtherProbeIo)}\"");
-        Assert.That(reply, Does.StartWith("Error:").And.Contain(refusal), "the board's refusal is the reply");
+        Assert.That(reply, Reply.IsError(refusal), "the board's refusal is the reply");
         Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)), Is.Null,
                     "no probe is left in sensors.probes[0] (RRF EndstopsManager::HandleM558)");
     }
@@ -642,7 +642,7 @@ public class M558Tests : BenchFixture
                                              .StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync(ProbeLine);
-        Assert.That(reply, Does.StartWith("Warning:").And.Contain(warning), "the board's warning is the reply");
+        Assert.That(reply, Reply.IsWarning(warning), "the board's warning is the reply");
         Probe? probe = await bench.Host.ReadModelAsync(model => ProbeAt(model, 0));
         Assert.Multiple(() =>
         {
@@ -669,7 +669,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine + " H3:2 T2000 R0.5 S0.1 A4 B1\nG31 K0 P600 X5 Y-5 Z2");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M558 K0 P8 C\"{ProbePort(OtherProbeIo)}\"")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 P8 C\"{ProbePort(OtherProbeIo)}\""), Reply.IsEmpty,
                     "the redefinition is accepted");
 
         Probe probe = (await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)))!;
@@ -705,12 +705,10 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M558 K0 P8 C\"{ProbePort(ProbeIo, OtherBoard)}\"")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 P8 C\"{ProbePort(ProbeIo, OtherBoard)}\""), Reply.IsEmpty,
                     "the redefinition is accepted");
 
-        string[] sent = [.. bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage)
-                                           .Select(p => p.DecodeCanMessage().Header)
-                                           .Select(h => $"{(CanMessageType)h.MsgType}@{h.DstAddress}")];
+        string[] sent = [.. bench.CanMaster.CanMessages().Select(message => $"{message.Type}@{message.Board}")];
         Assert.That(sent, Is.EqualTo(new[] { $"{CanMessageType.ChangeInputMonitorV1}@{Machines.DriverBoard}",
                                              $"{CanMessageType.CreateInputMonitorV1}@{OtherBoard}" }),
                     "the old board is told first, then the new one (RRF ~RemoteZProbe, RemoteZProbe::Create)");
@@ -740,7 +738,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M558 K0 P0 H5 F120 T3000")).Trim(), Is.Empty, "M558 P0 is accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0 P0 H5 F120 T3000"), Reply.IsEmpty, "M558 P0 is accepted");
 
         var released = bench.CanMaster.CanMessages<CanMessageChangeInputMonitorV1>();
         Assert.Multiple(async () =>
@@ -766,7 +764,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M558 K0 P10 H5")).Trim(), Is.Empty, "M558 P10 is accepted without a port");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0 P10 H5"), Reply.IsEmpty, "M558 P10 is accepted without a port");
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)?.Type), Is.EqualTo(ProbeType.ZMotorStall),
@@ -784,7 +782,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync();
 
-        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K{RemoteProbes.MaxProbes} P8 C\"{ProbePort()}\""), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K{RemoteProbes.MaxProbes} P8 C\"{ProbePort()}\""), Reply.IsError(),
                     "K past the last probe is refused");
         Assert.Multiple(async () =>
         {
@@ -803,7 +801,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M558 K0 A40")).Trim(), Is.Empty, "A40 is accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0 A40"), Reply.IsEmpty, "A40 is accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)!.MaxProbeCount), Is.EqualTo(31),
                     "and limited to MaxTapsLimit (RRF ZProbe::Configure)");
     }
@@ -821,7 +819,7 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M558 K0 A0")).Trim(), Is.Empty, "A0 is accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0 A0"), Reply.IsEmpty, "A0 is accepted");
         Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)!.MaxProbeCount), Is.Zero,
                     "sensors.probes[0].maxProbeCount is 0 (RRF ZProbe::Configure)");
     }
@@ -837,13 +835,13 @@ public class M558Tests : BenchFixture
     {
         await using Bench bench = await StartBenchAsync(ProbeLine + (suspended ? "" : " B1"));
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M558 K0 B{b}")).Trim(), Is.Empty, $"B{b} is accepted");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 B{b}"), Reply.IsEmpty, $"B{b} is accepted");
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)!.DisablesHeaters), Is.EqualTo(suspended),
                         "sensors.probes[0].disablesHeaters (RRF ZProbe::Configure)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M558 K0"),
-                        Does.Contain(suspended ? "heaters suspended" : "heaters normal"), "and the report says so");
+                        Reply.IsSuccess(suspended ? "heaters suspended" : "heaters normal"), "and the report says so");
         });
     }
 
@@ -914,12 +912,12 @@ public class M558Tests : BenchFixture
         await using Bench bench = await StartBenchAsync();
 
         Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 P12 C\"{loadCell}\""),
-                    Does.StartWith("Error:").And.Contain("V parameter"),
+                    Reply.IsError("V parameter"),
                     "a load cell without its scale is refused (RRF ZProbe::Configure)");
         Assert.That(await bench.Host.ReadModelAsync(model => ProbeAt(model, 0)), Is.Null, "and leaves no probe");
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M558 K0 P12 C\"{loadCell}\" V0.0025 U-50:50")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 P12 C\"{loadCell}\" V0.0025 U-50:50"), Reply.IsEmpty,
                     "a load cell with its scale is accepted on an expansion board (RRF RemoteZProbe::Create)");
         Assert.Multiple(async () =>
         {
@@ -945,7 +943,7 @@ public class M558Tests : BenchFixture
         await using Bench bench = await StartBenchAsync(ProbeLine);
 
         Assert.That(await bench.Host.ExecuteCodeAsync($"M558 K0 {parameter}"),
-                    Does.StartWith("Error:").And.Contain("only valid for load cell"),
+                    Reply.IsError("only valid for load cell"),
                     "the parameter is refused (RRF ZProbe::Configure)");
     }
 }

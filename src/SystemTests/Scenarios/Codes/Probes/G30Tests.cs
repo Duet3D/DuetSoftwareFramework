@@ -215,7 +215,7 @@ public class G30Tests : BenchFixture
         StopMove(bench.CanMaster, dive);
 
         string reply = await probeTask;
-        Assert.That(reply.Trim(), Is.Empty, "G30 completed without error");
+        Assert.That(reply, Reply.IsEmpty, "G30 completed without error");
         bool homed = await bench.Host.ReadModelAsync(model => model.Move.Axes[2].Homed);
         const double diveHeight = 5.0, triggerHeight = 1.5;
         double zPosition = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].MachinePosition,
@@ -260,7 +260,7 @@ public class G30Tests : BenchFixture
         (double user, double machine) = await SettledZAsync(bench, StartHeight);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(moves, Has.Length.EqualTo(2), "the dive and the lift");
             Assert.That(moves.Select(move => move.Has(ScheduleMoveFlags.CheckEndstops)), Is.EqualTo(new[] { true, false }));
             Assert.That(ArmedOn(moves[0], 0), Is.True, "every driver of the dive stops on probe 0");
@@ -313,7 +313,7 @@ public class G30Tests : BenchFixture
         double user = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].UserPosition, StartHeight + toolZOffset);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { DiveSteps, LiftSteps }),
                         "the dive and the lift, measured in the machine's coordinates");
             Assert.That(machine, Is.EqualTo(StartHeight).Within(1e-3), "the machine's Z is the one set to the trigger height");
@@ -343,7 +343,7 @@ public class G30Tests : BenchFixture
         (double user, double machine) = await SettledZAsync(bench, expected);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("not triggered"));
+            Assert.That(reply, Reply.IsError("not triggered"));
             Assert.That(StepsOf(moves[0], ZDriver), Is.EqualTo(DiveSteps), "the dive runs to its end");
             Assert.That(machine, Is.EqualTo(expected).Within(1e-3), "Z reads where the motors put it: its datum is not touched");
             Assert.That(user, Is.EqualTo(expected).Within(1e-3));
@@ -369,11 +369,11 @@ public class G30Tests : BenchFixture
         int before = bench.CanMaster.ScheduledMoves().Count;
         int monitorsBefore = bench.CanMaster.CanMessages<CanMessageChangeInputMonitorV1>().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G30")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("G30");
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("already triggered"));
+            Assert.That(reply, Reply.IsError("already triggered"));
             Assert.That(MovesSince(bench, before), Is.Empty, "nothing moves");
             Assert.That(MonitorChanges(bench, monitorsBefore), Is.Empty, "the board is not told about a tap that does not happen");
             Assert.That(await bench.Host.GlobalAsync("deployRan"), Is.EqualTo(1), "the probe was deployed");
@@ -397,11 +397,11 @@ public class G30Tests : BenchFixture
         bench.CanMaster.ReportWith<CanMessageChangeInputMonitorV1>(boardSays, CodeResult.Error);
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G30")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("G30");
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain(boardSays), "the board's refusal fails the code");
+            Assert.That(reply, Reply.IsError(boardSays), "the board's refusal fails the code");
             Assert.That(MovesSince(bench, before), Is.Empty, "nothing moves");
             Assert.That(await bench.Host.GlobalAsync("retractRan"), Is.EqualTo(1), "the probe is retracted");
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.UserPosition), Is.EqualTo(StartHeight).Within(1e-3f));
@@ -423,11 +423,11 @@ public class G30Tests : BenchFixture
         bench.CanMaster.NeverAnswer<CanMessageChangeInputMonitorV1>();
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G30")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("G30");
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("CAN response timeout"));
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(Machines.DriverBoard, CanMessageChangeInputMonitorV1.MessageType)));
             Assert.That(MovesSince(bench, before), Is.Empty, "nothing moves");
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.UserPosition), Is.EqualTo(StartHeight).Within(1e-3f));
         });
@@ -454,7 +454,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"));
+            Assert.That(reply, Reply.IsNotError);
             Assert.That(await bench.Host.WaitForMessageAsync(MessageType.Warning, boardSays), Does.Contain(boardSays),
                         "the warning is passed on");
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.Homed), Is.True, "and the probe set Z");
@@ -484,7 +484,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That((deployedAtDive, retractedAtDive), Is.EqualTo((1, 0)), "deployed before the dive");
             Assert.That(await bench.Host.GlobalAsync("deployRan"), Is.EqualTo(1), "once");
             Assert.That(await bench.Host.GlobalAsync("retractRan"), Is.EqualTo(1), "and retracted once afterwards");
@@ -508,7 +508,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(Dives(bench, before), Has.Length.EqualTo(2), "the second tap agrees with the first");
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.Homed), Is.True);
         });
@@ -583,7 +583,7 @@ public class G30Tests : BenchFixture
         (double user, double machine) = await SettledZAsync(bench, StartHeight);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(user, Is.EqualTo(StartHeight).Within(1e-3), "the stop reads as the trigger height, H or not");
             Assert.That(machine, Is.EqualTo(StartHeight).Within(1e-3));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight), Is.EqualTo(Bed - h).Within(1e-3f),
@@ -617,7 +617,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, expected);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(Dives(bench, before), Has.Length.EqualTo(2), "the two readings agree within the tolerance");
             Assert.That(user, Is.EqualTo(expected).Within(1e-3), "the mean of the errors 0 and -H is taken off Z");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight), Is.EqualTo(TriggerHeight - h).Within(1e-3f),
@@ -643,7 +643,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, DiveTarget);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("not triggered"));
+            Assert.That(reply, Reply.IsError("not triggered"));
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { DiveSteps }), "the dive alone");
             Assert.That(user, Is.EqualTo(DiveTarget).Within(1e-3));
         });
@@ -676,7 +676,7 @@ public class G30Tests : BenchFixture
             Assert.That(reply, Is.EqualTo(Invariant($"Z probe trigger height set to {Bed:F3} mm")));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TriggerHeight), Is.EqualTo(Bed).Within(1e-3f),
                         "sensors.probes[0].triggerHeight");
-            Assert.That(report, Does.Contain(Invariant($"trigger height {Bed:F3}")), "G31 reports it");
+            Assert.That(report, Reply.IsSuccess(Invariant($"trigger height {Bed:F3}")), "G31 reports it");
             Assert.That(user, Is.EqualTo(expected).Within(1e-3), "Z keeps its datum: it reads the stopped height plus whatever moved it since");
         });
     }
@@ -700,7 +700,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("not triggered"));
+            Assert.That(reply, Reply.IsError("not triggered"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TriggerHeight), Is.EqualTo(TriggerHeight).Within(1e-3f));
         });
     }
@@ -717,11 +717,11 @@ public class G30Tests : BenchFixture
         int before = bench.CanMaster.ScheduledMoves().Count;
         int monitorsBefore = bench.CanMaster.CanMessages<CanMessageChangeInputMonitorV1>().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G30 S-2")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("G30 S-2");
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(MovesSince(bench, before), Is.Empty);
             Assert.That(MonitorChanges(bench, monitorsBefore), Is.Empty);
             Assert.That(await bench.Host.GlobalAsync("deployRan"), Is.Zero, "the probe is not deployed");
@@ -770,11 +770,11 @@ public class G30Tests : BenchFixture
         await using Bench bench = await StartHomedAsync();
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(MovesSince(bench, before), Is.Empty);
         });
     }
@@ -788,11 +788,11 @@ public class G30Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G92 X0 Y0 Z0");
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G30")).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("G30");
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(MovesSince(bench, before), Is.Empty);
         });
     }
@@ -810,11 +810,11 @@ public class G30Tests : BenchFixture
         await using Bench bench = await StartHomedAsync();
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync(code)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync(code);
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(MovesSince(bench, before), Is.Empty);
         });
     }
@@ -843,7 +843,7 @@ public class G30Tests : BenchFixture
         ScheduledMove[] moves = MovesSince(bench, before);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("not triggered"));
+            Assert.That(reply, Reply.IsError("not triggered"));
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { DiveSteps, (int)(lift * ZStepsPerMm) }),
                         "the dive, then the macro's relative lift measured from where the dive ended");
         });
@@ -871,11 +871,11 @@ public class G30Tests : BenchFixture
         }
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string reply = (await bench.Host.ExecuteCodeAsync("G30", timeoutMs: 60_000)).Trim();
+        string reply = await bench.Host.ExecuteCodeAsync("G30", timeoutMs: 60_000);
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("homed").IgnoreCase);
+            Assert.That(reply, Reply.IsError("homed"));
             Assert.That(MovesSince(bench, before), Is.Empty);
             Assert.That(await bench.Host.GlobalAsync("deployRan"), Is.Zero);
         });
@@ -906,7 +906,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, StartHeight);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)),
                         Is.EqualTo(new[] { (int)(-1.1f * (Machines.ZMax - ZMin) * ZStepsPerMm), LiftSteps }),
                         "the dive from where Z is, the length of a homing move, and the lift");
@@ -937,7 +937,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, StartHeight);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("not triggered"));
+            Assert.That(reply, Reply.IsError("not triggered"));
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { DiveSteps, -DiveSteps }), "the dive and the lift");
             Assert.That(user, Is.EqualTo(StartHeight).Within(1e-3));
         });
@@ -970,7 +970,7 @@ public class G30Tests : BenchFixture
         double machine = await bench.Host.SettledNumberAsync(model => model.Move.Axes[2].MachinePosition, Bed);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error"));
+            Assert.That(reply, Reply.IsNotError);
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { DiveSteps }), "one dive and no lift");
             Assert.That(machine, Is.EqualTo(Bed).Within(1e-3), "the head stays where the probe stopped");
         });
@@ -1003,7 +1003,7 @@ public class G30Tests : BenchFixture
             model => (model.Tools[0]!.Offsets[2], model.Tools[0]!.OffsetsProbed, model.Move.Axes[2].UserPosition, model.Move.Axes[2].MachinePosition));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(after.Offset, Is.EqualTo(offset).Within(1e-3f), "tools[0].offsets[2] is minus the height error");
             Assert.That(after.Probed, Is.EqualTo(1 << 2), "tools[0].offsetsProbed has Z's bit");
             Assert.That(after.User - after.Machine, Is.EqualTo(offset).Within(1e-3f), "the user position takes the new offset");
@@ -1033,7 +1033,7 @@ public class G30Tests : BenchFixture
         (float Offset, int Probed) after = await bench.Host.ReadModelAsync(model => (model.Tools[0]!.Offsets[2], model.Tools[0]!.OffsetsProbed));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("not triggered"));
+            Assert.That(reply, Reply.IsError("not triggered"));
             Assert.That(Dives(bench, before), Has.Length.EqualTo(1), "the probe dived once");
             Assert.That(after.Offset, Is.EqualTo(toolZOffset).Within(1e-4f), "tools[0].offsets[2] is unchanged");
             Assert.That(after.Probed, Is.Zero, "tools[0].offsetsProbed is unchanged");
@@ -1076,7 +1076,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(await bench.Host.GlobalAsync("deployRan"), Is.EqualTo(1));
             Assert.That(await bench.Host.GlobalAsync("retractRan"), Is.EqualTo(1));
         });
@@ -1099,7 +1099,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(await bench.Host.GlobalAsync("deployRan"), Is.EqualTo(1), "only M401 deployed it");
             Assert.That(await bench.Host.GlobalAsync("retractRan"), Is.Zero, "and G30 did not retract it");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.DeployedByUser), Is.True);
@@ -1134,7 +1134,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(await bench.Host.GlobalAsync("macroLog"), Is.EqualTo(expected));
         });
     }
@@ -1164,7 +1164,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, StartHeight);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)), Is.EqualTo(new[] { DiveSteps, LiftSteps, DiveSteps, LiftSteps }));
             Assert.That(moves.Select(move => move.Has(ScheduleMoveFlags.CheckEndstops)), Is.EqualTo(new[] { true, false, true, false }));
             Assert.That(user, Is.EqualTo(StartHeight).Within(1e-3));
@@ -1180,7 +1180,7 @@ public class G30Tests : BenchFixture
     /// <remarks>
     /// RRF truth: CheckIfMoreTapsNeeded, once M558 A taps have been made, takes
     /// <c>g30zHeightErrorSum / tapsDone</c> and sets "Z probe readings not consistent" as the code's
-    /// error (its comment says it issues a warning; the message type is not asserted). The first tap's
+    /// error (its comment calls it a warning, but SetError makes the reply an error). The first tap's
     /// error is zero, since it set the datum, so the mean is of both readings: 4.0 and 4.5 here, so Z
     /// reads 0.25 below where the second tap's lift took it. DSF says nothing and lifts from the last tap
     /// by its second dive height
@@ -1203,7 +1203,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, StartHeight - meanError);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain("Z probe readings not consistent"));
+            Assert.That(reply, Reply.IsError("Z probe readings not consistent"));
             Assert.That(moves.Select(move => StepsOf(move, ZDriver)),
                         Is.EqualTo(new[] { DiveSteps, LiftSteps, DiveSteps, (int)MathF.Round((StartHeight - secondStop) * ZStepsPerMm) }),
                         "each tap lifts to the start height of the datum the first one set");
@@ -1237,7 +1237,7 @@ public class G30Tests : BenchFixture
         ScheduledMove[] dives = Dives(bench, before);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(dives.Select(dive => MoveCapture.MmPerSecond(dive.Header.TopSpeed)),
                         Is.EqualTo(new[] { fast / 60.0f, slow / 60.0f }).Within(0.01f), "a fast tap, then a slow one");
         });
@@ -1274,7 +1274,7 @@ public class G30Tests : BenchFixture
         const float error0 = Bed - TriggerHeight, error1 = secondBed - TriggerHeight;
         Assert.Multiple(async () =>
         {
-            Assert.That(first, Is.Empty);
+            Assert.That(first, Reply.IsEmpty);
             Assert.That(second, Is.EqualTo(Invariant($"G32 bed probe heights: {error0:F3} {error1:F3}, mean {(error0 + error1) / 2:F3}, deviation from mean {(error1 - error0) / 2:F3}")));
             Assert.That(moves.Select(move => (StepsOf(move, Machines.XDriver), StepsOf(move, Machines.YDriver), StepsOf(move, ZDriver))),
                         Is.EqualTo(new[]
@@ -1307,13 +1307,13 @@ public class G30Tests : BenchFixture
         await using Bench bench = await StartHomedAsync();
         int before = bench.CanMaster.ScheduledMoves().Count;
 
-        string first = (await bench.Host.ExecuteCodeAsync("G30 P0 X10 Y20 Z0.3")).Trim();
+        string first = await bench.Host.ExecuteCodeAsync("G30 P0 X10 Y20 Z0.3");
         string report = (await bench.Host.ExecuteCodeAsync("G30 P1 X30 Y40 Z-0.2 S-1")).Trim();
         string afterClearing = (await bench.Host.ExecuteCodeAsync("G30 P0 X10 Y20 Z0.1 S-1")).Trim();
 
         Assert.Multiple(() =>
         {
-            Assert.That(first, Is.Empty);
+            Assert.That(first, Reply.IsEmpty);
             Assert.That(report, Is.EqualTo("G32 bed probe heights: 0.300 -0.200, mean 0.050, deviation from mean 0.250"));
             Assert.That(afterClearing, Is.EqualTo("G32 bed probe heights: 0.100, mean 0.100, deviation from mean 0.000"),
                         "the report cleared the heights it reported");
@@ -1337,13 +1337,13 @@ public class G30Tests : BenchFixture
     {
         await using Bench bench = await StartHomedAsync();
 
-        string first = (await bench.Host.ExecuteCodeAsync("G30 P0 X10 Y20 Z0.3")).Trim();
-        string calibrate = (await bench.Host.ExecuteCodeAsync($"G30 P1 X30 Y40 Z-0.2 S{s}")).Trim();
+        string first = await bench.Host.ExecuteCodeAsync("G30 P0 X10 Y20 Z0.3");
+        string calibrate = await bench.Host.ExecuteCodeAsync($"G30 P1 X30 Y40 Z-0.2 S{s}");
 
         Assert.Multiple(() =>
         {
-            Assert.That(first, Is.Empty);
-            Assert.That(calibrate, Does.StartWith("Error").And.Contain(reason));
+            Assert.That(first, Reply.IsEmpty);
+            Assert.That(calibrate, Reply.IsError(reason));
         });
     }
 
@@ -1372,11 +1372,11 @@ public class G30Tests : BenchFixture
         Assert.That(box!.Title, Is.EqualTo("Manual bed probing"));
 
         await bench.Host.ExecuteCodeAsync("M292", DuetAPI.CodeChannel.SBC);
-        string reply = (await code).Trim();
+        string reply = await code;
         (double user, _) = await SettledZAsync(bench, StartHeight);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight), Is.EqualTo(StartHeight).Within(1e-3f),
                         "the confirmed height is where the probe stopped");
             Assert.That(user, Is.EqualTo(StartHeight).Within(1e-3), "Z set to the trigger height there, and lifted by the dive height");

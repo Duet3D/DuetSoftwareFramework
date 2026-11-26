@@ -28,7 +28,7 @@ public class M118Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M118 S\"M118 bench message\"");
-        Assert.That(reply, Does.Contain("M118 bench message"),
+        Assert.That(reply, Reply.IsSuccess("M118 bench message"),
                     "M118 S sends the message to the requesting channel (RRF GCodes2.cpp case 118, platform.Message with GenericMessage)");
     }
 }

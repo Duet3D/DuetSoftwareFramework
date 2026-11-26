@@ -35,13 +35,13 @@ public class M0M1M2Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ExecuteCodeAsync("M0"),
-                        Does.Contain("Pause the print before attempting to cancel it"),
+                        Reply.IsError("Pause the print before attempting to cancel it"),
                         "M0 with no paused print is refused (GCodes2.cpp case 0)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M1"),
-                        Does.Contain("Pause the print before attempting to cancel it"),
+                        Reply.IsError("Pause the print before attempting to cancel it"),
                         "M1 with no paused print is refused (GCodes2.cpp case 1)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M2"),
-                        Does.Contain("Pause the print before attempting to cancel it"),
+                        Reply.IsError("Pause the print before attempting to cancel it"),
                         "M2 with no paused print is refused (GCodes2.cpp case 2)");
         });
 

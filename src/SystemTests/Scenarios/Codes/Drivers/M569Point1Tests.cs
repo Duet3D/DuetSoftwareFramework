@@ -38,9 +38,9 @@ public class M569Point1Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         const byte board = DriversRig.ClosedLoopBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync(
-                        $"M569.1 P{Expansion.Driver(board, 0)} T2 C1000 S200 R80 I0.05 D0.02 V500 A100 Q0.75 E1.5:3.0 B0.5")).Trim(),
-                    Is.Empty, "the board took the configuration");
+        Assert.That(await bench.Host.ExecuteCodeAsync(
+                        $"M569.1 P{Expansion.Driver(board, 0)} T2 C1000 S200 R80 I0.05 D0.02 V500 A100 Q0.75 E1.5:3.0 B0.5"),
+                    Reply.IsEmpty, "the board took the configuration");
 
         (byte sentTo, CanMessageM569Point1 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point1>();
         Assert.Multiple(() =>
@@ -212,7 +212,7 @@ public class M569Point1Tests : BenchFixture
         DriverClosedLoopConfig config = await bench.Host.ReadModelAsync(model => model.FindBoard(DriversRig.ClosedLoopBoard)!.Drivers![0].Config.ClosedLoop);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569.1: {refusal}"));
+            Assert.That(reply, Reply.IsError(refusal));
             Assert.That(config.EncoderType, Is.EqualTo(EncoderType.None), "nothing the board refused is recorded");
             Assert.That(config.CountsPerRev, Is.Null);
             Assert.That(config.TorqueConstant, Is.Null);
@@ -235,7 +235,7 @@ public class M569Point1Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M569.1 P{DriversRig.MainDriver(0)} T2 C1000 S200");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.1: Command is not supported"));
+            Assert.That(reply, Reply.IsError(CodeErrors.NotSupported));
             Assert.That(await bench.Host.ReadModelAsync(model => model.FindBoard(DriversRig.MainDriverBoard)!.Drivers![0].Config.ClosedLoop.EncoderType),
                         Is.EqualTo(EncoderType.None));
         });
@@ -253,7 +253,7 @@ public class M569Point1Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M569.1 T2");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.1: missing parameter 'P'"));
+            Assert.That(reply, Reply.IsError(CodeErrors.MissingParameter('P')));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point1>(), Is.Empty);
         });
     }

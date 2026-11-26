@@ -44,7 +44,7 @@ public class M374Tests : BenchFixture
                         "a saved map carries RRF's v2 label line (GridDefinition::WriteHeadingAndParameters)");
             Assert.That(savedLines[2], Does.StartWith("X,Y,20.00,180.00,20.00,180.00,"),
                         "the saved grid parameters match the loaded grid");
-            Assert.That(saveReply, Does.Contain("Height map saved to file"),
+            Assert.That(saveReply, Reply.IsSuccess("Height map saved to file"),
                         "M374 reports the save in RRF's wording (GCodes::TrySaveHeightMap)");
         });
     }

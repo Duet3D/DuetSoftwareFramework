@@ -85,7 +85,7 @@ public class M24M27Tests : BenchFixture
             Assert.That(await bench.Host.SettledNumberAsync(model => model.Job.LastDuration), Is.GreaterThanOrEqualTo(0),
                         "job.lastDuration holds what the finished job took, in seconds (PrintMonitor.cpp lastDuration)");
             Assert.That(await bench.Host.ExecuteCodeAsync("M27", timeoutMs: ReportTimeoutMs),
-                        Does.Contain("Not SD printing."),
+                        Reply.IsSuccess("Not SD printing."),
                         "M27 reports no print once the job has stopped (GCodes2.cpp case 27)");
         });
     }

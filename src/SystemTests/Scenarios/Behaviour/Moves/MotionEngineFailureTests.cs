@@ -26,7 +26,7 @@ public class MotionEngineFailureTests : BenchFixture
 
         string reply = await bench.Host.ExecuteCodeAsync(code);
 
-        Assert.That(reply, Does.StartWith("Error: ").And.Contain("Move could not be planned"));
+        Assert.That(reply, Reply.IsError("Move could not be planned"));
     }
 
     [Test]
@@ -39,6 +39,6 @@ public class MotionEngineFailureTests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G1 X10 F6000");
         string reply = await bench.Host.ExecuteCodeAsync("M400");
 
-        Assert.That(reply, Does.Not.StartWith("Error: "));
+        Assert.That(reply, Reply.IsNotError);
     }
 }

@@ -36,12 +36,6 @@ public class M584Tests : BenchFixture
     /// <summary>M584s that create U and then fail on P, out of range or with no value</summary>
     private static readonly string[] CreatingUThenFailing = [$"M584 U{Expansion.Driver(Machines.DriverBoard, UDriver)} P9", $"M584 U{Expansion.Driver(Machines.DriverBoard, UDriver)} P"];
 
-    /// <summary>Every CAN message the machine has sent since the capture was last cleared, as the board and the type</summary>
-    private static (byte Board, CanMessageType Type)[] SentCanMessages(Bench bench)
-        => [.. bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage)
-                              .Select(packet => packet.DecodeCanMessage().Header)
-                              .Select(header => (header.DstAddress, (CanMessageType)header.MsgType))];
-
     /// <summary>Steps per mm and microstepping of every driver a steps per mm request carries, in the order the board reads them</summary>
     private static (float StepsPerMm, ushort Microstepping)[] Values(CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping message)
         => [.. Enumerable.Range(0, System.Numerics.BitOperations.PopCount(message.DriversToUpdate))
@@ -67,9 +61,9 @@ public class M584Tests : BenchFixture
         float yStepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Axes[1].StepsPerMm);
         float zStepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Axes[2].StepsPerMm);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} Y{DriversRig.MainDriver(4)} Z{DriversRig.MainDriver(5)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} Y{DriversRig.MainDriver(4)} Z{DriversRig.MainDriver(5)}"), Reply.IsEmpty);
 
-        Assert.That(SentCanMessages(bench), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }),
+        Assert.That(bench.CanMaster.CanMessages().Select(message => (message.Board, message.Type)), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }),
                     "one request for the board the drivers are on, and no step mode reset because no drive was phase stepping");
         (byte board, CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping sent) =
             bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>();
@@ -104,8 +98,8 @@ public class M584Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         float eStepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].StepsPerMm);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.MainDriver(3)}")).Trim(), Is.Empty);
-        Assert.That(SentCanMessages(bench), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.MainDriver(3)}"), Reply.IsEmpty);
+        Assert.That(bench.CanMaster.CanMessages().Select(message => (message.Board, message.Type)), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }));
         CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping sent = bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>().Message;
         Assert.Multiple(async () =>
         {
@@ -116,7 +110,7 @@ public class M584Tests : BenchFixture
         });
 
         bench.CanMaster.ClearCapture();
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)}"), Reply.IsEmpty);
         sent = bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>().Message;
         Assert.Multiple(async () =>
         {
@@ -129,7 +123,7 @@ public class M584Tests : BenchFixture
             Assert.That(Values(sent), Is.EqualTo(new[] { (eStepsPerMm, X16Interpolated), (Extruder.DefaultStepsPerMm, X16Interpolated) }));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.MainDriver(4)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 E{DriversRig.MainDriver(4)}"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders.Select(extruder => extruder.Driver).ToArray()),
                     Is.EqualTo(new[] { new DriverId(DriversRig.MainDriverBoard, 4) }),
                     "and a shorter list drops the extruders it no longer names");
@@ -152,18 +146,18 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970 X1 E1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970 X1 E1"), Reply.IsEmpty);
         bench.CanMaster.ClearCapture();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} Y{DriversRig.MainDriver(4)} E{DriversRig.MainDriver(5)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} Y{DriversRig.MainDriver(4)} E{DriversRig.MainDriver(5)}"), Reply.IsEmpty);
 
-        Assert.That(SentCanMessages(bench), Is.EquivalentTo(new[]
+        Assert.That(bench.CanMaster.CanMessages().Select(message => (message.Board, message.Type)), Is.EquivalentTo(new[]
                     {
                         (DriversRig.MainDriverBoard, CanMessageType.M970),
                         (DriversRig.ClosedLoopBoard, CanMessageType.M970),
                         (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
                     }));
-        Assert.That(SentCanMessages(bench)[^1].Type, Is.EqualTo(CanMessageType.SetStepsPerMmAndMicrostepping),
+        Assert.That(bench.CanMaster.CanMessages()[^1].Type, Is.EqualTo(CanMessageType.SetStepsPerMmAndMicrostepping),
                     "the resets come before the new drivers are told their settings");
         Assert.That(bench.CanMaster.CanMessages<CanMessageM970>().Select(message => (message.Board, message.Message.P, message.Message.S)),
                     Is.EquivalentTo(new[]
@@ -196,17 +190,16 @@ public class M584Tests : BenchFixture
     public async Task M584ReportsAStepModeResetThatWentUnanswered()
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970 X1 Y1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970 X1 Y1"), Reply.IsEmpty);
         bench.CanMaster.NeverAnswer<CanMessageM970>();
         bench.CanMaster.ClearCapture();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} Y{DriversRig.MainDriver(4)}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
-            Assert.That(reply.TrimEnd().Split('\n'), Has.Length.EqualTo(2),
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(DriversRig.MainDriverBoard, CanMessageType.M970)));
+            Assert.That(Reply.Lines(reply), Has.Length.EqualTo(2),
                         "one timeout line per drive, because a drive stops at the first driver that did not answer");
-            Assert.That(reply, Does.Contain($"CAN response timeout: board {DriversRig.MainDriverBoard}, req type {(int)CanMessageType.M970}"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Drivers[0]),
                         Is.EqualTo(new DriverId(DriversRig.MainDriverBoard, 3)), "the mapping stands");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[1].Drivers[0]),
@@ -262,7 +255,7 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584 P2")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584 P2"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Visible).ToArray()),
@@ -272,13 +265,13 @@ public class M584Tests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints.Select(point => point.Coords.Count).ToArray()),
                         Is.EqualTo(Enumerable.Repeat(2, DuetControlServer.Motion.RestorePoint.NumVisible)),
                         "each restore point holds the two visible axes");
-            Assert.That(SentCanMessages(bench), Is.Empty, "hiding an axis is nothing the boards need to know");
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "hiding an axis is nothing the boards need to know");
         });
 
         Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
                     Is.EqualTo($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} E{DriversRig.ClosedLoopDriver(0)}, 2 axes visible"));
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584 P3")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584 P3"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints.Select(point => point.Coords.Count).ToArray()),
                     Is.EqualTo(Enumerable.Repeat(3, DuetControlServer.Motion.RestorePoint.NumVisible)),
                     "and showing Z again puts it back");
@@ -299,7 +292,7 @@ public class M584Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M584 P{visible}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("Invalid number of visible axes"));
+            Assert.That(reply, Reply.IsError("Invalid number of visible axes"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Visible).ToArray()),
                         Is.EqualTo(new[] { true, true, false }), "the axes that were visible still are");
         });
@@ -323,7 +316,7 @@ public class M584Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} U{DriversRig.MainDriver(4)} P9");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("Invalid number of visible axes"));
+            Assert.That(reply, Reply.IsError("Invalid number of visible axes"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => (axis.Letter, axis.Drivers.Single())).ToArray()),
                         Is.EqualTo(new[]
                         {
@@ -356,7 +349,7 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 U{DriversRig.MainDriver(3)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 U{DriversRig.MainDriver(3)}"), Reply.IsEmpty);
         Axis created = await bench.Host.ReadModelAsync(model => model.Move.Axes[3]);
         Assert.Multiple(() =>
         {
@@ -400,7 +393,7 @@ public class M584Tests : BenchFixture
                         "and a coordinate for U in every restore point");
         });
 
-        Assert.That(SentCanMessages(bench), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }),
+        Assert.That(bench.CanMaster.CanMessages().Select(message => (message.Board, message.Type)), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }),
                     "the new driver is told its steps per mm and microstepping, and nothing else");
         CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping sent = bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>().Message;
         Assert.That((sent.DriversToUpdate, Values(sent)), Is.EqualTo(((ushort)0b1000, new[] { (80.0f, X16Interpolated) })));
@@ -430,7 +423,7 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 {letter}{DriversRig.MainDriver(3)}{flags}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 {letter}{DriversRig.MainDriver(3)}{flags}"), Reply.IsEmpty);
         Axis created = await bench.Host.ReadModelAsync(model => model.Move.Axes[3]);
         Assert.Multiple(async () =>
         {
@@ -452,7 +445,7 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} U{DriversRig.MainDriver(4)} V{DriversRig.MainDriver(5)} R1 S1")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} U{DriversRig.MainDriver(4)} V{DriversRig.MainDriver(5)} R1 S1"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => (axis.Letter, axis.Rotational, axis.ContinuousRotation)).ToArray()),
                     Is.EqualTo(new[] { ('X', false, false), ('Y', false, false), ('Z', false, false), ('U', true, true), ('V', true, true) }));
     }
@@ -473,12 +466,12 @@ public class M584Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} U{DriversRig.MainDriver(4)} {flag}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Letter).ToArray()),
                         Is.EqualTo(new[] { 'X', 'Y', 'Z' }), "no axis is created");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Drivers[0]),
                         Is.EqualTo(new DriverId(DriversRig.MainDriverBoard, 0)), "and X keeps its driver");
-            Assert.That(SentCanMessages(bench), Is.Empty);
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty);
         });
     }
 
@@ -494,7 +487,7 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 C{DriversRig.MainDriver(3)} U{DriversRig.MainDriver(4)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 C{DriversRig.MainDriver(3)} U{DriversRig.MainDriver(4)}"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Letter).ToArray()),
                     Is.EqualTo(new[] { 'X', 'Y', 'Z', 'U', 'C' }));
     }
@@ -509,11 +502,11 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M584 P2");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 U{DriversRig.MainDriver(3)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 U{DriversRig.MainDriver(3)}"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Visible).ToArray()),
                     Is.EqualTo(new[] { true, true, true, true }));
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 V{DriversRig.MainDriver(4)} P3")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 V{DriversRig.MainDriver(4)} P3"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Visible).ToArray()),
                     Is.EqualTo(new[] { true, true, true, false, false }),
                     "unless the same code says how many are visible");
@@ -584,7 +577,7 @@ public class M584Tests : BenchFixture
         float stepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Axes[3].StepsPerMm);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: "), "the code fails");
+            Assert.That(reply, Reply.IsError(), "the code fails");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[3].Letter), Is.EqualTo('U'),
                         "but the axis it created stays");
         });
@@ -613,11 +606,11 @@ public class M584Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
         float zStepsPerMm = await bench.Host.ReadModelAsync(model => model.Move.Axes[2].StepsPerMm);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 Z{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 Z{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)}"), Reply.IsEmpty);
 
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[2].Drivers.ToArray()),
                     Is.EqualTo(new[] { new DriverId(DriversRig.MainDriverBoard, 3), new DriverId(DriversRig.MainDriverBoard, 4) }));
-        Assert.That(SentCanMessages(bench), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }));
+        Assert.That(bench.CanMaster.CanMessages().Select(message => (message.Board, message.Type)), Is.EqualTo(new[] { (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping) }));
         CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping steps = bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>().Message;
         Assert.That((steps.DriversToUpdate, Values(steps)),
                     Is.EqualTo(((ushort)0b11000, new[] { (zStepsPerMm, X16Interpolated), (zStepsPerMm, X16Interpolated) })),
@@ -656,12 +649,12 @@ public class M584Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} {letter}{drivers}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Count), Is.EqualTo(3));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders.Count), Is.EqualTo(1));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Drivers[0]),
                         Is.EqualTo(new DriverId(DriversRig.MainDriverBoard, 0)));
-            Assert.That(SentCanMessages(bench), Is.Empty);
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty);
         });
     }
 
@@ -687,7 +680,7 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 'A{DriversRig.MainDriver(3)} 'G{DriversRig.MainDriver(4)} 'm{DriversRig.MainDriver(5)}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 'A{DriversRig.MainDriver(3)} 'G{DriversRig.MainDriver(4)} 'm{DriversRig.MainDriver(5)}"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Letter).ToArray()),
@@ -716,30 +709,30 @@ public class M584Tests : BenchFixture
         const int maxAxes = 30, maxDrives = 32;
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584 " + MapLetters(Axis.Letters.Skip(3).Take(maxAxes - 3)))).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584 " + MapLetters(Axis.Letters.Skip(3).Take(maxAxes - 3))), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Count), Is.EqualTo(maxAxes));
 
         bench.CanMaster.ClearCapture();
         string reply = await bench.Host.ExecuteCodeAsync($"M584 X{DriversRig.MainDriver(3)} {MapLetters(Axis.Letters.Skip(maxAxes).Take(1))}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("Too many axes"));
+            Assert.That(reply, Reply.IsError("Too many axes"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Count), Is.EqualTo(maxAxes), "no axis is created");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Drivers[0]),
                         Is.EqualTo(new DriverId(DriversRig.MainDriverBoard, 0)), "and X keeps its driver");
-            Assert.That(SentCanMessages(bench), Is.Empty);
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty);
         });
 
         string extruders = string.Join(':', Enumerable.Range(0, maxDrives - maxAxes + 1).Select(i => Expansion.Driver(OtherBoard, i)));
         reply = await bench.Host.ExecuteCodeAsync($"M584 E{extruders}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain("Too many axes and extruders"));
+            Assert.That(reply, Reply.IsError("Too many axes and extruders"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders.Count), Is.EqualTo(1), "the extruders are as they were");
         });
 
         extruders = string.Join(':', Enumerable.Range(0, maxDrives - maxAxes).Select(i => Expansion.Driver(OtherBoard, i)));
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M584 E{extruders}")).Trim(), Is.Empty, "and as many as there are drives left is fine");
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M584 E{extruders}"), Reply.IsEmpty, "and as many as there are drives left is fine");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders.Count), Is.EqualTo(maxDrives - maxAxes));
     }
 
@@ -766,11 +759,11 @@ public class M584Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M584 " + string.Format(mapping, missing, Expansion.Driver(AnnouncedBoard, 0)));
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain($"Driver {missing} does not exist"));
+            Assert.That(reply, Reply.IsError($"Driver {missing} does not exist"));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Count), Is.EqualTo(3), "no axis is created");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders.Select(extruder => extruder.Driver).ToArray()),
                         Is.EqualTo(new[] { new DriverId(DriversRig.ClosedLoopBoard, 0) }), "and the extruder keeps its driver");
-            Assert.That(SentCanMessages(bench), Is.Empty);
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty);
         });
     }
 
@@ -805,9 +798,8 @@ public class M584Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M584 U{DriversRig.MainDriver(3)} V{Expansion.Driver(AbsentBoard, 0)} W{DriversRig.MainDriver(4)} A{Expansion.Driver(OtherBoard, 0)}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
-            Assert.That(reply.TrimEnd().Split('\n'), Has.Length.EqualTo(1), "one board did not answer one request");
-            Assert.That(reply, Does.Contain($"board {AbsentBoard}, req type {(int)CanMessageType.SetStepsPerMmAndMicrostepping}"));
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(AbsentBoard, CanMessageType.SetStepsPerMmAndMicrostepping)));
+            Assert.That(Reply.Lines(reply), Has.Length.EqualTo(1), "one board did not answer one request");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Skip(3).Select(axis => (axis.Letter, axis.Drivers.Single())).ToArray()),
                         Is.EqualTo(new[]
                         {
@@ -816,7 +808,7 @@ public class M584Tests : BenchFixture
                             ('W', new DriverId(DriversRig.MainDriverBoard, 4)),
                             ('A', new DriverId(OtherBoard, 0)),
                         }), "every axis is created and mapped, the one behind the absent board included");
-            Assert.That(SentCanMessages(bench), Is.EquivalentTo(new[]
+            Assert.That(bench.CanMaster.CanMessages().Select(message => (message.Board, message.Type)), Is.EquivalentTo(new[]
                         {
                             (DriversRig.MainDriverBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
                             (OtherBoard, CanMessageType.SetStepsPerMmAndMicrostepping),
@@ -832,8 +824,8 @@ public class M584Tests : BenchFixture
         reply = await bench.Host.ExecuteCodeAsync($"M92 U{stepsPerMm} V{stepsPerMm} W{stepsPerMm} A{stepsPerMm}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error").And.Contain($"board {AbsentBoard}, req type {(int)CanMessageType.SetStepsPerMmAndMicrostepping}"));
-            Assert.That(SentCanMessages(bench).Select(message => message.Board), Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, OtherBoard, AbsentBoard }),
+            Assert.That(reply, Reply.IsError(CodeErrors.CanResponseTimeout(AbsentBoard, CanMessageType.SetStepsPerMmAndMicrostepping)));
+            Assert.That(bench.CanMaster.CanMessages().Select(message => message.Board), Is.EquivalentTo(new[] { DriversRig.MainDriverBoard, OtherBoard, AbsentBoard }),
                         "the new axes are usable: M92 reaches every one of them");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Skip(3).Select(axis => axis.StepsPerMm).ToArray()),
                         Is.EqualTo(Enumerable.Repeat(stepsPerMm, 4)));
@@ -855,14 +847,14 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(Machines.Xye);
 
-        string report = (await bench.Host.ExecuteCodeAsync("M584")).Trim();
+        string report = await bench.Host.ExecuteCodeAsync("M584");
         Assert.Multiple(() =>
         {
             Assert.That(report, Does.StartWith("Driver assignments:"),
                         "bare M584 reports the driver assignments (RRF GCodes3.cpp DoDriveMapping report branch)");
-            Assert.That(report, Does.Contain($"X{Expansion.Driver(Machines.DriverBoard, Machines.XDriver)}")
-                                    .And.Contain($"Y{Expansion.Driver(Machines.DriverBoard, Machines.YDriver)}")
-                                    .And.Contain($"E{Expansion.Driver(Machines.DriverBoard, Machines.EDriver)}"),
+            Assert.That(report, Reply.IsSuccess($"X{Expansion.Driver(Machines.DriverBoard, Machines.XDriver)}",
+                                                 $"Y{Expansion.Driver(Machines.DriverBoard, Machines.YDriver)}",
+                                                 $"E{Expansion.Driver(Machines.DriverBoard, Machines.EDriver)}"),
                         "the bare M584 report names the drivers the object model holds for X, Y and E");
         });
 
@@ -885,7 +877,7 @@ public class M584Tests : BenchFixture
         });
 
         string conflict = await bench.Host.ExecuteCodeAsync($"M584 V{Expansion.Driver(Machines.DriverBoard, Machines.XDriver)}");
-        Assert.That(conflict, Does.Contain(Expansion.Driver(Machines.DriverBoard, Machines.XDriver)).And.Contain("already used"),
+        Assert.That(conflict, Reply.IsError($"Driver {Expansion.Driver(Machines.DriverBoard, Machines.XDriver)} is already used"),
                     "M584 refuses a driver another axis owns, naming it (rrf-differences.md section 3.1)");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Count), Is.EqualTo(3),
                     "the refused mapping creates no axis (rrf-differences.md section 3.1)");

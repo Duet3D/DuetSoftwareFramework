@@ -117,7 +117,7 @@ public class DeferredPauseTests : BenchFixture
                     "a second M25 while the first is pending");
         Assert.That(pause.IsCompleted, Is.False, "the first M25 waits for the macro to end");
 
-        Assert.That((await pause).Trim(), Is.Empty, "the M25 reports nothing: the pause is made by the file");
+        Assert.That(await pause, Reply.IsEmpty, "the M25 reports nothing: the pause is made by the file");
         await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
         Assert.Multiple(async () =>
         {

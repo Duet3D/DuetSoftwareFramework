@@ -25,7 +25,7 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X70 Y70 Z70")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913 X70 Y70 Z70"), Reply.IsEmpty);
 
         var sent = bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>();
         Assert.That(sent, Has.Count.EqualTo(3), "one request per axis named");
@@ -91,7 +91,7 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X150")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913 X150"), Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {
@@ -113,7 +113,7 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X0")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913 X0"), Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {
@@ -143,7 +143,7 @@ public class M913Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestMotorCurrents>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.EqualTo(100));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PercentCurrent), Is.EqualTo(100));
@@ -163,7 +163,7 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M913 X50");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906 X800")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906 X800"), Reply.IsEmpty);
         Assert.Multiple(async () =>
         {
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
@@ -172,7 +172,7 @@ public class M913Tests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].PercentCurrent), Is.EqualTo(50));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X100")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913 X100"), Reply.IsEmpty);
         Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestMotorCurrents>().Message.Values[0],
                     Is.EqualTo(800.0f), "and 100% is the whole of it again");
     }
@@ -207,7 +207,7 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913 X50.5")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913 X50.5"), Reply.IsEmpty);
 
         Assert.Multiple(async () =>
         {

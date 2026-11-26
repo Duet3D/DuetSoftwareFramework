@@ -43,7 +43,7 @@ public class M120M121Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G21");
         await bench.Host.ExecuteCodeAsync("G94");
         await bench.Host.ExecuteCodeAsync("G1 F3000");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M120")).Trim(), Is.Empty, "M120 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M120"), Reply.IsEmpty, "M120 replies nothing");
         Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.EqualTo(1), "M120 pushes one level");
 
         // Change every piece of state the pop must restore
@@ -67,7 +67,7 @@ public class M120M121Tests : BenchFixture
                         "G93 after M120 changes inputs[].inverseTimeMode");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M121")).Trim(), Is.Empty, "M121 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M121"), Reply.IsEmpty, "M121 replies nothing");
         input = await bench.Host.ReadModelAsync(model => model.Inputs[http]);
         await Assert.MultipleAsync(async () =>
         {
@@ -110,7 +110,7 @@ public class M120M121Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
         await bench.Host.ExecuteCodeAsync("G91");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M121")).TrimEnd(), Does.StartWith("Error: M121:").And.Contain("stack underflow"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M121"), Reply.IsError("stack underflow"));
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative), Is.True, "nothing was restored");
@@ -150,7 +150,7 @@ public class M120M121Tests : BenchFixture
             Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative), Is.True, "and so does the caller's G91");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M121")).Trim(), Is.Empty, "the caller's own M121 pops its level");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M121"), Reply.IsEmpty, "the caller's own M121 pops its level");
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative), Is.False, "restoring the G90 pushed before the macro");
@@ -181,7 +181,7 @@ public class M120M121Tests : BenchFixture
             """);
 
         await bench.Host.ExecuteCodeAsync("G90");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m120-pair.g\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-m120-pair.g\""), Reply.IsEmpty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("pushedDepth"), Is.EqualTo(2), "M120 in a macro stacks on the macro's level");
@@ -256,7 +256,7 @@ public class M120M121Tests : BenchFixture
             """);
 
         await bench.Host.ExecuteCodeAsync("G90");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m120-open.g\"")).Trim(), Is.Empty, "leaving a level open is not an error");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-m120-open.g\""), Reply.IsEmpty, "leaving a level open is not an error");
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("depth"), Is.EqualTo(3), "the macro had two levels of its own open");
@@ -264,7 +264,7 @@ public class M120M121Tests : BenchFixture
             Assert.That(await bench.Host.ReadInputAsync(input => input.AxesRelative), Is.False, "the caller's G90 is restored");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M121")).TrimEnd(), Does.StartWith("Error: M121:").And.Contain("stack underflow"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M121"), Reply.IsError("stack underflow"),
                     "the caller has no level of its own to pop");
     }
 
@@ -294,11 +294,11 @@ public class M120M121Tests : BenchFixture
 
         for (int i = 0; i < InterpreterStateStack.MaxDepth; i++)
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M120")).Trim(), Is.Empty, $"push {i + 1} fits");
+            Assert.That(await bench.Host.ExecuteCodeAsync("M120"), Reply.IsEmpty, $"push {i + 1} fits");
         }
         await bench.Host.ExecuteCodeAsync("G91");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M120")).TrimEnd(), Does.StartWith("Error: M120:").And.Contain("stack overflow"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M120"), Reply.IsError("stack overflow"));
         Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.EqualTo(InterpreterStateStack.MaxDepth), "nothing was pushed");
 
         await bench.Host.ExecuteCodeAsync("M121");

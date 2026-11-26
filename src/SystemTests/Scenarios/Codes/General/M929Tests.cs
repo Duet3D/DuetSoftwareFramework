@@ -29,7 +29,7 @@ public class M929Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M929 S3 P\"eventlog.txt\"");
-        Assert.That(reply, Does.Not.Contain("Error"), "M929 S3 starts logging (RRF Platform::ConfigureLogging)");
+        Assert.That(reply, Reply.IsNotError, "M929 S3 starts logging (RRF Platform::ConfigureLogging)");
         using (await bench.Host.Model.AccessReadOnlyAsync(CancellationToken.None))
         {
             Assert.Multiple(() =>

@@ -33,7 +33,7 @@ public class G60Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M400");
 
         string reply = await bench.Host.ExecuteCodeAsync("G60 S2");
-        Assert.That(reply.Trim(), Is.Empty, "G60 S2 executes without error (RRF GCodes3.cpp SavePosition)");
+        Assert.That(reply, Reply.IsEmpty, "G60 S2 executes without error (RRF GCodes3.cpp SavePosition)");
 #pragma warning disable CS0618
         RestorePoint restorePoint = await bench.Host.ReadModelAsync(model => model.State.RestorePoints[2]);
 #pragma warning restore

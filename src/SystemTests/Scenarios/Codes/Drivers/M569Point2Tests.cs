@@ -32,7 +32,7 @@ public class M569Point2Tests : BenchFixture
                 message => message.V is null && message.R is not null ? registerReport : string.Empty)).StartAsync();
         const byte board = DriversRig.ClosedLoopBoard;
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.2 P{Expansion.Driver(board, 0)} R108 V335577173")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.2 P{Expansion.Driver(board, 0)} R108 V335577173"), Reply.IsEmpty,
                     "a register write is acknowledged silently");
         (byte sentTo, CanMessageM569Point2 written) = bench.CanMaster.LastCanMessage<CanMessageM569Point2>();
         Assert.Multiple(() =>
@@ -71,8 +71,8 @@ public class M569Point2Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M569.2 P{DriversRig.MainDriver(0)} V4");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.2: missing parameter 'R'"));
-            Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point2>(), Is.Empty, "and nothing is sent");
+            Assert.That(reply, Reply.IsError(CodeErrors.MissingParameter('R')));
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "and nothing is sent");
         });
     }
 
@@ -88,7 +88,7 @@ public class M569Point2Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M569.2 R108");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo("Error: M569.2: missing parameter 'P'"));
+            Assert.That(reply, Reply.IsError(CodeErrors.MissingParameter('P')));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM569Point2>(), Is.Empty);
         });
     }
@@ -109,7 +109,7 @@ public class M569Point2Tests : BenchFixture
         const byte board = DriversRig.MainDriverBoard;
         string driver = DriversRig.MainDriver(5);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.2 P{driver} S4 J1.28 O180")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.2 P{driver} S4 J1.28 O180"), Reply.IsEmpty);
         (byte sentTo, CanMessageM569Point2 correction) = bench.CanMaster.LastCanMessage<CanMessageM569Point2>();
         Assert.Multiple(() =>
         {
@@ -159,7 +159,7 @@ public class M569Point2Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M569.2 P{DriversRig.MainDriver(5)} {parameters}");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo($"Error: M569.2: {refusal}"));
+            Assert.That(reply, Reply.IsError(refusal));
             Assert.That(await ReadCorrectionsAsync(bench, DriversRig.MainDriverBoard, 5), Is.Empty, "nothing refused is recorded");
         });
     }

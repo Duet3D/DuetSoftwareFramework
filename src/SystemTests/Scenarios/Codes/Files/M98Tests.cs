@@ -1,4 +1,3 @@
-using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using DuetAPI;
@@ -38,7 +37,7 @@ public class M98Tests : BenchFixture
             set global.line = global.line * 10 + 2
             """);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-m98.g\"")).Trim(), Is.Empty, "M98 replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-m98.g\""), Reply.IsEmpty, "M98 replies nothing");
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("line"), Is.EqualTo(12), "both lines ran, in order");
@@ -148,7 +147,7 @@ public class M98Tests : BenchFixture
             """);
 
         string fractionText = fraction.ToString(CultureInfo.InvariantCulture);
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-params.g\" A\"{text}\" S{integer} C{negative} X{fractionText} E{{\"{digits}\"}} V{{true}} Y{{{string.Join(",", array)}}} B{{3+4}}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-params.g\" A\"{text}\" S{integer} C{negative} X{fractionText} E{{\"{digits}\"}} V{{true}} Y{{{string.Join(",", array)}}} B{{3+4}}"), Reply.IsEmpty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalTextAsync("text"), Is.EqualTo(text), "a quoted string arrives as a string");
@@ -177,7 +176,7 @@ public class M98Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync("global first = \"\"");
         bench.Host.Sd.WriteSys("drt-m98-list.g", "set global.first = param.F ^ \"\"");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-list.g\" F{list}")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M98 P\"drt-m98-list.g\" F{list}"), Reply.IsEmpty);
         Assert.That(await bench.Host.GlobalTextAsync("first"), Is.EqualTo(first));
     }
 
@@ -197,9 +196,7 @@ public class M98Tests : BenchFixture
         bench.Host.Sd.WriteSys("drt-m98-empty.g", "set global.ran = 1");
 
         string line = $"M98 P\"drt-m98-empty.g\" {parameters}";
-        int column = line.IndexOf(" S", StringComparison.Ordinal) + 3;
-        Assert.That((await bench.Host.ExecuteCodeAsync(line)).TrimEnd(),
-                    Is.EqualTo($"Error: at column {column}: M98: invalid value for parameter 'S'"));
+        Assert.That(await bench.Host.ExecuteCodeAsync(line), Reply.IsError(CodeErrors.InvalidParameterValue('S')));
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalAsync("ran"), Is.Zero, "the macro did not run");
@@ -252,7 +249,7 @@ public class M98Tests : BenchFixture
             set global.unwound = global.unwound + 1
             """);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"drt-recurse.g\"")).Trim(), Is.Empty,
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"drt-recurse.g\""), Reply.IsEmpty,
                     "the overflow is reported where it happened, not again by the M98 that started the recursion");
         string error = await bench.Host.WaitForMessageAsync(MessageType.Error, "stack overflow");
         await Assert.MultipleAsync(async () =>
@@ -313,8 +310,7 @@ public class M98Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M98 P\"{fileName}\"")).TrimEnd(),
-                    Is.EqualTo($"Error: M98: Macro file {fileName} not found"));
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M98 P\"{fileName}\""), Reply.IsError($"Macro file {fileName} not found"));
         Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "nothing was pushed for a macro that is not there");
     }
 
@@ -325,7 +321,7 @@ public class M98Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98")).TrimEnd(), Is.EqualTo("Error: M98: No P or R parameter"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98"), Reply.IsError("No P or R parameter"));
         Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "nothing was pushed");
     }
 
@@ -371,11 +367,11 @@ public class M98Tests : BenchFixture
             """);
 
         // Outside any macro, as the regression case's second code does
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 R1")).Trim(), Is.Empty, "M98 R replies nothing");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 R1"), Reply.IsEmpty, "M98 R replies nothing");
         Assert.That(await bench.Host.ReadInputAsync(input => input.MacroRestartable), Is.True, "M98 R1 outside a macro sets the flag");
         Assert.That(await bench.Host.ReadInputAsync(input => (int)input.StackDepth), Is.Zero, "M98 R pushes nothing");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M98 P\"0:/sys/drt-m98r.g\"")).Trim(), Is.Empty);
+        Assert.That(await bench.Host.ExecuteCodeAsync("M98 P\"0:/sys/drt-m98r.g\""), Reply.IsEmpty);
         await Assert.MultipleAsync(async () =>
         {
             Assert.That(await bench.Host.GlobalFlagAsync("atStart"), Is.False, "a macro starts unflagged though its caller is flagged");

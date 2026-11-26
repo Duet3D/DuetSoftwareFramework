@@ -142,13 +142,13 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M566 X{x} Y{y} Z{z}");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "setting jerk is not a report");
+            Assert.That(reply, Reply.IsEmpty, "setting jerk is not a report");
             Assert.That(move.Axes[0].Jerk, Is.EqualTo(x).Within(1e-2));
             Assert.That(move.Axes[1].Jerk, Is.EqualTo(y).Within(1e-2));
             Assert.That(move.Axes[2].Jerk, Is.EqualTo(z).Within(1e-2));
             Assert.That(move.Axes[2].PrintingJerk, Is.EqualTo(z).Within(1e-2));
             Assert.That(move.Extruders[0].Jerk, Is.EqualTo(Machines.EJerk * 60.0f).Within(1e-2), "no E, so the extruder keeps its jerk");
-            Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty,
+            Assert.That(bench.CanMaster.CanMessages(), Is.Empty,
                         "jerk is the planner's limit, so M566 tells no board anything");
         });
 
@@ -177,7 +177,7 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "an extruder-only M566 reports nothing (RRF reports only when no axis, E or P is seen)");
+            Assert.That(reply, Reply.IsEmpty, "an extruder-only M566 reports nothing (RRF reports only when no axis, E or P is seen)");
             for (int i = 0; i < expected.Length; i++)
             {
                 Assert.That(move.Extruders[i].Jerk, Is.EqualTo(expected[i]).Within(1e-2), $"move.extruders[{i}].jerk");
@@ -203,7 +203,7 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M566 E700:800:900:1000");
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(move.Extruders.Select(extruder => extruder.Jerk), Is.EqualTo(new[] { 400.0f, 500.0f, 600.0f }).Within(1e-2f),
                         "no extruder is set, including the ones the list did reach");
         });
@@ -227,7 +227,7 @@ public class M205M566Tests : BenchFixture
             : (model.Move.Axes[0].Jerk, model.Move.Axes[0].PrintingJerk));
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Not.StartWith("Error").And.Not.StartWith("Warning"), "a low value is clamped, not refused");
+            Assert.That(reply, Reply.IsSuccess(), "a low value is clamped, not refused");
             Assert.That(jerk, Is.EqualTo(RrfMinimumJerkMmPerMin).Within(1e-2));
             Assert.That(printingJerk, Is.EqualTo(RrfMinimumJerkMmPerMin).Within(1e-2));
         });
@@ -245,7 +245,7 @@ public class M205M566Tests : BenchFixture
         Extruder extruder = await bench.Host.ReadModelAsync(model => model.Move.Extruders[0]);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error:"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(extruder.Jerk, Is.EqualTo(before.Jerk));
             Assert.That(extruder.PrintingJerk, Is.EqualTo(before.PrintingJerk));
         });
@@ -280,7 +280,7 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(move.Axes[0].Jerk, Is.EqualTo(Machines.XyJerk * 60.0f).Within(1e-2));
             Assert.That(move.Extruders[0].Jerk, Is.EqualTo(Machines.EJerk * 60.0f).Within(1e-2));
             Assert.That(move.JerkPolicy, Is.EqualTo(1));
@@ -299,7 +299,7 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M566 P-1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"));
+            Assert.That(reply, Reply.IsError());
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.JerkPolicy), Is.EqualTo(1));
         });
     }
@@ -322,7 +322,7 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M566 P1");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty, "P is a setting, not a report");
+            Assert.That(reply, Reply.IsEmpty, "P is a setting, not a report");
             Assert.That(move.JerkPolicy, Is.EqualTo(1));
             Assert.That(move.Axes[0].Jerk, Is.EqualTo(Machines.XyJerk * 60.0f).Within(1e-2), "P alone sets no jerk");
             Assert.That(move.Extruders[0].Jerk, Is.EqualTo(Machines.EJerk * 60.0f).Within(1e-2), "P alone sets no jerk");
@@ -413,7 +413,7 @@ public class M205M566Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync($"M566 X{machineJerkMmPerMin} Y{machineJerkMmPerMin} E1:2");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error"), "Machines.Xye has one extruder");
+            Assert.That(reply, Reply.IsError(), "Machines.Xye has one extruder");
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Jerk), Is.EqualTo(machineJerkMmPerMin).Within(1e-2));
         });
 

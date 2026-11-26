@@ -31,7 +31,7 @@ public class M999Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M999 B{Machines.DriverBoard}");
-        Assert.That(reply, Does.Not.StartWith("Error:"), "restarting a board is not an error");
+        Assert.That(reply, Reply.IsNotError, "restarting a board is not an error");
 
         (byte board, _) = bench.CanMaster.LastCanMessage<CanMessageReset>();
         Assert.That(board, Is.EqualTo(Machines.DriverBoard), "the reset goes to the board B named");

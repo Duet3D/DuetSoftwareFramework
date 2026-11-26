@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using DuetControlServer.Link.Protocol.Shared;
 
 namespace SystemTests;
 
@@ -53,6 +54,15 @@ internal sealed class CapturedPacket(ushort request, ushort id, byte[] data)
         SendCanMessageHeader header = Wire.Read<SendCanMessageHeader>(Data);
         return (header, Data.AsSpan(12, header.DataLength).ToArray());
     }
+}
+
+/// <summary>One CAN message the machine sent, as <see cref="ScriptedCanMaster.CanMessages()"/> lists it</summary>
+/// <param name="Board">CAN address of the board it was addressed to</param>
+/// <param name="Type">What the message is</param>
+/// <param name="Payload">The payload exactly as long as it was transmitted</param>
+internal sealed record SentCanMessage(byte Board, CanMessageType Type, byte[] Payload)
+{
+    public override string ToString() => $"{Type} to board {Board}";
 }
 
 /// <summary>

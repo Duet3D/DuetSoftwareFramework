@@ -25,7 +25,7 @@ public class M959Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M959 B0"), Does.StartWith("Error:"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M959 B0"), Reply.IsError(),
                     "board 0 is below M959's range (GetLimitedUIValue('B', 1, MaxCanAddress + 1))");
     }
 
@@ -69,10 +69,10 @@ public class M959Tests : BenchFixture
         string all = await bench.Host.ExecuteCodeAsync("M959");
         Assert.Multiple(() =>
         {
-            Assert.That(one, Does.Contain("Board 1 connection timeout 30 seconds"),
+            Assert.That(one, Reply.IsSuccess("Board 1 connection timeout 30 seconds"),
                         "M959 B1 reports that board's timeout from this side's copy, so it answers whether "
                         + "or not the board took the message");
-            Assert.That(all, Does.Not.StartWith("Error:"),
+            Assert.That(all, Reply.IsNotError,
                         "and a bare M959 enumerates the boards. It lists none here: the bench's controller "
                         + "answers CAN requests but announces no board, so the only entry is the one this "
                         + "code created, which is RepRapFirmware's state == unknown and is filtered out of "

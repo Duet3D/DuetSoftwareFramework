@@ -64,7 +64,7 @@ public class M669Tests : BenchFixture
         bool xHomed = await host.ReadModelAsync(model => model.Move.Axes[0].Homed);
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(name, Is.EqualTo(KinematicsName.CoreXY));
             Assert.That(xHomed, Is.False, "a kinematics change clears the homed flags");
         });
@@ -104,7 +104,7 @@ public class M669Tests : BenchFixture
             string report = await host.ExecuteCodeAsync("M669");
             Assert.Multiple(() =>
             {
-                Assert.That(reply.Trim(), Is.Empty, $"M669 {selection} succeeds silently");
+                Assert.That(reply, Reply.IsEmpty, $"M669 {selection} succeeds silently");
                 Assert.That(name, Is.EqualTo(expected), $"M669 {selection} sets move.kinematics.name");
                 Assert.That(KinematicsNameConverter.ToName(name), Is.EqualTo(reported), "the object model spells it as RRF 3.7 does");
                 Assert.That(report, Does.StartWith($"Kinematics is {reported}, "), "the report names it as RRF 3.7 does");
@@ -130,7 +130,7 @@ public class M669Tests : BenchFixture
         KinematicsName name = await host.ReadModelAsync(model => model.Move.Kinematics.Name);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: M669: Unknown kinematics type"));
+            Assert.That(reply, Reply.IsError("Unknown kinematics type"));
             Assert.That(name, Is.EqualTo(KinematicsName.CoreXY), "the geometry that was selected stays");
             Assert.That(await AllHomedAsync(host), Is.True, "a refused code does not un-home the machine");
         });
@@ -171,7 +171,7 @@ public class M669Tests : BenchFixture
 
         bench.CanMaster.ClearCapture();
         await bench.Host.ExecuteCodeAsync("M669 K1 S50 T0.5");
-        Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty);
+        Assert.That(bench.CanMaster.CanMessages(), Is.Empty);
     }
 
     // ---- Matrix geometries ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ public class M669Tests : BenchFixture
 
         string report = await bench.Host.ExecuteCodeAsync("M669");
         Assert.That(report.TrimEnd(), Is.EqualTo($"Kinematics is cartesian, no segmentation, {XyzIdentity}"));
-        Assert.That(report, Does.Not.StartWith("Error"));
+        Assert.That(report, Reply.IsNotError);
     }
 
     /// <summary>
@@ -279,7 +279,7 @@ public class M669Tests : BenchFixture
         string[] reportedRows = report.TrimEnd().Split('\n')[1..];
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(report.TrimEnd(), Is.EqualTo(expected));
             Assert.That(inverse.Select(row => string.Join(' ', row.Select(value => value == 0 ? "0" : value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture)))),
                         Is.EqualTo(reportedRows), "move.kinematics.inverseMatrix holds what is reported");
@@ -302,7 +302,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync("M669 X1:1:0:0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain("array too long"));
+            Assert.That(reply, Reply.IsError(CodeErrors.ArrayTooLong('X')));
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(), Does.EndWith(" matrix:\n1.00 1.00 0\n1.00 -1.00 0\n0 0 1.00"));
         });
     }
@@ -326,7 +326,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync("M669 X1:1 Y1:1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain("Invalid kinematics matrix"));
+            Assert.That(reply, Reply.IsError("Invalid kinematics matrix"));
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(), Does.EndWith(", matrix:\n1.00 1.00 0\n1.00 -1.00 0\n0 0 1.00"));
             Assert.That(await AllHomedAsync(host), Is.True, "a refused code leaves the axes homed");
         });
@@ -347,7 +347,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync("M669 Z0:0:2 A1:0:0");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain("The machine has no A axis"));
+            Assert.That(reply, Reply.IsError("The machine has no A axis"));
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(), Does.EndWith(", matrix:\n1.00 1.00 0\n1.00 -1.00 0\n0 0 1.00"),
                         "the Z row given with it is not applied either");
         });
@@ -371,7 +371,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync("M669 K8 U0:0:0:1:-1 V0:0:0:1:1");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(),
                         Is.EqualTo("Kinematics is coreXYUV, no segmentation, modified matrix:\n1.00 1.00 0 0 0\n1.00 -1.00 0 0 0\n0 0 1.00 0 0\n0 0 0 1.00 -1.00\n0 0 0 1.00 1.00"));
         });
@@ -408,7 +408,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync("M669 K5");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain("no V axis"));
+            Assert.That(reply, Reply.IsError("no V axis"));
             Assert.That(await host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian));
         });
     }
@@ -448,7 +448,7 @@ public class M669Tests : BenchFixture
         MoveSegmentation? segmentation = await host.ReadModelAsync(model => model.Move.Kinematics.Segmentation);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(segmentation?.SegmentsPerSec, Is.EqualTo(200f), "move.kinematics.segmentation.segmentsPerSec");
             Assert.That(segmentation?.MinSegLength, Is.EqualTo(0.2f), "move.kinematics.segmentation.minSegLength");
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(),
@@ -606,7 +606,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync("M669 A-90");
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain("Wrong number of values in array, expected 2"));
+            Assert.That(reply, Reply.IsError(CodeErrors.WrongArrayLength(2)));
             Assert.That((await ReadKinematicsAsync<ScaraKinematics>(host)).ThetaLimits, Is.EqualTo(new[] { -90f, 90f }));
         });
     }
@@ -708,7 +708,7 @@ public class M669Tests : BenchFixture
         FiveBarScaraKinematics fiveBar = await ReadKinematicsAsync<FiveBarScaraKinematics>(host);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(fiveBar.XOrigins, Is.EqualTo(new[] { -25f, 25f }));
             Assert.That(fiveBar.YOrigins, Is.EqualTo(new[] { 0f, 0f }));
             Assert.That(fiveBar.ProximalLengths, Is.EqualTo(new[] { 100f, 100f }));
@@ -769,18 +769,24 @@ public class M669Tests : BenchFixture
         {
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(),
                         Is.EqualTo("Kinematics is fiveBarScara, 100 segments/sec, min. segment length 0.20mm, actuator origins (0.0, 0.0) and (0.0, 0.0), proximal arms 0.0:0.0mm, distal arms 0.0:0.0mm, cantilevers 0.0:0.0mm, work mode 1, homing angles 0.0:0.0, head angle 0.0 to 0.0, proximal-distal angles 0.0 to 0.0 and 0.0 to 0.0, actuator angles 0.0 to 0.0 and 0.0 to 0.0"));
-            Assert.That((await host.ExecuteCodeAsync("M669 S50 T0.5")).Trim(), Is.Empty);
+            Assert.That(await host.ExecuteCodeAsync("M669 S50 T0.5"), Reply.IsEmpty);
             Assert.That((await ReadKinematicsAsync<FiveBarScaraKinematics>(host)).Segmentation?.SegmentsPerSec, Is.EqualTo(50f));
         });
     }
 
+    /// <summary>The codes <see cref="M669RefusesAnIncompleteFiveBarScara"/> sends, each with the error it expects</summary>
+    private static readonly object[] IncompleteFiveBarScaras =
+    [
+        new object[] { "M669 K9 X-25:25 Y0:0 P100:100", CodeErrors.MissingParameter('D') },
+        new object[] { "M669 K9 Y0:0 P100:100 D100:100", CodeErrors.MissingParameter('X') },
+        new object[] { "M669 K9 X-25:25 Y0:0 P100:100 D100:100 L3", "L parameter must be 1, 2 or 4" },
+        new object[] { "M669 K9 X-25:25 Y0:0 P100:100 D100:100:5", "D parameter must have 2 or 4 values" },
+        new object[] { "M669 K9 X-25 Y0:0 P100:100 D100:100", CodeErrors.WrongArrayLength(2) }
+    ];
+
     /// <summary>The five-bar SCARA's refusals, each leaving the geometry it had and the axes homed</summary>
     /// <remarks>FiveBarScaraKinematics::Configure: MustSee X, Y, P and D, then the L and D checks</remarks>
-    [TestCase("M669 K9 X-25:25 Y0:0 P100:100", "missing parameter 'D'")]
-    [TestCase("M669 K9 Y0:0 P100:100 D100:100", "missing parameter 'X'")]
-    [TestCase("M669 K9 X-25:25 Y0:0 P100:100 D100:100 L3", "L parameter must be 1, 2 or 4")]
-    [TestCase("M669 K9 X-25:25 Y0:0 P100:100 D100:100:5", "D parameter must have 2 or 4 values")]
-    [TestCase("M669 K9 X-25 Y0:0 P100:100 D100:100", "Wrong number of values in array, expected 2")]
+    [TestCaseSource(nameof(IncompleteFiveBarScaras))]
     [Category("KnownGap")]
     public async Task M669RefusesAnIncompleteFiveBarScara(string code, string error)
     {
@@ -790,7 +796,7 @@ public class M669Tests : BenchFixture
         string reply = await host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain(error));
+            Assert.That(reply, Reply.IsError(error));
             Assert.That(await host.ReadModelAsync(model => model.Move.Kinematics.Name), Is.EqualTo(KinematicsName.Cartesian),
                         "nothing of a refused code is applied");
             Assert.That(await AllHomedAsync(host), Is.True);
@@ -830,7 +836,7 @@ public class M669Tests : BenchFixture
         RotaryDeltaKinematics rotary = await ReadKinematicsAsync<RotaryDeltaKinematics>(host);
         Assert.Multiple(async () =>
         {
-            Assert.That(m666Reply.Trim(), Is.Empty);
+            Assert.That(m666Reply, Reply.IsEmpty);
             Assert.That(rotary.ArmLengths, Is.EqualTo(new[] { 90f, 91f, 92f }));
             Assert.That(rotary.RodLengths, Is.EqualTo(new[] { 190f, 190f, 190f }), "one value is all three");
             Assert.That(rotary.BearingHeights, Is.EqualTo(new[] { 240f, 241f, 242f }));
@@ -847,11 +853,17 @@ public class M669Tests : BenchFixture
         });
     }
 
+    /// <summary>The codes <see cref="M669RefusesABadRotaryDeltaParameter"/> sends, each with the error it expects</summary>
+    private static readonly object[] BadRotaryDeltaParameters =
+    [
+        new object[] { "M669 U90:91", CodeErrors.WrongArrayLength(3) },
+        new object[] { "M669 A-40", CodeErrors.WrongArrayLength(2) },
+        new object[] { "M669 B0", CodeErrors.NotGreaterThanZero }
+    ];
+
     /// <summary>The rotary delta's refusals, each leaving the geometry as it was</summary>
     /// <remarks>RotaryDeltaKinematics::Configure: TryGetFloatArray with padding for U, L and H, without for A; GetPositiveFValue for B</remarks>
-    [TestCase("M669 U90:91", "Wrong number of values in array, expected 3")]
-    [TestCase("M669 A-40", "Wrong number of values in array, expected 2")]
-    [TestCase("M669 B0", "greater than zero")]
+    [TestCaseSource(nameof(BadRotaryDeltaParameters))]
     [Category("KnownGap")]
     public async Task M669RefusesABadRotaryDeltaParameter(string code, string error)
     {
@@ -863,7 +875,7 @@ public class M669Tests : BenchFixture
         RotaryDeltaKinematics rotary = await ReadKinematicsAsync<RotaryDeltaKinematics>(host);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain(error));
+            Assert.That(reply, Reply.IsError(error));
             Assert.That(rotary.ArmLengths, Is.EqualTo(new[] { 100f, 100f, 100f }));
             Assert.That(rotary.ArmAngleLimits, Is.EqualTo(new[] { -45f, 45f }));
             Assert.That(rotary.PrintRadius, Is.EqualTo(80f));
@@ -892,9 +904,9 @@ public class M669Tests : BenchFixture
         DeltaKinematics delta = await ReadKinematicsAsync<DeltaKinematics>(host);
         Assert.Multiple(async () =>
         {
-            Assert.That(threeTowers, Does.StartWith("Error: ").And.Contain("Wrong number of X values"), "a three-tower delta has no extra towers");
-            Assert.That(reply.Trim(), Is.Empty);
-            Assert.That(tooMany, Does.StartWith("Error: ").And.Contain("Wrong number of Y values"));
+            Assert.That(threeTowers, Reply.IsError("Wrong number of X values"), "a three-tower delta has no extra towers");
+            Assert.That(reply, Reply.IsEmpty);
+            Assert.That(tooMany, Reply.IsError("Wrong number of Y values"));
             Assert.That(delta.Towers, Has.Count.EqualTo(4), "M665 L gives one rod length per tower");
             Assert.That(delta.Towers[3].Diagonal, Is.EqualTo(260f));
             Assert.That(delta.Towers[3].XPos, Is.EqualTo(50f), "move.kinematics.towers[3].xPos");
@@ -924,7 +936,7 @@ public class M669Tests : BenchFixture
         HangprinterKinematics hangprinter = await ReadKinematicsAsync<HangprinterKinematics>(host);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(hangprinter.Anchors, Is.EqualTo(new[] { new[] { 0f, -2000f, -100f }, new[] { 2000f, 1000f, -100f }, new[] { -2000f, 1000f, -100f }, new[] { 0f, 0f, 3000f } }));
             Assert.That(hangprinter.PrintRadius, Is.EqualTo(1500f));
             Assert.That((await host.ExecuteCodeAsync("M669")).TrimEnd(),
@@ -949,7 +961,7 @@ public class M669Tests : BenchFixture
         HangprinterKinematics hangprinter = await ReadKinematicsAsync<HangprinterKinematics>(host);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.Empty);
+            Assert.That(reply, Reply.IsEmpty);
             Assert.That(hangprinter.Anchors, Has.Count.EqualTo(5));
             Assert.That(hangprinter.Anchors[0], Is.EqualTo(new[] { 0f, -1500f, -90f }));
             Assert.That(hangprinter.Anchors[1], Is.EqualTo(new[] { 2000f, 1000f, -100f }), "an anchor not given keeps its position");
@@ -959,16 +971,22 @@ public class M669Tests : BenchFixture
         });
     }
 
+    /// <summary>The codes <see cref="M669RefusesABadHangprinterParameter"/> sends, each with the error it expects</summary>
+    private static readonly object[] BadHangprinterParameters =
+    [
+        new object[] { "M669 N9", "N" },
+        new object[] { "M669 N2", "N" },
+        new object[] { "M669 N6", "no W axis" },
+        new object[] { "M669 A0:-1500", CodeErrors.WrongArrayLength(3) },
+        new object[] { "M669 P0", CodeErrors.NotGreaterThanZero }
+    ];
+
     /// <summary>The hangprinter's refusals, each leaving the geometry as it was</summary>
     /// <remarks>
     /// HangprinterKinematics::Configure takes N unchecked, which overruns its arrays past eight anchors; DSF refuses a
     /// count outside 3 to 8 (rrf-differences.md). Six anchors need a W axis this machine does not have
     /// </remarks>
-    [TestCase("M669 N9", "N")]
-    [TestCase("M669 N2", "N")]
-    [TestCase("M669 N6", "no W axis")]
-    [TestCase("M669 A0:-1500", "Wrong number of values in array, expected 3")]
-    [TestCase("M669 P0", "greater than zero")]
+    [TestCaseSource(nameof(BadHangprinterParameters))]
     [Category("KnownGap")]
     public async Task M669RefusesABadHangprinterParameter(string code, string error)
     {
@@ -980,7 +998,7 @@ public class M669Tests : BenchFixture
         HangprinterKinematics hangprinter = await ReadKinematicsAsync<HangprinterKinematics>(host);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Error: ").And.Contain(error));
+            Assert.That(reply, Reply.IsError(error));
             Assert.That(hangprinter.Anchors, Has.Count.EqualTo(4));
             Assert.That(hangprinter.Anchors[0], Is.EqualTo(new[] { 0f, -2000f, -100f }));
             Assert.That(hangprinter.PrintRadius, Is.EqualTo(1500f));

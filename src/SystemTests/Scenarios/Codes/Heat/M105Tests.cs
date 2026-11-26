@@ -49,9 +49,9 @@ public class M105Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.Contain($"T0:{OneDecimal(toolHeater.Current)} /0.0"),
+            Assert.That(reply, Reply.IsSuccess($"T0:{OneDecimal(toolHeater.Current)} /0.0"),
                         "M105 reports the tool heater's current and a 0.0 target while it is off (RRF GCodes5.cpp ReportToolTemperatures, Heat.cpp GetTargetTemperature)");
-            Assert.That(reply, Does.Contain($"B:{OneDecimal(bed.Current)} /{OneDecimal(bed.Active)}"),
+            Assert.That(reply, Reply.IsSuccess($"B:{OneDecimal(bed.Current)} /{OneDecimal(bed.Active)}"),
                         "M105 reports the bed's current and active temperatures (RRF GCodes.cpp GenerateTemperatureReport)");
         });
     }
