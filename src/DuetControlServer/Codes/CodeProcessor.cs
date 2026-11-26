@@ -559,6 +559,7 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
                 if (code.Channel != item.Channel && code.FilePosition == item.FilePosition)
                 {
                     _syncRequests[item].TrySetResult(true);
+                    _syncRequests.Remove(item);
                     return true;
                 }
             }
@@ -567,7 +568,20 @@ public sealed class CodeProcessor(Expressions expressions, Model.ObjectModel mod
             _syncRequests.Add(code, tcs);
             syncTask = tcs.Task;
         }
-        return await syncTask;
+
+        try
+        {
+            return await syncTask.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // A pause that stops this stream must not wait for the other one to get here
+            lock (_syncRequests)
+            {
+                _syncRequests.Remove(code);
+            }
+            return false;
+        }
     }
 
     /// <summary>
