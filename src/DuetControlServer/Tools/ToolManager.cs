@@ -70,6 +70,12 @@ public sealed class ToolManager(Model.ObjectModel model, MacroRunner macroRunner
     public const float DefaultRetractSpeed = 1000.0f / 60.0f;
 
     /// <summary>
+    /// Lowest firmware retraction and unretraction speed, in mm/s
+    /// </summary>
+    /// <remarks>RepRapFirmware's <c>MinRetractSpeed</c>, which is 60 mm/min</remarks>
+    public const float MinRetractSpeed = 1.0f;
+
+    /// <summary>
     /// Find a tool by number
     /// </summary>
     /// <param name="toolNumber">The number</param>
