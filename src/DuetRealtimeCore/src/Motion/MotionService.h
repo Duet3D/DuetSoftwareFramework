@@ -33,6 +33,7 @@
 #include <Motion/MoveParams.h>
 #include <Motion/DDARing.h>
 #include <Platform/RingBuffer.h>
+#include <Platform/Waker.h>
 
 #include <atomic>
 #include <span>
@@ -342,6 +343,8 @@ namespace Duet::Sbc
 
 		std::thread m_thread;
 		std::atomic<bool> m_stop{false};
+		// Wakes the motion thread for work handed to it, for a move of a pinned clock, and to stop
+		Waker m_wake{Waker::Clock::Follow};
 
 		// Set once Init has built the rings, and read from the managed side, which asks for room in
 		// a ring from its own threads and can do so before the engine has been started

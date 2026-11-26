@@ -137,6 +137,13 @@ public abstract class Bench : IAsyncDisposable
     public abstract Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Let the stack finish what it is doing without letting emulated time pass, so that what a test
+    /// reads next is the same on every run. The emulated machines stand still between calls, so only
+    /// a stack that runs outside them has anything to finish.
+    /// </summary>
+    public virtual Task QuiesceAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>
     /// Wait until <paramref name="condition"/> holds, for up to <paramref name="timeout"/> of emulated time,
     /// and return the emulated time that passed
     /// </summary>
@@ -145,6 +152,7 @@ public abstract class Bench : IAsyncDisposable
                                                CancellationToken cancellationToken = default)
     {
         TimeSpan start = System.Time;
+        await QuiesceAsync(cancellationToken);
         while (!await condition())
         {
             if (System.Time - start >= timeout)

@@ -56,7 +56,8 @@ public readonly struct LockWrapper : IDisposable
     /// <param name="lifetime">Lifetime of the application</param>
     /// <param name="logger">Logger instance</param>`
     /// <param name="settings">Settings of the application</param>
-    public LockWrapper(IDisposable lockItem, bool isWriteLock, OnUpdatedHandler onUpdated, IHostApplicationLifetime lifetime, ObjectModel model, ILogger logger, IOptions<Settings> settings)
+    /// <param name="timeProvider">Clock the lock time is measured on</param>
+    public LockWrapper(IDisposable lockItem, bool isWriteLock, OnUpdatedHandler onUpdated, IHostApplicationLifetime lifetime, ObjectModel model, ILogger logger, IOptions<Settings> settings, TimeProvider timeProvider)
     {
         _lock = lockItem;
         _isWriteLock = isWriteLock;
@@ -74,7 +75,7 @@ public readonly struct LockWrapper : IDisposable
             {
                 try
                 {
-                    await Task.Delay(maxLockTime, releaseToken);
+                    await Task.Delay(TimeSpan.FromMilliseconds(maxLockTime), timeProvider, releaseToken);
                     logger.LogCritical("{LockType} deadlock detected, stack trace of the deadlock:\n{StackTrace}", isWriteLock ? "Writer" : "Reader", stackTrace);
                     lifetime.StopApplication();
                 }

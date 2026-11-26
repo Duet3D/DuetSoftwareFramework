@@ -14,13 +14,11 @@ namespace DuetEmulation.Dsf;
 /// DuetControlServer's own
 /// </summary>
 /// <remarks>
-/// DuetControlServer runs in real time, so the emulation runs continuously rather than only while a
-/// call waits: a pump lets emulated time pass a slice at a time for as long as the bench is up. What a
-/// test sees is therefore not repeatable to the emulated microsecond as it is on the RepRapFirmware
-/// bench, though waits are still measured in emulated time.
+/// DuetControlServer and DuetRealtimeCore run in lockstep with the emulation (<see cref="SbcLockstep"/>),
+/// on emulated time, so as on the RepRapFirmware bench emulated time passes only while a call waits,
+/// and a test does the same things at the same emulated times on every run.
 /// <para>
-/// One DSF bench runs in a process at a time: DuetRealtimeCore's step clock and the time base it is
-/// timed against are process-wide
+/// One DSF bench runs in a process at a time: DuetRealtimeCore's clock is process-wide
 /// </para>
 /// </remarks>
 public sealed class DsfBench : Bench
@@ -31,20 +29,23 @@ public sealed class DsfBench : Bench
     // The global variable config.g ends by creating, which says it has run to the end
     private const string ConfigDoneVariable = "emulationConfigDone";
 
-    // How much emulated time each step of the pump lets pass
-    private static readonly TimeSpan PumpSlice = TimeSpan.FromMilliseconds(5);
+    // Real time between moves of DuetControlServer's clock while it shuts down, when the emulation no longer runs
+    private static readonly TimeSpan ShutdownTick = TimeSpan.FromMilliseconds(10);
 
     private static int s_running;
 
-    private readonly CancellationTokenSource _stop = new();
     private readonly string _socketDirectory;
-    private Task _pump = Task.CompletedTask;
+    private readonly SbcLockstep _lockstep;
     private DcsHost? _dcs;
 
     /// <summary>DuetControlServer</summary>
     public DcsHost Dcs => _dcs ?? throw new InvalidOperationException("DuetControlServer has not started");
 
-    private DsfBench(EmulatedSystem system, string socketDirectory) : base(system) => _socketDirectory = socketDirectory;
+    private DsfBench(EmulatedSystem system, string socketDirectory, string sbcBridge) : base(system)
+    {
+        _socketDirectory = socketDirectory;
+        _lockstep = new SbcLockstep(system, sbcBridge);
+    }
 
     /// <summary>
     /// Create the boards, start the emulation and DuetControlServer with <paramref name="config"/> as
@@ -92,19 +93,39 @@ public sealed class DsfBench : Bench
             throw;
         }
         string socketPath = Path.Combine(socketDirectory, "sbc.sock");
-        DsfBench bench = new(system, socketDirectory);
+        DsfBench bench;
         try
         {
             string bridge = system.Main.Type.SbcBridge ?? throw new InvalidOperationException($"{system.Main.Type.Name} has no SBC port");
-            await system.ExecuteAsync(system.Main, $"{bridge} ListenForSbc {Emulator.MonitorSyntax.Quote(socketPath)}", cancellationToken);
-            bench._pump = Task.Run(() => bench.PumpAsync(bench._stop.Token), CancellationToken.None);
+            bench = new(system, socketDirectory, bridge);
+        }
+        catch
+        {
+            Directory.Delete(socketDirectory, recursive: true);
+            await system.DisposeAsync();
+            Volatile.Write(ref s_running, 0);
+            throw;
+        }
+        try
+        {
+            await system.ExecuteAsync(system.Main, $"{bench._lockstep.SbcBridge} ListenForSbc {Emulator.MonitorSyntax.Quote(socketPath)}", cancellationToken);
 
             Dictionary<string, string> sdCard = new() { ["sys/config.g"] = $"{ConfigPreamble}{config}\nglobal {ConfigDoneVariable} = 1\n" };
             foreach ((string path, string contents) in files ?? new Dictionary<string, string>())
             {
                 sdCard[path] = contents;
             }
-            bench._dcs = await DcsHost.StartAsync(system.WorkDirectory, socketDirectory, socketPath, sdCard, cancellationToken);
+
+            // Starting DuetControlServer connects to the controller, which takes emulated time, so the
+            // lockstep runs while it starts. It starts on the thread pool, where the lockstep sees it
+            // work and sees it wait for the controller.
+            Task<DcsHost> starting = Task.Run(() => DcsHost.StartAsync(system.WorkDirectory, socketDirectory, socketPath, sdCard,
+                                                                       bench._lockstep.Clock, cancellationToken), cancellationToken);
+            while (!starting.IsCompleted)
+            {
+                await bench._lockstep.RunForAsync(system.Quantum, cancellationToken);
+            }
+            bench._dcs = await starting;
             await bench.BootAsync(TimeSpan.FromSeconds(60), cancellationToken);
             return bench;
         }
@@ -115,29 +136,16 @@ public sealed class DsfBench : Bench
         }
     }
 
-    // Let emulated time pass for as long as the bench is up. Commands to Renode from tests and from
-    // DuetControlServer's link run between the slices
-    private async Task PumpAsync(CancellationToken cancellationToken)
-    {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            await System.RunForAsync(PumpSlice, cancellationToken);
-        }
-    }
-
     /// <inheritdoc/>
     protected override async Task StartStackAsync(TimeSpan timeout, CancellationToken cancellationToken)
     {
-        await WaitUntilAsync(async () => await Dcs.ReadModelAsync(m => m.Global.ContainsKey(ConfigDoneVariable), cancellationToken),
+        await WaitUntilAsync(async () => await ReadModelAsync(m => m.Global.ContainsKey(ConfigDoneVariable), cancellationToken),
                              timeout, "DuetControlServer to connect and run config.g", cancellationToken);
     }
 
     /// <inheritdoc/>
-    public override Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default)
-    {
-        ThrowIfPumpFailed();
-        return Task.FromResult(new PendingCode(this, code, ExecuteAsync(code, cancellationToken)));
-    }
+    public override Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new PendingCode(this, code, ExecuteAsync(code, cancellationToken)));
 
     private async Task<CodeReply> ExecuteAsync(string code, CancellationToken cancellationToken) =>
         CodeReply.Parse(await Dcs.ExecuteCodeAsync(code, cancellationToken));
@@ -145,28 +153,34 @@ public sealed class DsfBench : Bench
     /// <inheritdoc/>
     public override async Task<JsonNode?> GetObjectModelAsync(string key = "", CancellationToken cancellationToken = default)
     {
-        byte[] json = await Dcs.ReadModelAsync(m => m.ToUtf8Json(), cancellationToken);
+        await QuiesceAsync(cancellationToken);
+        byte[] json = await ReadModelAsync(m => m.ToUtf8Json(), cancellationToken);
         return ObjectModelKey.Select(JsonNode.Parse(json), key);
     }
 
-    /// <inheritdoc/>
-    public override async Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Read the object model under its lock. A code may hold the lock while it waits for the boards,
+    /// which needs emulated time, so the emulation runs until the lock is free
+    /// </summary>
+    private async Task<T> ReadModelAsync<T>(Func<DuetControlServer.Model.ObjectModel, T> read, CancellationToken cancellationToken)
     {
-        TimeSpan until = System.Time + time;
-        while (System.Time < until)
+        Task<T> reading = Dcs.ReadModelAsync(read, cancellationToken);
+        while (!reading.IsCompleted)
         {
-            ThrowIfPumpFailed();
-            await Task.Delay(TimeSpan.FromMilliseconds(5), cancellationToken);
+            await _lockstep.CatchUpAsync(cancellationToken);
+            if (!reading.IsCompleted)
+            {
+                await _lockstep.RunForAsync(System.Quantum, cancellationToken);
+            }
         }
+        return await reading;
     }
 
-    private void ThrowIfPumpFailed()
-    {
-        if (_pump.IsFaulted)
-        {
-            throw new InvalidOperationException("The emulation stopped", _pump.Exception);
-        }
-    }
+    /// <inheritdoc/>
+    public override Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default) => _lockstep.RunForAsync(time, cancellationToken);
+
+    /// <inheritdoc/>
+    public override Task QuiesceAsync(CancellationToken cancellationToken = default) => _lockstep.CatchUpAsync(cancellationToken);
 
     /// <inheritdoc/>
     public override async ValueTask DisposeAsync()
@@ -175,21 +189,24 @@ public sealed class DsfBench : Bench
         {
             if (_dcs is not null)
             {
-                await _dcs.DisposeAsync();
+                // Shutting down is not part of what a test observes, so DuetRealtimeCore goes back to
+                // real time and DuetControlServer's clock is moved on in real time while it stops
+                SbcLockstep.Release();
+                Task stopping = _dcs.DisposeAsync().AsTask();
+                while (!stopping.IsCompleted)
+                {
+                    _lockstep.Clock.AdvanceTo(_lockstep.Clock.Now + ShutdownTick);
+                    while (_lockstep.Clock.FireNextDue())
+                    {
+                    }
+                    await Task.WhenAny(stopping, Task.Delay(ShutdownTick));
+                }
+                await stopping;
             }
         }
         finally
         {
-            await _stop.CancelAsync();
-            try
-            {
-                // A run that hangs is ended by disposing Renode, which kills it
-                await _pump.WaitAsync(TimeSpan.FromSeconds(10));
-            }
-            catch (Exception e) when (e is OperationCanceledException or TimeoutException or Emulator.RenodeException or InvalidOperationException)
-            {
-                // The pump stops when cancelled, or ended earlier because the emulation failed
-            }
+            SbcLockstep.Release();
             try
             {
                 await base.DisposeAsync();
@@ -197,7 +214,6 @@ public sealed class DsfBench : Bench
             finally
             {
                 Directory.Delete(_socketDirectory, recursive: true);
-                _stop.Dispose();
                 Volatile.Write(ref s_running, 0);
             }
         }

@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -28,6 +27,7 @@ namespace DuetControlServer.Motion;
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger</param>
 /// <param name="settings">Settings</param>
+/// <param name="timeProvider">Clock the live position is republished on</param>
 internal sealed class MotionService(
     // EventLogger eventLogger,
     LinkInterface linkInterface,
@@ -36,7 +36,8 @@ internal sealed class MotionService(
     Model.ObjectModel model,
     // IHostApplicationLifetime lifetime,
     ILogger<MotionService> logger,
-    IOptions<Settings> settings) : BackgroundService
+    IOptions<Settings> settings,
+    TimeProvider timeProvider) : BackgroundService
 {
     /// <summary>
     /// How often the live machine position is republished
@@ -55,17 +56,40 @@ internal sealed class MotionService(
     }
 
     /// <summary>
-    /// Start a thread that performs the communication with the firmware
+    /// Start the motion engine, then keep the reported position up to date until shutdown
     /// </summary>
-    /// <remarks>
-    /// This effectively starts a thread with higher priority in order to ensure
-    /// that the communication with the controller is not blocked by other tasks
-    /// </remarks>
     /// <param name="stoppingToken">Cancellation token</param>
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        TaskCompletionSource tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        Thread wrapper = new(() =>
+        if (!await StartEngineAsync(stoppingToken))
+        {
+            return;
+        }
+
+        try
+        {
+            await PublishMotionAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Shutting down
+        }
+        finally
+        {
+            linkInterface.Native.StopMotion();
+        }
+    }
+
+    /// <summary>
+    /// Configure the motion engine and start it, from a thread of its own placed where the motion
+    /// thread is to run: the engine's native thread inherits the placement of the thread that starts it
+    /// </summary>
+    /// <param name="stoppingToken">Cancellation token</param>
+    /// <returns>Whether the engine is running</returns>
+    private Task<bool> StartEngineAsync(CancellationToken stoppingToken)
+    {
+        TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Thread starter = new(() =>
         {
             try
             {
@@ -96,44 +120,22 @@ internal sealed class MotionService(
                         }
                     }
                 }
-                Execute(stoppingToken);
-                tcs.SetResult();
+                tcs.SetResult(StartEngine(stoppingToken));
             }
-            catch (Exception e)
+            catch (Exception e) when ((e as AggregateException)?.InnerException is OperationCanceledException || e is OperationCanceledException)
             {
-                if (e is AggregateException ae)
+                if (stoppingToken.IsCancellationRequested)
                 {
-                    if (ae.InnerException is OperationCanceledException)
-                    {
-                        if (stoppingToken.IsCancellationRequested)
-                        {
-                            tcs.SetResult();
-                        }
-                        else
-                        {
-                            tcs.SetCanceled();
-                        }
-                    }
-                    else
-                    {
-                        tcs.SetException(ae.InnerException!);
-                    }
-                }
-                else if (e is OperationCanceledException)
-                {
-                    if (stoppingToken.IsCancellationRequested)
-                    {
-                        tcs.SetResult();
-                    }
-                    else
-                    {
-                        tcs.SetCanceled();
-                    }
+                    tcs.SetResult(false);
                 }
                 else
                 {
-                    tcs.SetException(e);
+                    tcs.SetCanceled(stoppingToken);
                 }
+            }
+            catch (Exception e)
+            {
+                tcs.SetException((e as AggregateException)?.InnerException ?? e);
             }
         })
         {
@@ -141,25 +143,18 @@ internal sealed class MotionService(
             Priority = ThreadPriority.Highest,
             IsBackground = true
         };
-        wrapper.Start();
+        starter.Start();
         return tcs.Task;
     }
 
-    /// <inheritdoc />
-    public override async Task StopAsync(CancellationToken stoppingToken)
-    {
-        // Shut down this service.
-        await base.StopAsync(stoppingToken);
-    }
-
     /// <summary>
-    /// Run the motion engine
+    /// Configure the motion engine and start it
     /// </summary>
     /// <remarks>
     /// <para>
-    /// This thread no longer produces moves - the G-code path does that now, through
-    /// <see cref="MovePlanner"/>. What is left is the engine's lifecycle: configure it before
-    /// starting it, keep it running, and stop it on shutdown.
+    /// Nothing here produces moves - the G-code path does that, through <see cref="MovePlanner"/>.
+    /// What is left is the engine's lifecycle: configure it before starting it, keep it running, and
+    /// stop it on shutdown.
     /// </para>
     /// <para>
     /// Configuration has to come first. The engine's defaults are all zero, and a zeroed description
@@ -169,47 +164,52 @@ internal sealed class MotionService(
     /// </para>
     /// </remarks>
     /// <param name="stoppingToken">Cancellation token</param>
-    private void Execute(CancellationToken stoppingToken)
+    /// <returns>Whether the engine is running</returns>
+    private bool StartEngine(CancellationToken stoppingToken)
     {
         if (!planner.ReconfigureAsync(stoppingToken, adoptGeometryFromObjectModel: true).AsTask().GetAwaiter().GetResult())
         {
             logger.LogError("Could not configure the native motion engine; no moves will be executed");
             planner.ReportEngineFailed();
-            return;
+            return false;
         }
 
         if (!linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0))
         {
             logger.LogError("Native motion engine did not start; no moves will be executed");
             planner.ReportEngineFailed();
-            return;
+            return false;
         }
 
         logger.LogInformation("Motion engine started for {NumAxes} axes and {NumExtruders} extruders",
                               planner.Parameters.NumAxes, planner.Parameters.NumExtruders);
+        return true;
+    }
 
-        try
+    /// <summary>
+    /// Republish the live position every <see cref="LivePositionInterval"/>, and as soon as the motion ends
+    /// </summary>
+    /// <remarks>
+    /// The engine runs its own thread natively, so nothing here drives the motion. What this does
+    /// drive is the reported position: the object model's machinePosition is the live one, which
+    /// means it has to be read back from the engine rather than written by whoever queued the last move
+    /// </remarks>
+    /// <param name="stoppingToken">Cancellation token</param>
+    private async Task PublishMotionAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
         {
-            while (!stoppingToken.IsCancellationRequested)
+            await PublishMotionOnceAsync(stoppingToken);
+
+            // A move ending while others follow it is not the end of the motion, which is reported at once
+            using CancellationTokenSource waitCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            Task due = Task.Delay(LivePositionInterval, timeProvider, waitCts.Token);
+            while (await Task.WhenAny(tracker.MoveEnded.WaitAsync(waitCts.Token), due) != due && planner.IsMoving)
             {
-                // The engine runs its own thread natively, so nothing here drives the motion. What
-                // this loop does drive is the reported position: the object model's machinePosition
-                // is the live one, which means it has to be read back from the engine rather than
-                // written by whoever queued the last move
-                PublishMotion(stoppingToken);
-
-                // The end of the motion is reported as soon as it happens
-                long published = Stopwatch.GetTimestamp();
-                TimeSpan remaining = LivePositionInterval;
-                while (remaining > TimeSpan.Zero && (!tracker.MoveEnded.WaitOne(remaining) || planner.IsMoving))
-                {
-                    remaining = LivePositionInterval - Stopwatch.GetElapsedTime(published);
-                }
             }
-        }
-        finally
-        {
-            linkInterface.Native.StopMotion();
+            // Withdraws the wait that lost, so that it does not take the next move's end
+            await waitCts.CancelAsync();
+            stoppingToken.ThrowIfCancellationRequested();
         }
     }
 
@@ -230,9 +230,9 @@ internal sealed class MotionService(
     /// and one of them would be wrong
     /// </para>
     /// </remarks>
-    private void PublishMotion(CancellationToken cancellationToken)
+    private async Task PublishMotionOnceAsync(CancellationToken cancellationToken)
     {
-        using (model.AccessReadWriteAsync(cancellationToken).AsTask().GetAwaiter().GetResult())
+        using (await model.AccessReadWriteAsync(cancellationToken))
         {
             // Read before the position, so that the position is the final one when the machine has stopped. Moves are queued
             // under this lock

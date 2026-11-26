@@ -252,7 +252,7 @@ namespace UnitTests.Machine
         public void DcsObjectModelDoesNotExposeExtraProperties()
         {
             IOptions<Settings> settings = Options.Create(new Settings());
-            DcsModel model = new(new TestLifetime(), NullLogger<DcsModel>.Instance, settings);
+            DcsModel model = new(new TestLifetime(), NullLogger<DcsModel>.Instance, settings, TimeProvider.System);
 
             // DCS adds its own members to the object model, but the descriptor must only describe the API model
             Assert.That(model.Descriptor.Properties.Count, Is.EqualTo(ObjectModel.TypeDescriptor.Properties.Count));

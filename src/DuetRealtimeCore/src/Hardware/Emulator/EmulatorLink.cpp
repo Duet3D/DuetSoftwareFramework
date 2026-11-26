@@ -1,7 +1,9 @@
 #include "EmulatorLink.h"
 
-#include <Hardware/Emulator/EmulatedTimeBase.h>
+#include <Platform/Activity.h>
+#include <Platform/LocalClock.h>
 
+#include <poll.h>
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -10,7 +12,6 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
-#include <ctime>
 #include <system_error>
 
 namespace Duet::Sbc::Emulator
@@ -22,12 +23,8 @@ namespace Duet::Sbc::Emulator
 		// Pause between attempts to connect to an emulator that is not listening yet
 		constexpr auto connectRetryInterval = std::chrono::milliseconds(20);
 
-		int64_t MonotonicNs() noexcept
-		{
-			timespec ts{};
-			clock_gettime(CLOCK_MONOTONIC, &ts);
-			return (int64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
-		}
+		std::mutex currentMutex;
+		std::weak_ptr<EmulatorLink> currentLink;
 
 		// Read exactly `length` bytes. False on end of stream or a socket error.
 		bool ReadExact(int fd, void* data, size_t length) noexcept
@@ -50,6 +47,8 @@ namespace Duet::Sbc::Emulator
 			return true;
 		}
 
+		// Connecting waits for Renode to start listening, in real time: it happens before the bench
+		// drives anything
 		int Connect(const std::string& socketPath, int timeoutMs)
 		{
 			sockaddr_un addr{};
@@ -115,15 +114,11 @@ namespace Duet::Sbc::Emulator
 			}
 			throw;
 		}
-		// The step clock is timed by emulated time from here on (EmulatedTimeBase.h)
-		EmulatedTimeBase::Instance().Reset();
-		EmulatedTimeBase::Install();
 		m_reader = std::thread([this] { ReaderLoop(); });
 	}
 
 	EmulatorLink::~EmulatorLink()
 	{
-		EmulatedTimeBase::Uninstall();
 		// Unblocks the reader, which then sees the end of the stream
 		::shutdown(m_socketFd, SHUT_RDWR);
 		if (m_reader.joinable())
@@ -133,8 +128,25 @@ namespace Duet::Sbc::Emulator
 		::close(m_socketFd);
 		for (LineState& line : m_lines)
 		{
+			// Edges nobody will take any more
+			Edge edge{};
+			while (TakeEdge(static_cast<Line>(&line - m_lines.data()), edge))
+			{
+			}
 			::close(line.eventFd);
 		}
+	}
+
+	std::shared_ptr<EmulatorLink> EmulatorLink::Current()
+	{
+		const std::lock_guard lock(currentMutex);
+		return currentLink.lock();
+	}
+
+	void EmulatorLink::SetCurrent(const std::shared_ptr<EmulatorLink>& link)
+	{
+		const std::lock_guard lock(currentMutex);
+		currentLink = link;
 	}
 
 	void EmulatorLink::SendAll(const void* data, size_t length)
@@ -164,6 +176,7 @@ namespace Duet::Sbc::Emulator
 		}
 
 		const std::lock_guard exchangeLock(m_exchangeMutex);
+		uint16_t sequence = 0;
 		{
 			const std::lock_guard lock(m_resultMutex);
 			if (m_failed)
@@ -171,24 +184,40 @@ namespace Duet::Sbc::Emulator
 				throw std::system_error(ENOTCONN, std::generic_category(), "Emulator link failed: " + m_failure);
 			}
 			m_haveResult = false;
-		}
-
-		uint16_t sequence = 0;
-		{
-			const std::lock_guard lock(m_resultMutex);
 			sequence = ++m_sequence;
 		}
+
 		const FrameHeader header{static_cast<uint8_t>(FrameType::Exchange), 0, sequence, static_cast<uint32_t>(length), 0};
 		SendAll(&header, sizeof(header));
 		SendAll(tx, length);
+		m_framesSent.fetch_add(1);
 
-		std::unique_lock lock(m_resultMutex);
-		if (!m_resultReady.wait_for(lock,
-									std::chrono::milliseconds(m_exchangeTimeoutMs),
-									[this] { return m_haveResult || m_failed; }))
+		// The result comes when the bench releases it, and the timeout is local time, which the bench moves
+		const int64_t deadline = LocalClock::DeadlineAfterMs(m_exchangeTimeoutMs);
+		while (true)
 		{
-			throw std::system_error(ETIMEDOUT, std::generic_category(), "Emulator did not complete an SPI exchange");
+			{
+				const std::lock_guard lock(m_resultMutex);
+				if (m_haveResult || m_failed)
+				{
+					break;
+				}
+			}
+			const int timeout = LocalClock::PollTimeoutMs(deadline);
+			if (timeout == 0)
+			{
+				throw std::system_error(ETIMEDOUT, std::generic_category(), "Emulator did not complete an SPI exchange");
+			}
+			pollfd fds[2] = {{m_resultWaker.Fd(), POLLIN, 0}, {m_clockWaker.Fd(), POLLIN, 0}};
+			{
+				const Activity::WaitingOn waiting(fds);
+				(void)::poll(fds, 2, timeout);
+			}
+			m_resultWaker.Drain();
+			m_clockWaker.Drain();
 		}
+
+		const std::lock_guard lock(m_resultMutex);
 		if (!m_haveResult)
 		{
 			throw std::system_error(ENOTCONN, std::generic_category(), "Emulator link failed: " + m_failure);
@@ -201,71 +230,101 @@ namespace Duet::Sbc::Emulator
 		m_haveResult = false;
 	}
 
+	bool EmulatorLink::NextFrameTime(int64_t& ns)
+	{
+		const std::lock_guard lock(m_heldMutex);
+		if (m_held.empty())
+		{
+			return false;
+		}
+		ns = static_cast<int64_t>(m_held.front().header.emulatedTimeNs);
+		return true;
+	}
+
+	bool EmulatorLink::ReleaseFrame()
+	{
+		HeldFrame frame;
+		{
+			const std::lock_guard lock(m_heldMutex);
+			if (m_held.empty())
+			{
+				return false;
+			}
+			frame = std::move(m_held.front());
+			m_held.pop_front();
+		}
+		Deliver(frame);
+		return true;
+	}
+
 	void EmulatorLink::ReaderLoop() noexcept
 	{
-		std::vector<uint8_t> payload;
 		while (true)
 		{
-			FrameHeader header{};
-			if (!ReadExact(m_socketFd, &header, sizeof(header)))
+			HeldFrame frame;
+			if (!ReadExact(m_socketFd, &frame.header, sizeof(frame.header)))
 			{
 				Fail("connection closed");
 				return;
 			}
-			if (header.length > MaxExchangeLength)
+			if (frame.header.length > MaxExchangeLength)
 			{
 				Fail("oversized frame");
 				return;
 			}
-			payload.resize(header.length);
-			if (!ReadExact(m_socketFd, payload.data(), payload.size()))
+			frame.payload.resize(frame.header.length);
+			if (!ReadExact(m_socketFd, frame.payload.data(), frame.payload.size()))
 			{
 				Fail("connection closed");
 				return;
 			}
-
-			EmulatedTimeBase::Instance().OnSample((int64_t)header.emulatedTimeNs, MonotonicNs());
-			switch (static_cast<FrameType>(header.type))
 			{
-			case FrameType::Time:
-				break;
+				const std::lock_guard lock(m_heldMutex);
+				m_held.push_back(std::move(frame));
+			}
+			m_framesReceived.fetch_add(1);
+		}
+	}
 
-			case FrameType::ExchangeResult:
+	void EmulatorLink::Deliver(HeldFrame& frame)
+	{
+		switch (static_cast<FrameType>(frame.header.type))
+		{
+		case FrameType::ExchangeResult:
+		{
+			const std::lock_guard lock(m_resultMutex);
+			if (frame.header.sequence != m_sequence)
 			{
-				const std::lock_guard lock(m_resultMutex);
-				if (header.sequence != m_sequence)
-				{
-					// The result of an exchange that timed out: nobody is waiting for it
-					break;
-				}
-				m_result.swap(payload);
-				m_haveResult = true;
-				m_resultReady.notify_all();
+				// The result of an exchange that timed out: nobody is waiting for it
 				break;
 			}
+			m_result.swap(frame.payload);
+			m_haveResult = true;
+			m_resultWaker.Signal();
+			break;
+		}
 
-			case FrameType::LineLevel:
+		case FrameType::LineLevel:
+		{
+			LineLevelPayload level{};
+			if (frame.payload.size() != sizeof(level))
 			{
-				LineLevelPayload level{};
-				if (payload.size() != sizeof(level))
-				{
-					Fail("malformed line frame");
-					return;
-				}
-				std::memcpy(&level, payload.data(), sizeof(level));
-				if (level.line >= NumLines)
-				{
-					Fail("frame for an unknown line");
-					return;
-				}
-				OnLineLevel(static_cast<Line>(level.line), level.level != 0);
-				break;
-			}
-
-			default:
-				Fail("unknown frame type");
+				Fail("malformed line frame");
 				return;
 			}
+			std::memcpy(&level, frame.payload.data(), sizeof(level));
+			if (level.line >= NumLines)
+			{
+				Fail("frame for an unknown line");
+				return;
+			}
+			OnLineLevel(static_cast<Line>(level.line), level.level != 0);
+			break;
+		}
+
+		default:
+			Fail("unknown frame type");
+			return;
 		}
 	}
 
@@ -285,6 +344,7 @@ namespace Duet::Sbc::Emulator
 			return;
 		}
 		state.edges.push_back({level, state.sequenceNumber});
+		Activity::Signalled(state.eventFd);
 		const uint64_t one = 1;
 		(void)::write(state.eventFd, &one, sizeof(one));
 	}
@@ -294,7 +354,7 @@ namespace Duet::Sbc::Emulator
 		const std::lock_guard lock(m_resultMutex);
 		m_failed = true;
 		m_failure = reason;
-		m_resultReady.notify_all();
+		m_resultWaker.Signal();
 	}
 
 	int EmulatorLink::LineFd(Line line) const noexcept

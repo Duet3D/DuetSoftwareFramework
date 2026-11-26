@@ -8,9 +8,12 @@
 
 #include <Motion/MoveTiming.h>
 #include <Motion/StepTimer.h>
+#include <Platform/Activity.h>
+#include <Platform/LocalClock.h>
 #include <Platform/ProcessHelpers.h>
 
-#include <chrono>
+#include <poll.h>
+
 #include <cstring>
 
 namespace Duet::Sbc
@@ -85,6 +88,7 @@ namespace Duet::Sbc
 	void MotionService::Configure(const Motion::MachineConfig& config)
 	{
 		m_move.Configure(config);
+		m_wake.Signal();
 	}
 
 	void MotionService::Start(int rtPriority)
@@ -108,6 +112,7 @@ namespace Duet::Sbc
 	void MotionService::Stop()
 	{
 		m_stop.store(true, std::memory_order_release);
+		m_wake.Signal();
 		if (m_thread.joinable())
 		{
 			m_thread.join();
@@ -116,13 +121,21 @@ namespace Duet::Sbc
 
 	void MotionService::Run()
 	{
+		const Activity::Running running;
 		while (!m_stop.load(std::memory_order_acquire))
 		{
 			SpinOnce();
 			// A fixed tick rather than the interval the rings ask for. Spin returns how long it may
 			// be before more preparation is needed, but a move submitted a moment later needs
-			// picking up sooner than that, and there is no cost to asking again.
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			// picking up sooner than that, and there is no cost to asking again. Work handed over
+			// wakes it sooner. A pinned clock stands still between moves, so then only the clock
+			// moving or work being handed over is a reason to spin again.
+			pollfd wake{m_wake.Fd(), POLLIN, 0};
+			{
+				const Activity::WaitingOn waiting({&wake, 1});
+				(void)::poll(&wake, 1, LocalClock::IsPinned() ? -1 : 1);
+			}
+			m_wake.Drain();
 		}
 	}
 
@@ -326,7 +339,12 @@ namespace Duet::Sbc
 		ForcedPositions forced;
 		forced.driveMask = driveMask & suppliedDrives;
 		std::memcpy(forced.positions, positions.data(), count * sizeof(int32_t));
-		return m_forcedPositions.Write(AsBytes(forced));
+		if (!m_forcedPositions.Write(AsBytes(forced)))
+		{
+			return false;
+		}
+		m_wake.Signal();
+		return true;
 	}
 
 	void MotionService::DrainForcedPositions()
@@ -358,7 +376,12 @@ namespace Duet::Sbc
 	bool MotionService::RequestStop(DDARing::StopKind kind)
 	{
 		const uint8_t token = static_cast<uint8_t>(kind);
-		return m_feedholdRequests.Write({&token, 1});
+		if (!m_feedholdRequests.Write({&token, 1}))
+		{
+			return false;
+		}
+		m_wake.Signal();
+		return true;
 	}
 
 	void MotionService::DrainFeedholds()
@@ -516,6 +539,7 @@ namespace Duet::Sbc
 			m_submissionsDropped.fetch_add(1, std::memory_order_relaxed);
 			return false;
 		}
+		m_wake.Signal();
 		return true;
 	}
 
@@ -525,6 +549,7 @@ namespace Duet::Sbc
 		{
 			m_ringState[ring].shouldStartMove.store(shouldStartMove, std::memory_order_relaxed);
 			m_ringState[ring].waitingForEmpty.store(waitingForEmpty, std::memory_order_relaxed);
+			m_wake.Signal();
 		}
 	}
 

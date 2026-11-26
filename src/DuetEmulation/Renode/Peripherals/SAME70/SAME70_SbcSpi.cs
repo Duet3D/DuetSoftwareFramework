@@ -10,10 +10,13 @@
 // select raises NSSR, which is how the firmware learns that a transfer has ended. Master mode and
 // interrupt-driven transfers without DMA are not modelled.
 //
-// The link: a Unix domain socket server that a monitor command opens. An Exchange from the SBC is one
-// chip-select cycle, run at the machine's next synchronised point; the controller's TfrRdy and
-// DataAvailable outputs (PIO pins connected to this model's GPIO inputs 0 and 1) go back as LineLevel
-// frames, and a Time frame every millisecond of emulated time lets the SBC follow emulated time. The
+// The link: a Unix domain socket server that a monitor command opens. The bench that drives the
+// emulation keeps it in lockstep with the SBC (EmulatorLinkFormats.h): between runs of emulated time
+// it calls Sync, which waits until the connection and the Exchanges the SBC says it has sent have
+// arrived, applies them in order (a new connection is told the lines' levels; an Exchange is one
+// chip-select cycle), and returns how many frames have been sent to the SBC, so the bench can wait
+// for them in turn. The controller's TfrRdy and DataAvailable outputs (PIO pins connected to this
+// model's GPIO inputs 0 and 1) go back as LineLevel frames, each stamped with the emulated time. The
 // cycle runs at once, but the firmware drops TfrRdy from its end-of-transfer interrupt, after it; on
 // hardware TfrRdy is low before the master has its bytes back, so the result is held until it is.
 //
@@ -29,9 +32,11 @@
 //         1 -> spi1@1          // DataAvailable
 //
 //     spi1 ListenForSbc "/path/to/sbc.sock"
+//     spi1 Sync 1 42      // after the SBC's first connection and 42 Exchanges on it; prints the frames sent
 //
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
@@ -41,7 +46,6 @@ using Antmicro.Renode.Logging;
 using Antmicro.Renode.Peripherals.Bus;
 using Antmicro.Renode.Peripherals.DMA;
 using Antmicro.Renode.Peripherals.GPIOPort;
-using Antmicro.Renode.Peripherals.Timers;
 using Antmicro.Renode.Time;
 
 namespace Antmicro.Renode.Peripherals.SPI
@@ -60,9 +64,6 @@ namespace Antmicro.Renode.Peripherals.SPI
             IRQ = new GPIO();
             dma.RegisterRequestSource(txPeripheralId, FillTransmitter);
             dma.RegisterRequestSource(rxPeripheralId, () => { });
-            timeFrames = new LimitTimer(machine.ClockSource, 1000000000 / (long)TimeFrameIntervalNs, this, "sbcTime", 1,
-                                        Direction.Ascending, false, WorkMode.Periodic, true, true);
-            timeFrames.LimitReached += () => Send(FrameTime, 0, Array.Empty<byte>());
             Reset();
         }
 
@@ -110,6 +111,64 @@ namespace Antmicro.Renode.Peripherals.SPI
             listener.Bind(new UnixDomainSocketEndPoint(path));
             listener.Listen(1);
             new Thread(AcceptLoop) { IsBackground = true, Name = "SBC link" }.Start();
+        }
+
+        // Wait until the SBC's `connections`th connection has arrived with `exchanges` Exchanges on it,
+        // apply everything that has arrived, and return the frames sent to the SBC on its connection.
+        // Called between runs of emulated time, so what is applied happens at the same emulated time
+        // on every run.
+        public int Sync(int connections, int exchanges)
+        {
+            List<InboxItem> items;
+            lock(connectionLock)
+            {
+                var deadline = DateTime.UtcNow + SyncTimeout;
+                while(connectionsAccepted < connections || (connectionsAccepted == connections && exchangesReceived < exchanges))
+                {
+                    var left = deadline - DateTime.UtcNow;
+                    if(left <= TimeSpan.Zero)
+                    {
+                        throw new Exceptions.RecoverableException(
+                            $"The SBC's connection {connections} and {exchanges} exchanges did not arrive (have connection {connectionsAccepted}, {exchangesReceived} exchanges)");
+                    }
+                    Monitor.Wait(connectionLock, left);
+                }
+                items = new List<InboxItem>(inbox);
+                inbox.Clear();
+            }
+
+            foreach(var item in items)
+            {
+                lock(connectionLock)
+                {
+                    // What arrived on a connection that has since closed is not applied
+                    if(item.Generation != generation || connection == null)
+                    {
+                        continue;
+                    }
+                }
+                if(item.Mosi == null)
+                {
+                    for(var line = 0; line < NumLines; line++)
+                    {
+                        Send(FrameLineLevel, 0, new byte[] { (byte)line, (byte)(lineLevels[line] ? 1 : 0) });
+                    }
+                    continue;
+                }
+                var miso = Exchange(item.Mosi);
+                if(!lineLevels[LineTransferReady])
+                {
+                    Send(FrameExchangeResult, item.Sequence, miso);
+                    continue;
+                }
+                heldResult = Tuple.Create(item.Sequence, miso);
+                machine.ScheduleAction(TimeInterval.FromMilliseconds(MaxResultHoldMs), __ => SendHeldResult());
+            }
+
+            lock(connectionLock)
+            {
+                return framesSent;
+            }
         }
 
         public void Dispose()
@@ -281,20 +340,16 @@ namespace Antmicro.Renode.Peripherals.SPI
                     connection?.Dispose();
                     connection = accepted;
                     generation++;
+                    connectionsAccepted++;
+                    exchangesReceived = 0;
+                    framesSent = 0;
                     outgoing = new BlockingCollection<byte[]>();
                     var queue = outgoing;
                     new Thread(() => WriteLoop(accepted, queue)) { IsBackground = true, Name = "SBC link writer" }.Start();
+                    // The SBC learns the lines' levels when Sync applies its connection
+                    inbox.Add(new InboxItem(generation, 0, null));
+                    Monitor.PulseAll(connectionLock);
                 }
-                // The SBC learns the lines' levels when it connects. They are sent from the emulation
-                // thread, like their changes, so that a change cannot overtake them.
-                machine.LocalTimeSource.ExecuteInNearestSyncedState(_ =>
-                {
-                    timeFrames.Enabled = true;
-                    for(var line = 0; line < NumLines; line++)
-                    {
-                        Send(FrameLineLevel, 0, new byte[] { (byte)line, (byte)(lineLevels[line] ? 1 : 0) });
-                    }
-                });
                 ReadLoop(accepted);
             }
         }
@@ -322,25 +377,15 @@ namespace Antmicro.Renode.Peripherals.SPI
                 {
                     break;
                 }
-                machine.LocalTimeSource.ExecuteInNearestSyncedState(_ =>
+                lock(connectionLock)
                 {
-                    // An exchange of a connection that has since closed is not clocked
-                    lock(connectionLock)
+                    if(generation == ourGeneration)
                     {
-                        if(generation != ourGeneration || connection == null)
-                        {
-                            return;
-                        }
+                        inbox.Add(new InboxItem(ourGeneration, sequence, mosi));
+                        exchangesReceived++;
+                        Monitor.PulseAll(connectionLock);
                     }
-                    var miso = Exchange(mosi);
-                    if(!lineLevels[LineTransferReady])
-                    {
-                        Send(FrameExchangeResult, sequence, miso);
-                        return;
-                    }
-                    heldResult = Tuple.Create(sequence, miso);
-                    machine.ScheduleAction(TimeInterval.FromMilliseconds(MaxResultHoldMs), __ => SendHeldResult());
-                });
+                }
             }
             lock(connectionLock)
             {
@@ -350,13 +395,6 @@ namespace Antmicro.Renode.Peripherals.SPI
                     connection = null;
                 }
             }
-            machine.LocalTimeSource.ExecuteInNearestSyncedState(_ =>
-            {
-                lock(connectionLock)
-                {
-                    timeFrames.Enabled = connection != null;
-                }
-            });
             socket.Dispose();
         }
 
@@ -421,8 +459,24 @@ namespace Antmicro.Renode.Peripherals.SPI
                 if(connection != null && !outgoing.IsAddingCompleted)
                 {
                     outgoing.Add(frame);
+                    framesSent++;
                 }
             }
+        }
+
+        // An Exchange from the SBC, or its connection when Mosi is null, waiting for Sync
+        private sealed class InboxItem
+        {
+            public InboxItem(int generation, ushort sequence, byte[] mosi)
+            {
+                Generation = generation;
+                Sequence = sequence;
+                Mosi = mosi;
+            }
+
+            public int Generation { get; }
+            public ushort Sequence { get; }
+            public byte[] Mosi { get; }
         }
 
         private readonly IMachine machine;
@@ -431,9 +485,9 @@ namespace Antmicro.Renode.Peripherals.SPI
         private readonly int rxPeripheralId;
         private readonly SAME70_ParallelIO chipSelect;
         private readonly int chipSelectPin;
-        private readonly LimitTimer timeFrames;
         private readonly bool[] lineLevels = new bool[NumLines];
         private readonly object connectionLock = new object();
+        private readonly List<InboxItem> inbox = new List<InboxItem>();
 
         private bool enabled;
         private uint interruptMask;
@@ -444,6 +498,9 @@ namespace Antmicro.Renode.Peripherals.SPI
         private uint received;
         private Tuple<ushort, byte[]> heldResult;
         private int generation;
+        private int connectionsAccepted;
+        private int exchangesReceived;
+        private int framesSent;
         private Socket listener;
         private Socket connection;
         private BlockingCollection<byte[]> outgoing;
@@ -453,13 +510,13 @@ namespace Antmicro.Renode.Peripherals.SPI
         private const byte FrameExchange = 1;
         private const byte FrameExchangeResult = 2;
         private const byte FrameLineLevel = 3;
-        private const byte FrameTime = 4;
         private const int NumLines = 2;
         private const int LineTransferReady = 0;
         // How long a result waits for the firmware to drop TfrRdy before it is sent anyway
         private const int MaxResultHoldMs = 10;
         private const uint MaxExchangeLength = 65536;
-        private const ulong TimeFrameIntervalNs = 1000000;
+        // How long Sync waits, in real time, for what the SBC has sent to arrive
+        private static readonly TimeSpan SyncTimeout = TimeSpan.FromSeconds(10);
 
         private const long Cr = 0x00;
         private const long Mr = 0x04;

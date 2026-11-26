@@ -1,3 +1,4 @@
+using System;
 using DuetAPI.ObjectModel;
 using DuetControlServer;
 using DuetControlServer.Model;
@@ -34,7 +35,7 @@ namespace UnitTests.Machine
         public void Setup()
         {
             _changes.Clear();
-            _model = new DcsModel(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()));
+            _model = new DcsModel(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()), TimeProvider.System);
 
             DcsObserver observer = new(_model);
             observer.OnPropertyPathChanged += (path, changeType, value) => _changes.Add((path, changeType, value));

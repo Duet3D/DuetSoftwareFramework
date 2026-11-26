@@ -40,6 +40,7 @@ namespace DuetControlServer.Motion;
 internal sealed class EndstopCorrection(
     NativeLink nativeLink,
     MovePlanner planner,
+    TimeProvider timeProvider,
     ILogger<EndstopCorrection> logger) : IDiagnostics
 {
     /// <summary>
@@ -78,7 +79,7 @@ internal sealed class EndstopCorrection(
     private readonly record struct StoppedDriver(byte Board, byte Driver);
 
     private readonly Lock _lock = new();
-    private DateTime _lastRevertSentAt = DateTime.MinValue;
+    private long? _lastRevertSentAt;
 
     /// <summary>
     /// Which drivers of each drive have stopped so far, one bit per driver of the axis
@@ -270,7 +271,7 @@ internal sealed class EndstopCorrection(
         {
             using (_lock.EnterScope())
             {
-                return DateTime.UtcNow - _lastRevertSentAt < TotalRevertTime;
+                return _lastRevertSentAt is long sentAt && timeProvider.GetElapsedTime(sentAt) < TotalRevertTime;
             }
         }
     }
@@ -411,7 +412,7 @@ internal sealed class EndstopCorrection(
         {
             using (_lock.EnterScope())
             {
-                _lastRevertSentAt = DateTime.UtcNow;
+                _lastRevertSentAt = timeProvider.GetTimestamp();
             }
         }
     }

@@ -22,9 +22,12 @@ public sealed class DcsHost : IAsyncDisposable
 {
     private static readonly Lazy<bool> NativeLibraryRegistered = new(() =>
     {
-        HostLibraryLocator.Register(typeof(Settings).Assembly);
+        HostLibraryLocator.Register(typeof(Settings).Assembly, typeof(DcsHost).Assembly);
         return true;
     });
+
+    /// <summary>Resolve <c>libduet_realtime_core.so</c> for DuetControlServer and this assembly, once</summary>
+    internal static void RegisterNativeLibrary() => _ = NativeLibraryRegistered.Value;
 
     private readonly IHost _host;
     private readonly FileLoggerProvider _log;
@@ -53,11 +56,12 @@ public sealed class DcsHost : IAsyncDisposable
     /// <param name="socketDirectory">Where its IPC socket goes, which must be a short path: a Unix socket's is limited to 107 bytes</param>
     /// <param name="emulatorSocket">The socket the controller's SPI model listens on</param>
     /// <param name="files">Files on the SD card, by path on the card ("sys/config.g")</param>
+    /// <param name="clock">The clock DuetControlServer reads, which the bench moves</param>
     /// <param name="cancellationToken">Cancels starting</param>
     public static async Task<DcsHost> StartAsync(string workDirectory, string socketDirectory, string emulatorSocket, IReadOnlyDictionary<string, string> files,
-                                                 CancellationToken cancellationToken = default)
+                                                 TimeProvider clock, CancellationToken cancellationToken = default)
     {
-        _ = NativeLibraryRegistered.Value;
+        RegisterNativeLibrary();
 
         string root = Path.Combine(workDirectory, "dsf");
         string sd = Path.Combine(root, "sd");
@@ -82,15 +86,9 @@ public sealed class DcsHost : IAsyncDisposable
             [nameof(Settings.SocketDirectory)] = socketDirectory,
             [nameof(Settings.StartErrorFile)] = Path.Combine(root, "dcs.err"),
             [nameof(Settings.PluginDirectory)] = Path.Combine(root, "plugins"),
-            // TODO: these bound what the controller does in real time, and the emulator runs several
-            // times slower than real time and not at a steady rate, so they are scaled up. Once
-            // DuetControlServer takes its time from a TimeProvider they can be measured in emulated
-            // time instead, which makes the DSF bench deterministic
-            [nameof(Settings.SbcConnectTimeout)] = "30000",
-            [nameof(Settings.SbcTransferTimeout)] = "5000",
-            [nameof(Settings.SbcConnectionTimeout)] = "20000",
-            [nameof(Settings.CanRequestTimeout)] = "15000",
-            [nameof(Settings.ExpansionBoardTimeout)] = "50000",
+            // Walking the network interfaces and volumes runs subprocesses outside the emulated
+            // timeline, and what it finds is the host's, so it is done once only
+            [nameof(Settings.HostUpdateInterval)] = int.MaxValue.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
 
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
@@ -101,6 +99,7 @@ public sealed class DcsHost : IAsyncDisposable
                 .AddProvider(log)
                 .SetMinimumLevel(LogLevel.Debug))
             .ConfigureServices(services => services
+                .AddSingleton(clock)
                 .AddSettings(configuration, updateOnly: false, logLevel: LogLevel.Debug,
                              configFile: new FileInfo(Path.Combine(root, "config.json")),
                              socketDirectory: null, socketFile: null, baseDirectory: null,
@@ -120,12 +119,15 @@ public sealed class DcsHost : IAsyncDisposable
         return new DcsHost(host, log, sd);
     }
 
-    /// <summary>Run codes as if entered on the HTTP input, and return the reply once they have finished</summary>
+    /// <summary>
+    /// Run codes as if entered on Aux2, the channel the standalone bench's console is, so that the two
+    /// stacks' object models describe the codes on the same input, and return the reply once they have finished
+    /// </summary>
     public Task<string> ExecuteCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         SimpleCode command = Services.GetRequiredService<CommandFactory>().Create<SimpleCode>();
         command.Code = code;
-        command.Channel = DuetAPI.CodeChannel.HTTP;
+        command.Channel = DuetAPI.CodeChannel.Aux2;
         return command.ExecuteAsync(cancellationToken);
     }
 

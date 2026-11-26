@@ -1,3 +1,4 @@
+using System;
 using DuetControlServer;
 using DuetControlServer.Link.Expansion;
 using DuetControlServer.Link.Protocol.Shared;
@@ -26,12 +27,12 @@ public class ExpansionBoardManagerTests
     {
         DuetControlServer.Model.ObjectModel model = new(new StoppedLifetime(),
                                                         NullLogger<DuetControlServer.Model.ObjectModel>.Instance,
-                                                        Options.Create(new Settings()));
+                                                        Options.Create(new Settings()), TimeProvider.System);
         events = new DuetControlServer.Events.EventQueue(NullLogger<DuetControlServer.Events.EventQueue>.Instance);
         DuetControlServer.Link.Expansion.ClosedLoopDataCollector closedLoop =
-            new(null!, model, NullLogger<DuetControlServer.Link.Expansion.ClosedLoopDataCollector>.Instance);
-        return new ExpansionBoardManager(model, events, closedLoop, new DuetControlServer.Heat.SensorManager(model),
-                                         Options.Create(new Settings()), NullLogger<ExpansionBoardManager>.Instance);
+            new(null!, model, TimeProvider.System, NullLogger<DuetControlServer.Link.Expansion.ClosedLoopDataCollector>.Instance);
+        return new ExpansionBoardManager(model, events, closedLoop, new DuetControlServer.Heat.SensorManager(model, TimeProvider.System),
+                                         Options.Create(new Settings()), TimeProvider.System, NullLogger<ExpansionBoardManager>.Instance);
     }
 
     /// <summary>

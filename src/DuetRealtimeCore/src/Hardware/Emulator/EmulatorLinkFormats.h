@@ -15,14 +15,13 @@
 //   LineLevel       emulator -> SBC  An input line's level: payload is the line, then 0 or 1. The
 //                                    emulator sends one for each line when the SBC connects and one
 //                                    each time a line changes.
-//   Time            emulator -> SBC  Nothing but the header's time. The emulator sends one every
-//                                    TimeFrameIntervalNs of emulated time, so that the SBC's clock
-//                                    follows emulated time while the link is otherwise idle.
 //
-// Frames from the emulator are in the order things happened on the emulated controller, so a
-// LineLevel that follows an ExchangeResult happened after that exchange, and each carries the
-// emulated time at which it was sent. The emulator runs slower than real time, and not at a steady
-// rate, so the SBC times what it does against the controller's clock by that time (EmulatedTimeBase).
+// The two sides run in lockstep under a bench that drives both clocks (src/DuetEmulation/Dsf). Each
+// frame from the emulator carries the emulated time it was sent at, and the SBC holds it until the
+// bench has moved the SBC's clock (Platform/LocalClock.h) to that time and releases it. The emulator
+// applies the SBC's Exchanges only when the bench tells it to, between runs of emulated time, and
+// says how many frames it has sent, so the bench knows when they have all arrived. Both directions
+// therefore happen at the same emulated times on every run.
 #pragma once
 
 #include <cstddef>
@@ -36,7 +35,6 @@ namespace Duet::Sbc::Emulator
 		Exchange = 1,
 		ExchangeResult = 2,
 		LineLevel = 3,
-		Time = 4,
 	};
 
 	enum class Line : uint8_t
@@ -69,8 +67,5 @@ namespace Duet::Sbc::Emulator
 
 	// The longest exchange either side accepts. SpiTransfer's largest is one data block.
 	inline constexpr uint32_t MaxExchangeLength = 65536;
-
-	// Emulated time between the emulator's Time frames
-	inline constexpr uint64_t TimeFrameIntervalNs = 1000000;
 
 } // namespace Duet::Sbc::Emulator

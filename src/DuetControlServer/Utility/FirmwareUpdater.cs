@@ -26,7 +26,8 @@ namespace DuetControlServer.Utility;
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<FirmwareUpdater> logger, IOptions<Settings> settings)
+/// <param name="timeProvider">Clock the waits for the boards are timed on</param>
+public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<FirmwareUpdater> logger, IOptions<Settings> settings, TimeProvider timeProvider)
 {
     /// <summary>
     /// Update the firmware from this instance
@@ -169,7 +170,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                     // Unlike with M997, we need to wait for RRF to complete the update process
                     while (true)
                     {
-                        await Task.Delay(2000, cancellationToken);
+                        await Task.Delay(TimeSpan.FromSeconds(2), timeProvider, cancellationToken);
 
                         using (await model.AccessReadOnlyAsync(cancellationToken))
                         {
@@ -382,7 +383,7 @@ public class FirmwareUpdater(CodeFactory codeFactory, FilePathResolver filePath,
                     // Unlike with M997, we need to wait for RRF to complete the update process
                     while (true)
                     {
-                        await Task.Delay(2000, cancellationToken);
+                        await Task.Delay(TimeSpan.FromSeconds(2), timeProvider, cancellationToken);
 
                         using JsonDocument patch = await subscribeConnection.GetObjectModelPatchAsync(cancellationToken);
                         objectModel.UpdateFromJson(patch.RootElement);

@@ -15,7 +15,8 @@ namespace DuetControlServer.Commands;
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public sealed class SetPluginProcess(CommandFactory commandFactory, Model.ObjectModel model, ILogger<SetPluginProcess> logger, IOptions<Settings> settings) : DuetAPI.Commands.SetPluginProcess
+/// <param name="timeProvider">Clock the restart interval is measured on</param>
+public sealed class SetPluginProcess(CommandFactory commandFactory, Model.ObjectModel model, ILogger<SetPluginProcess> logger, IOptions<Settings> settings, TimeProvider timeProvider) : DuetAPI.Commands.SetPluginProcess
 {
     /// <summary>
     /// Event that is set when a plugin has stopped
@@ -45,7 +46,7 @@ public sealed class SetPluginProcess(CommandFactory commandFactory, Model.Object
                         try
                         {
                             // Wait a moment to avoid excessive system load in case the plugin is broken
-                            await Task.Delay(settings.Value.PluginAutoRestartInterval, cancellationToken);
+                            await Task.Delay(TimeSpan.FromMilliseconds(settings.Value.PluginAutoRestartInterval), timeProvider, cancellationToken);
 
                             // Restart it
                             logger.LogInformation("Auto-restarting plugin {Plugin}", Plugin);

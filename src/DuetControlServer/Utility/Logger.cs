@@ -21,7 +21,8 @@ namespace DuetControlServer.Utility;
 /// <param name="lifetime">Host application lifetime</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
-public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<EventLogger> logger, IOptions<Settings> settings)
+/// <param name="timeProvider">Clock the log is stamped from</param>
+public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHostApplicationLifetime lifetime, ILogger<EventLogger> logger, IOptions<Settings> settings, TimeProvider timeProvider)
 {
     /// <summary>
     /// Default log file for M929 in case no P parameter is specified
@@ -68,7 +69,7 @@ public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHo
             _logCloseEvent = lifetime.ApplicationStopping.Register(Stop);
 
             // Write the first line
-            _writer.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
+            _writer.WriteLine($"{timeProvider.GetLocalNow():yyyy-MM-dd HH:mm:ss} Event logging started");
 
             // Update the object model
             using (model.AccessReadWrite())
@@ -102,7 +103,7 @@ public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHo
             _logCloseEvent = lifetime.ApplicationStopping.Register(Stop);
 
             // Write the first line
-            await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging started");
+            await _writer.WriteLineAsync($"{timeProvider.GetLocalNow():yyyy-MM-dd HH:mm:ss} Event logging started");
 
             // Update the object model
             using (await model.AccessReadWriteAsync())
@@ -148,7 +149,7 @@ public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHo
     {
         if (_writer is not null)
         {
-            _writer.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
+            _writer.WriteLine($"{timeProvider.GetLocalNow():yyyy-MM-dd HH:mm:ss} Event logging stopped");
             _writer.Close();
             _writer = null;
 
@@ -185,7 +186,7 @@ public class EventLogger(FilePathResolver filePath, Model.ObjectModel model, IHo
     {
         if (_writer is not null)
         {
-            await _writer.WriteLineAsync($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} Event logging stopped");
+            await _writer.WriteLineAsync($"{timeProvider.GetLocalNow():yyyy-MM-dd HH:mm:ss} Event logging stopped");
             _writer.Close();
             _writer = null;
 

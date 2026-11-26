@@ -44,15 +44,16 @@ namespace DuetControlServer.Link.Expansion;
 /// </remarks>
 /// <param name="model">Object model</param>
 /// <param name="sensorManager">Takes the sensor readings the boards report</param>
+/// <param name="timeProvider">Clock the boards' silence is measured on</param>
 /// <param name="logger">Logger</param>
 internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.EventQueue events,
                                            ClosedLoopDataCollector closedLoopDataCollector, Heat.SensorManager sensorManager,
-                                           IOptions<Settings> settings, ILogger<ExpansionBoardManager> logger) : BackgroundService
+                                           IOptions<Settings> settings, TimeProvider timeProvider, ILogger<ExpansionBoardManager> logger) : BackgroundService
 {
     /// <summary>
     /// When each board was last heard from, for the watchdog below
     /// </summary>
-    private readonly DateTime?[] _lastSeen = new DateTime?[CanId.MaxCanAddress + 1];
+    private readonly long?[] _lastSeen = new long?[CanId.MaxCanAddress + 1];
 
     /// <summary>
     /// How many reports may be waiting before the oldest is dropped
@@ -213,7 +214,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         // put boards[0] into a state meant for a board that stopped answering
         if (report.Source <= CanId.MaxCanAddress)
         {
-            _lastSeen[report.Source] = DateTime.UtcNow;
+            _lastSeen[report.Source] = timeProvider.GetTimestamp();
         }
 
         switch (report.Type)
@@ -353,7 +354,7 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
         }
 
         logger.LogInformation("Expansion board {Source} announced itself as {Description}", source, description);
-        _lastSeen[source] = DateTime.UtcNow;
+        _lastSeen[source] = timeProvider.GetTimestamp();
 
         // A board announces itself when it starts and when it regains time sync. The second is a board
         // the machine thought it still had, which is a different thing worth telling a macro about
@@ -906,15 +907,14 @@ internal sealed class ExpansionBoardManager(Model.ObjectModel model, Events.Even
     private async Task WatchForSilentBoardsAsync(CancellationToken stoppingToken)
     {
         TimeSpan timeout = TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout);
-        PeriodicTimer timer = new(TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout / 4));
+        PeriodicTimer timer = new(TimeSpan.FromMilliseconds(settings.Value.ExpansionBoardTimeout / 4), timeProvider);
         try
         {
             while (await timer.WaitForNextTickAsync(stoppingToken))
             {
-                DateTime now = DateTime.UtcNow;
                 for (byte address = 0; address <= CanId.MaxCanAddress; address++)
                 {
-                    if (_lastSeen[address] is not DateTime lastSeen || now - lastSeen < timeout)
+                    if (_lastSeen[address] is not long lastSeen || timeProvider.GetElapsedTime(lastSeen) < timeout)
                     {
                         continue;
                     }

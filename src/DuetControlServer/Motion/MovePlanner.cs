@@ -66,11 +66,13 @@ internal static class MoveSubmitResults
 /// </remarks>
 /// <param name="linkInterface">Link interface</param>
 /// <param name="model">Object model, which is where the machine configuration lives</param>
+/// <param name="timeProvider">Clock the waits for the engine are timed on</param>
 /// <param name="logger">Logger</param>
 internal sealed class MovePlanner(
     LinkInterface linkInterface,
     MotionTracker tracker,
     Model.ObjectModel model,
+    TimeProvider timeProvider,
     ILogger<MovePlanner> logger)
 {
     /// <summary>
@@ -376,7 +378,7 @@ internal sealed class MovePlanner(
         Task retired = Task.WhenAll(waits);
         while (!cancellationToken.IsCancellationRequested)
         {
-            Task finished = await Task.WhenAny(retired, Task.Delay(StandstillWatchdogInterval, cancellationToken));
+            Task finished = await Task.WhenAny(retired, Task.Delay(StandstillWatchdogInterval, timeProvider, cancellationToken));
             if (finished == retired)
             {
                 try
@@ -441,7 +443,7 @@ internal sealed class MovePlanner(
                 await StandstillAsync(cancellationToken);
                 return result;
             }
-            await Task.Delay(RingFullRetryDelay, cancellationToken);
+            await Task.Delay(RingFullRetryDelay, timeProvider, cancellationToken);
         }
         return null;
     }
@@ -850,7 +852,7 @@ internal sealed class MovePlanner(
             {
                 break;
             }
-            await Task.Delay(FeedholdPollInterval, cancellationToken);
+            await Task.Delay(FeedholdPollInterval, timeProvider, cancellationToken);
         }
         cancellationToken.ThrowIfCancellationRequested();
         return (firstPurgedMoveId, movesPurged, lastSurvivingMoveId, stopped);

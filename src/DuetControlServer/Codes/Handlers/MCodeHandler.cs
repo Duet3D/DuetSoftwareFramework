@@ -58,6 +58,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="sensorManager">The temperature sensors the machine has</param>
 /// <param name="toolManager">The tools the machine has, and which one is selected</param>
 /// <param name="configOverride">Where the settings config-override.g holds came from, for M500 and M501</param>
+/// <param name="timeProvider">Clock that waits and timeouts are measured on</param>
 /// <param name="settings">Settings</param>
 internal partial class MCodeHandler(
     CodeProcessor codeProcessor,
@@ -90,6 +91,7 @@ internal partial class MCodeHandler(
     Heat.SensorManager sensorManager,
     Tools.ToolManager toolManager,
     ConfigOverrideTracker configOverride,
+    TimeProvider timeProvider,
     IOptions<Settings> settings) : ICodeHandler
 {
     private MessageLoggerProvider? _messageLoggerProvider;
@@ -1338,7 +1340,7 @@ internal partial class MCodeHandler(
 
             // Perform emergency stop but don't wait longer than 4.5s
             Task stopTask = linkInterface.EmergencyStopAsync(cancellationToken);
-            Task completedTask = await Task.WhenAny(stopTask, Task.Delay(4500, lifetime.ApplicationStopped));
+            Task completedTask = await Task.WhenAny(stopTask, Task.Delay(TimeSpan.FromMilliseconds(4500), timeProvider, lifetime.ApplicationStopped));
             if (stopTask != completedTask)
             {
                 // Halt timed out, shut down this program
@@ -2295,7 +2297,7 @@ internal partial class MCodeHandler(
         _ = code.Task.ContinueWith(async task =>
         {
             await task;
-            await Task.Delay(1000);
+            await Task.Delay(TimeSpan.FromSeconds(1), timeProvider);
             lifetime.StopApplication();
         }, TaskContinuationOptions.RunContinuationsAsynchronously);
 
@@ -2320,7 +2322,7 @@ internal partial class MCodeHandler(
 
                 // Perform firmware reset but don't wait longer than 4.5s
                 Task resetTask = linkInterface.ResetFirmwareAsync(lifetime.ApplicationStopping);
-                Task completedTask = await Task.WhenAny(resetTask, Task.Delay(4500, lifetime.ApplicationStopped));
+                Task completedTask = await Task.WhenAny(resetTask, Task.Delay(TimeSpan.FromMilliseconds(4500), timeProvider, lifetime.ApplicationStopped));
                 if (resetTask != completedTask)
                 {
                     // Reset timed out, stop this program
@@ -2334,7 +2336,7 @@ internal partial class MCodeHandler(
                 _ = code.Task.ContinueWith(async task =>
                 {
                     await task;
-                    await Task.Delay(1000);
+                    await Task.Delay(TimeSpan.FromSeconds(1), timeProvider);
                     lifetime.StopApplication();
                 }, TaskContinuationOptions.RunContinuationsAsynchronously);
 

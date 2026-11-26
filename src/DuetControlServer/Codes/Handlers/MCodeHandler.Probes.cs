@@ -576,7 +576,7 @@ internal partial class MCodeHandler
             {
                 return new Message();
             }
-            await Task.Delay(WaitForInputInterval, cancellationToken);
+            await Task.Delay(WaitForInputInterval, timeProvider, cancellationToken);
         }
     }
 }

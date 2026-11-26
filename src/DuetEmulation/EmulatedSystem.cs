@@ -49,6 +49,9 @@ public sealed class EmulatedSystem : IAsyncDisposable
     /// <summary>Where the run's logs, traces and images are</summary>
     public string WorkDirectory { get; }
 
+    /// <summary>How long the machines run before they synchronise; emulated time passes in whole quanta</summary>
+    public TimeSpan Quantum => _quantum;
+
     /// <summary>The emulated time that has passed since the machines were created</summary>
     public TimeSpan Time => TimeSpan.FromTicks(Interlocked.Read(ref _elapsedTicks));
 

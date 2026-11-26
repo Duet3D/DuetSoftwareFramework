@@ -30,10 +30,12 @@ namespace DuetControlServer.Model;
 /// <param name="model">Object model</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings of the application</param>
+/// <param name="timeProvider">The SBC clock, which the object model reports</param>
 public partial class PeriodicUpdateService(
     ObjectModel model,
     ILogger<PeriodicUpdateService> logger,
-    IOptions<Settings> settings) : BackgroundService
+    IOptions<Settings> settings,
+    TimeProvider timeProvider) : BackgroundService
 {
     /// <summary>
     /// Where the Linux hostname is read from on each update
@@ -144,8 +146,8 @@ public partial class PeriodicUpdateService(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         string lastHostname = HostnameSource();
-        Stopwatch upTime = Stopwatch.StartNew();
-        Stopwatch sinceWalk = new();
+        long started = timeProvider.GetTimestamp();
+        long? lastWalk = null;
 
         try
         {
@@ -157,11 +159,11 @@ public partial class PeriodicUpdateService(
                     // volumes is taken on its own slower one, because it spawns a subprocess per
                     // interface and asks every mount for its size. sinceWalk is not running until
                     // the first walk, so the first tick takes both
-                    bool walkDue = !sinceWalk.IsRunning || sinceWalk.ElapsedMilliseconds >= settings.Value.HostUpdateInterval;
+                    bool walkDue = lastWalk is not long walked || timeProvider.GetElapsedTime(walked).TotalMilliseconds >= settings.Value.HostUpdateInterval;
                     if (walkDue)
                     {
                         // Timed from the attempt, so a walk that fails waits its interval like any other
-                        sinceWalk.Restart();
+                        lastWalk = timeProvider.GetTimestamp();
                     }
 
                     // Gather data outside the lock on a background thread (slow I/O, not cancellable)
@@ -196,7 +198,7 @@ public partial class PeriodicUpdateService(
                             ApplyVolumeData(volumeData);
                         }
                         ApplyHostname();
-                        ApplyClock(upTime);
+                        ApplyClock(timeProvider.GetElapsedTime(started));
                         CleanMessages();
                     }
                 }
@@ -207,7 +209,7 @@ public partial class PeriodicUpdateService(
                 }
 
                 // Wait for next scheduled update check
-                await Task.Delay(settings.Value.ModelUpdateInterval, stoppingToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(settings.Value.ModelUpdateInterval), timeProvider, stoppingToken);
             } while (!stoppingToken.IsCancellationRequested);
         }
         catch (OperationCanceledException)
@@ -241,14 +243,14 @@ public partial class PeriodicUpdateService(
     /// clock and the uptime is this program's, because this program is the main board
     /// </remarks>
     /// <param name="upTime">Time since this service started</param>
-    private void ApplyClock(Stopwatch upTime)
+    private void ApplyClock(TimeSpan upTime)
     {
         // Truncated to the second the object model publishes it in, so that polling faster than the
         // clock is reported does not patch subscribers with a value that serialises identically
-        DateTime now = DateTime.Now;
+        DateTime now = timeProvider.GetLocalNow().DateTime;
         model.State.Time = now.AddTicks(-(now.Ticks % TimeSpan.TicksPerSecond));
-        model.State.UpTime = (int)(upTime.ElapsedMilliseconds / 1000);
-        model.State.MsUpTime = (int)(upTime.ElapsedMilliseconds % 1000);
+        model.State.UpTime = (int)upTime.TotalSeconds;
+        model.State.MsUpTime = upTime.Milliseconds;
     }
 
     /// <summary>
@@ -617,7 +619,7 @@ public partial class PeriodicUpdateService(
     {
         for (int i = model.Messages.Count - 1; i >= 0; i--)
         {
-            if (DateTime.Now - model.Messages[i].Time > TimeSpan.FromSeconds(settings.Value.MaxMessageAge))
+            if (timeProvider.GetLocalNow().DateTime - model.Messages[i].Time > TimeSpan.FromSeconds(settings.Value.MaxMessageAge))
             {
                 model.Messages.RemoveAt(i);
             }

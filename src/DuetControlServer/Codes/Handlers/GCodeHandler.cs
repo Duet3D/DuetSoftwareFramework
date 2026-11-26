@@ -45,6 +45,7 @@ namespace DuetControlServer.Codes.Handlers;
 /// <param name="moveInterpreter">Turns a movement code into the move the engine is asked to run</param>
 /// <param name="eventLogger">Writes out what a board said while a code was still running</param>
 /// <param name="configOverride">Which probes M500 writes, which a G31 from config-override.g marks</param>
+/// <param name="timeProvider">Clock that dwells and waits are timed on</param>
 /// <param name="logger">Logger</param>
 internal sealed partial class GCodeHandler(
     Model.ObjectModel model,
@@ -60,6 +61,7 @@ internal sealed partial class GCodeHandler(
     MoveInterpreter moveInterpreter,
     Utility.EventLogger eventLogger,
     Files.ConfigOverrideTracker configOverride,
+    TimeProvider timeProvider,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
     /// <summary>
@@ -174,7 +176,7 @@ internal sealed partial class GCodeHandler(
             return new Message();
         }
 
-        await Task.Delay(dwell, cancellationToken);
+        await Task.Delay(TimeSpan.FromMilliseconds(dwell), timeProvider, cancellationToken);
         return new Message();
     }
 
@@ -525,7 +527,7 @@ internal sealed partial class GCodeHandler(
                     return new Message();
                 }
 
-                await Task.Delay(MovePlanner.RingFullRetryDelay, cancellationToken);
+                await Task.Delay(MovePlanner.RingFullRetryDelay, timeProvider, cancellationToken);
             }
 
             return new Message();

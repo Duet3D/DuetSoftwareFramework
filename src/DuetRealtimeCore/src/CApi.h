@@ -308,15 +308,38 @@ extern "C"
 
 	// --- Test seam ---
 	//
-	// Pin the local time base the step-clock model is fitted against to a caller-controlled value,
-	// instead of CLOCK_MONOTONIC. With the master clock a test bench reports also frozen, the whole
-	// motion timeline stands still until the test advances both together - which is what makes move
-	// retirement deterministic on the virtual bench.
+	// Pin the SBC's local time base (Platform/LocalClock.h) to a caller-controlled value instead of
+	// CLOCK_MONOTONIC, or move it if it is pinned already. Everything native that is timed reads it:
+	// the step-clock model, the transfer timeouts and the keep-alive, so nothing native falls due
+	// until the caller moves it, and moving it wakes every native wait to look at its deadline again.
 	// Process-wide, like the clock it replaces. Never call this against a real controller: the model
 	// would fit real ticks against a clock that does not move.
 	void DuetRT_PinLocalClock(int64_t ns);
 	// Restore CLOCK_MONOTONIC as the local time base.
 	void DuetRT_UnpinLocalClock(void);
+
+	// How much the native threads have left to do (Platform/Activity.h): threads running plus
+	// wake-ups and inbound events not yet taken. 0 means every native thread is waiting for the clock
+	// or for something from outside, which is when a bench driving the clock may move it again.
+	int64_t DuetRT_GetPendingActivity(void);
+
+	// Thread-pool threads parked in a native wait, which a bench watching the thread pool counts as
+	// waiting rather than working
+	int64_t DuetRT_GetParkedElsewhere(void);
+
+	// For DuetControlServer's own dedicated threads to take part in the pending activity: a thread
+	// that has started counts as running except while it waits in the library. Per calling thread.
+	void DuetRT_ActivityThreadStarted(void);
+	void DuetRT_ActivityThreadStopped(void);
+
+	// The emulator link in lockstep (Hardware/Emulator/EmulatorLinkFormats.h). Each returns 0 when no
+	// emulator link is connected.
+	//   GetCounts: exchanges sent to the emulator and frames received from it so far.
+	//   NextFrameTime: the emulated time of the oldest frame held; 0 if none is held.
+	//   ReleaseFrame: deliver the oldest frame held; 0 if none is held.
+	int32_t DuetRT_EmulatorGetCounts(uint32_t* framesSent, uint32_t* framesReceived);
+	int32_t DuetRT_EmulatorNextFrameTime(int64_t* ns);
+	int32_t DuetRT_EmulatorReleaseFrame(void);
 
 	// Destroy the instance (stops the loop first).
 	void DuetRT_Destroy(DuetRTHandle* h);

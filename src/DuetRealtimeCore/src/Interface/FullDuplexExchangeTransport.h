@@ -13,7 +13,8 @@
 //     and the connection-lost reporting that runs from PrepareReconnect
 //   - the outgoing packet writers, ReadNextPacket, ResendPacket
 //   - WriteIapSegment/StartIap, which are ordinary packets plus a state change
-//   - the stop/request eventfds and the cancellation they provide
+//   - the stop/request wake-ups and the cancellation they provide, and PollUntil, the one wait every
+//     transport's blocking goes through, timed on the local clock (Platform/LocalClock.h)
 //
 // What a transport supplies:
 //   - PerformExchange(): one attempt at exchanging the staged headers and data. Returns false to
@@ -27,9 +28,11 @@
 #include <Config/Configuration.h>
 #include <DuetSpiProtocol/MessageFormats.h>
 #include <Interface/Transport.h>
+#include <Platform/Waker.h>
+
+#include <poll.h>
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -126,8 +129,6 @@ namespace Duet::Sbc
 		}
 
 	  protected:
-		using clock = std::chrono::steady_clock;
-
 		// One attempt at exchanging the staged transfer with the controller: headers, data and the
 		// response codes that acknowledge them. Returns true when both sides accepted the exchange,
 		// false to retry it (the staged headers and data are left untouched, so a retry re-offers
@@ -148,8 +149,13 @@ namespace Duet::Sbc
 		// re-handshakes, and abandon whatever was staged for the transfer that did not happen.
 		void PrepareReconnect(const char* reason);
 
-		// Sleep up to `ms`, returning early if Stop() is called (used to pace error retries).
+		// Sleep up to `ms` of local time, returning early if Stop() is called (used to pace error retries).
 		void InterruptibleSleep(int ms);
+
+		// Block until one of `fds` is ready, Stop() is called, the local clock passes `deadlineNs`, or
+		// a pinned clock moves; the caller's fds get their revents. False once the deadline has
+		// passed, without waiting. Throws std::system_error if poll() fails.
+		bool PollUntil(std::span<pollfd> fds, int64_t deadlineNs);
 
 		// (Re)write the CRC fields of the staged TX header for the staged data.
 		void WriteCrc();
@@ -164,12 +170,14 @@ namespace Duet::Sbc
 		const Config config;
 		const size_t bufferSize;
 
-		// eventfds used to wake the interface thread out of poll(). The request fd is only watched
-		// between transfers (WaitForTransferReason); the stop fd is watched everywhere so shutdown
-		// is prompt. Keeping them separate means a RequestTransfer during a transfer does not
-		// spuriously wake a wait for the controller.
-		int m_requestEventFd = -1;
-		int m_stopEventFd = -1;
+		// Wake-ups for the interface thread. The request is only watched between transfers
+		// (WaitForTransferReason); stop and the clock are watched by every PollUntil, so that shutdown
+		// is prompt and a deadline on a pinned clock is seen when the clock moves. Keeping request
+		// and stop separate means a RequestTransfer during a transfer does not spuriously wake a wait
+		// for the controller.
+		Waker m_requestWaker;
+		Waker m_stopWaker;
+		Waker m_clockWaker{Waker::Clock::Follow};
 
 		bool m_waitingForFirstTransfer = true;
 		bool m_connected = false;
@@ -211,8 +219,8 @@ namespace Duet::Sbc
 		int m_numResyncs = 0;
 
 		// Diagnostics
-		std::chrono::steady_clock::time_point m_keepAliveStart;
-		std::chrono::steady_clock::time_point m_fullTransferStart;
+		int64_t m_keepAliveStartNs = 0;
+		int64_t m_fullTransferStartNs = 0;
 		bool m_fullTransferTimerRunning = false;
 		double m_maxFullTransferDelay = 0;
 		double m_maxPinWaitDuration = 0;

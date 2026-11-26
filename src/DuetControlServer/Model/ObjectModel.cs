@@ -51,6 +51,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<ObjectModel> _logger;
     private readonly IOptions<Settings> _settings;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>
     /// Main constructor
@@ -58,11 +59,13 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <param name="lifetime">Host application lifetime</param>
     /// <param name="logger">Logger instance</param>
     /// <param name="settings">Settings</param>
-    public ObjectModel(IHostApplicationLifetime lifetime, ILogger<ObjectModel> logger, IOptions<Settings> settings)
+    /// <param name="timeProvider">Clock that lock and update timeouts are measured on</param>
+    public ObjectModel(IHostApplicationLifetime lifetime, ILogger<ObjectModel> logger, IOptions<Settings> settings, TimeProvider timeProvider)
     {
         _lifetime = lifetime;
         _logger = logger;
         _settings = settings;
+        _timeProvider = timeProvider;
 
         OnDeserializationFailed += DeserializationFailedHandler;
 
@@ -612,7 +615,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public LockWrapper AccessReadOnly(CancellationToken cancellationToken)
     {
-        return new LockWrapper(_readWriteLock.ReaderLock(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings);
+        return new LockWrapper(_readWriteLock.ReaderLock(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings, _timeProvider);
     }
 
     /// <summary>
@@ -627,7 +630,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public LockWrapper AccessReadWrite(CancellationToken cancellationToken)
     {
-        return new LockWrapper(_readWriteLock.WriterLock(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings);
+        return new LockWrapper(_readWriteLock.WriterLock(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings, _timeProvider);
     }
 
     /// <summary>
@@ -642,7 +645,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public async ValueTask<LockWrapper> AccessReadOnlyAsync(CancellationToken cancellationToken)
     {
-        return new LockWrapper(await _readWriteLock.ReaderLockAsync(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings);
+        return new LockWrapper(await _readWriteLock.ReaderLockAsync(cancellationToken), false, OnModelUpdated, _lifetime, this, _logger, _settings, _timeProvider);
     }
 
     /// <summary>
@@ -657,7 +660,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <returns>Disposable lock object to be used with a using directive</returns>
     public async ValueTask<LockWrapper> AccessReadWriteAsync(CancellationToken cancellationToken)
     {
-        return new LockWrapper(await _readWriteLock.WriterLockAsync(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings);
+        return new LockWrapper(await _readWriteLock.WriterLockAsync(cancellationToken), true, OnModelUpdated, _lifetime, this, _logger, _settings, _timeProvider);
     }
 
     /// <summary>
@@ -695,6 +698,16 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     public Task WaitForUpdateAsync(CancellationToken cancellationToken) => Volatile.Read(ref _updateTcs).Task.WaitAsync(cancellationToken);
 
     /// <summary>
+    /// Add a message to the object model, stamped with the time on this program's clock, which is the
+    /// one expired messages are measured against
+    /// </summary>
+    private void AddMessage(Message message)
+    {
+        message.Time = _timeProvider.GetLocalNow().DateTime;
+        Messages.Add(message);
+    }
+
+    /// <summary>
     /// Wait for an update to occur asynchronously, giving up after the given timeout
     /// </summary>
     /// <param name="timeout">Maximum time to wait in ms</param>
@@ -703,7 +716,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     public async Task<bool> WaitForUpdateAsync(int timeout, CancellationToken cancellationToken)
     {
         Task updateTask = Volatile.Read(ref _updateTcs).Task;
-        if (await Task.WhenAny(updateTask, Task.Delay(timeout, cancellationToken)) != updateTask)
+        if (await Task.WhenAny(updateTask, Task.Delay(TimeSpan.FromMilliseconds(timeout), _timeProvider, cancellationToken)) != updateTask)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return false;
@@ -812,7 +825,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
                 }
 
                 // Send it to the object model
-                Messages.Add(message);
+                AddMessage(message);
             }
 
             return true;
@@ -854,7 +867,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
                 }
 
                 // Send it to the object model
-                Messages.Add(message);
+                AddMessage(message);
             }
 
             return true;
@@ -889,7 +902,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
             // Send it to the object model
             using (AccessReadWrite(cancellationToken))
             {
-                Messages.Add(message);
+                AddMessage(message);
             }
         }
     }
@@ -921,7 +934,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
             // Send it to the object model
             using (await AccessReadWriteAsync(cancellationToken))
             {
-                Messages.Add(message);
+                AddMessage(message);
             }
         }
     }

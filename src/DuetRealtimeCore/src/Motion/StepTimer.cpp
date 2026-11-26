@@ -4,10 +4,11 @@
 
 #include "StepTimer.h"
 
+#include <Platform/LocalClock.h>
+
 #include <atomic>
 #include <cinttypes>
 #include <cmath>
-#include <ctime>
 
 namespace
 {
@@ -29,8 +30,6 @@ namespace
 	// is the one thing this component must not do. Readers retry instead.
 	std::atomic<uint32_t> modelSeq{0};
 	ClockModel publishedModel{}; // only written between odd/even seq transitions
-
-	std::atomic<StepTimer::LocalClockSource> localClockSource{nullptr};
 
 	// Movement delay, in step clocks. Written rarely, read on the motion path.
 	std::atomic<uint32_t> movementDelay{0};
@@ -112,24 +111,7 @@ namespace
 		PublishModel(model);
 	}
 
-	int64_t MonotonicNs() noexcept
-	{
-		timespec ts{};
-		clock_gettime(CLOCK_MONOTONIC, &ts);
-		return (int64_t)ts.tv_sec * 1000000000 + ts.tv_nsec;
-	}
 } // namespace
-
-int64_t StepTimer::GetLocalTimeNs() noexcept
-{
-	const auto source = localClockSource.load(std::memory_order_acquire);
-	return (source != nullptr) ? source() : MonotonicNs();
-}
-
-void StepTimer::SetLocalClockSource(LocalClockSource source) noexcept
-{
-	localClockSource.store(source, std::memory_order_release);
-}
 
 // --- Reading -----------------------------------------------------------------------------------
 
@@ -150,13 +132,13 @@ void StepTimer::Init() noexcept
 	movementDelay.store(0, std::memory_order_relaxed);
 	movementDelayIncreased.store(false, std::memory_order_relaxed);
 
-	PublishModel(ClockModel{GetLocalTimeNs(), 0, nominalTicksPerNs});
+	PublishModel(ClockModel{Duet::Sbc::LocalClock::NowNs(), 0, nominalTicksPerNs});
 }
 
 StepTimer::Ticks StepTimer::GetTimerTicks() noexcept
 {
 	const ClockModel model = LoadModel();
-	return (Ticks)(uint64_t)TicksAt(model, GetLocalTimeNs());
+	return (Ticks)(uint64_t)TicksAt(model, Duet::Sbc::LocalClock::NowNs());
 }
 
 StepTimer::Ticks StepTimer::ConvertLocalToMovementTime(Ticks localTime) noexcept
@@ -315,7 +297,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 
 	fittedTicksPerNs.store(slope, std::memory_order_relaxed);
 	publishedSampleCount.store(numSamples, std::memory_order_relaxed);
-	PublishClamped(model, GetLocalTimeNs());
+	PublishClamped(model, Duet::Sbc::LocalClock::NowNs());
 }
 
 StepTimer::ClockStats StepTimer::GetClockStats() noexcept

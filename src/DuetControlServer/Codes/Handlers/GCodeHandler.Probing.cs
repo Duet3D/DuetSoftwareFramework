@@ -199,7 +199,7 @@ internal sealed partial class GCodeHandler
 
             if (settings.RecoveryTime > 0.0f)
             {
-                await Task.Delay(TimeSpan.FromSeconds(settings.RecoveryTime), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(settings.RecoveryTime), timeProvider, cancellationToken);
             }
 
             // Only an input can be closed before the move starts. A stall is a driver's judgement
@@ -433,7 +433,7 @@ internal sealed partial class GCodeHandler
                     return false;
 
                 default:
-                    await Task.Delay(MovePlanner.RingFullRetryDelay, cancellationToken);
+                    await Task.Delay(MovePlanner.RingFullRetryDelay, timeProvider, cancellationToken);
                     break;
             }
         }

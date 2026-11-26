@@ -5,7 +5,10 @@
 #include <Motion/MotionService.h>
 #include <Interface/LinkService.h>
 #include <Interface/SPI/SpiTransfer.h>
+#include <Hardware/Emulator/EmulatorLink.h>
 #include <Interface/TransportFactory.h>
+#include <Platform/Activity.h>
+#include <Platform/LocalClock.h>
 
 #include <algorithm>
 #include <atomic>
@@ -264,8 +267,10 @@ extern "C"
 
 	void DuetRT_ConsumeEvent(DuetRTHandle* h)
 	{
-		if (h != nullptr)
-			h->interface.Inbound().Consume();
+		if (h != nullptr && h->interface.Inbound().Consume())
+		{
+			Duet::Sbc::Activity::EventConsumed();
+		}
 	}
 
 	int32_t DuetRT_WaitForEvent(DuetRTHandle* h, int32_t timeoutMs)
@@ -536,23 +541,58 @@ extern "C"
 		return StepTimer::GetMovementDelay();
 	}
 
-	// The pinned local clock reading, and the source function StepTimer calls while it is pinned.
-	// Static because the local time base is process-wide, like the CLOCK_MONOTONIC it stands in for.
-	static std::atomic<int64_t> pinnedLocalClockNs{0};
-	static int64_t ReadPinnedLocalClock() noexcept
-	{
-		return pinnedLocalClockNs.load(std::memory_order_relaxed);
-	}
-
 	void DuetRT_PinLocalClock(int64_t ns)
 	{
-		pinnedLocalClockNs.store(ns, std::memory_order_relaxed);
-		StepTimer::SetLocalClockSource(ReadPinnedLocalClock);
+		Duet::Sbc::LocalClock::Pin(ns);
 	}
 
 	void DuetRT_UnpinLocalClock(void)
 	{
-		StepTimer::SetLocalClockSource(nullptr);
+		Duet::Sbc::LocalClock::Unpin();
+	}
+
+	int64_t DuetRT_GetPendingActivity(void)
+	{
+		return Duet::Sbc::Activity::Pending();
+	}
+
+	int64_t DuetRT_GetParkedElsewhere(void)
+	{
+		return Duet::Sbc::Activity::ParkedElsewhere();
+	}
+
+	void DuetRT_ActivityThreadStarted(void)
+	{
+		Duet::Sbc::Activity::ThreadStarted();
+	}
+
+	void DuetRT_ActivityThreadStopped(void)
+	{
+		Duet::Sbc::Activity::ThreadStopped();
+	}
+
+	int32_t DuetRT_EmulatorGetCounts(uint32_t* framesSent, uint32_t* framesReceived)
+	{
+		const std::shared_ptr<Duet::Sbc::Emulator::EmulatorLink> link = Duet::Sbc::Emulator::EmulatorLink::Current();
+		if (link == nullptr || framesSent == nullptr || framesReceived == nullptr)
+		{
+			return 0;
+		}
+		*framesSent = link->FramesSent();
+		*framesReceived = link->FramesReceived();
+		return 1;
+	}
+
+	int32_t DuetRT_EmulatorNextFrameTime(int64_t* ns)
+	{
+		const std::shared_ptr<Duet::Sbc::Emulator::EmulatorLink> link = Duet::Sbc::Emulator::EmulatorLink::Current();
+		return (link != nullptr && ns != nullptr && link->NextFrameTime(*ns)) ? 1 : 0;
+	}
+
+	int32_t DuetRT_EmulatorReleaseFrame(void)
+	{
+		const std::shared_ptr<Duet::Sbc::Emulator::EmulatorLink> link = Duet::Sbc::Emulator::EmulatorLink::Current();
+		return (link != nullptr && link->ReleaseFrame()) ? 1 : 0;
 	}
 
 	void DuetRT_GetClockStats(DuetRTHandle* h, DuetRTClockStats* stats)

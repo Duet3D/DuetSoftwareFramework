@@ -26,11 +26,13 @@ namespace DuetControlServer.Link;
 /// <param name="nativeLink">Native SPI transfer loop</param>
 /// <param name="logger">Logger instance</param>
 /// <param name="settings">Settings</param>
+/// <param name="timeProvider">Clock that request timeouts are measured on</param>
 [DiagnosticsPriority(-5)]
 public sealed partial class LinkInterface(
     NativeLink nativeLink,
     ILogger<LinkInterface> logger,
-    IOptions<Settings> settings) : IDiagnostics
+    IOptions<Settings> settings,
+    TimeProvider timeProvider) : IDiagnostics
 {
     /// <summary>
     /// The native SPI transfer loop and motion engine
@@ -316,7 +318,7 @@ public sealed partial class LinkInterface(
             // The controller reports every send and the link cancels what is outstanding when it
             // drops, so this bounds the cases neither covers: the acknowledgement ring or the response
             // ring overflowing while the link stays up
-            await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), cancellationToken);
+            await request.Task.WaitAsync(TimeSpan.FromMilliseconds(settings.Value.CanRequestTimeout), timeProvider, cancellationToken);
         }
         catch (TimeoutException) when (request.ExpectsReply)
         {

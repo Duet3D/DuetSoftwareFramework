@@ -1,3 +1,4 @@
+using System;
 using DuetAPI.ObjectModel;
 using DuetControlServer;
 using DuetControlServer.Motion;
@@ -42,11 +43,11 @@ public class BedCompensationTests
     }
 
     private static DcsModel NewModel()
-        => new(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()));
+        => new(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()), TimeProvider.System);
 
     private static BedCompensation Loaded(float taperHeight = 0.0f)
     {
-        BedCompensation compensation = new(NewModel());
+        BedCompensation compensation = new(NewModel(), TimeProvider.System);
         Assert.That(compensation.LoadAsync(new StringReader(SampleMap), "heightmap.csv", CancellationToken.None)
                                 .AsTask().GetAwaiter().GetResult(), Is.Null);
         compensation.SetTaperHeight(taperHeight);
@@ -58,7 +59,7 @@ public class BedCompensationTests
     {
         // Every move goes through this, so an unmapped machine has to come out the other side
         // untouched rather than approximately untouched
-        BedCompensation compensation = new(NewModel());
+        BedCompensation compensation = new(NewModel(), TimeProvider.System);
         Assert.Multiple(() =>
         {
             Assert.That(compensation.IsActive, Is.False);
@@ -203,7 +204,7 @@ public class BedCompensationTests
             model.Move.Axes.Add(new Axis { Letter = letter, Visible = true });
         }
 
-        BedCompensation compensation = new(model);
+        BedCompensation compensation = new(model, TimeProvider.System);
         Assert.That(compensation.LoadAsync(new StringReader(SampleMap), "heightmap.csv", CancellationToken.None)
                                 .AsTask().GetAwaiter().GetResult(), Is.Null);
         compensation.SetTaperHeight(taperHeight);
@@ -238,7 +239,7 @@ public class BedCompensationTests
     {
         DcsModel model = NewModel();
         model.Move.Axes.Add(new Axis { Letter = 'X', Visible = true });
-        BedCompensation compensation = new(model);
+        BedCompensation compensation = new(model, TimeProvider.System);
 
         RawMove raw = MoveTo(20.0f, 20.0f, 0.0f);
         compensation.Apply(raw, 1);

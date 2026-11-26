@@ -16,7 +16,8 @@ namespace DuetControlServer.Heat;
 /// <param name="model">Object model</param>
 /// <param name="heatManager">The heaters a tool's temperatures are read from</param>
 /// <param name="eventLogger">Writes out the warning that a tool was not driven</param>
-public sealed class ColdExtrusionInterlock(Model.ObjectModel model, HeatManager heatManager, Utility.EventLogger eventLogger)
+/// <param name="timeProvider">Clock the warning interval is measured on</param>
+public sealed class ColdExtrusionInterlock(Model.ObjectModel model, HeatManager heatManager, Utility.EventLogger eventLogger, TimeProvider timeProvider)
 {
     /// <summary>
     /// Shortest time between two cold extrusion warnings
@@ -130,9 +131,9 @@ public sealed class ColdExtrusionInterlock(Model.ObjectModel model, HeatManager 
     private readonly SortedSet<int> _notDrivenTools = [];
 
     /// <summary>
-    /// When the last warning went out, in <see cref="Environment.TickCount64"/> milliseconds
+    /// When the last warning went out, as a <see cref="TimeProvider"/> timestamp, or null before the first
     /// </summary>
-    private long _lastWarningTicks = long.MinValue / 2;
+    private long? _lastWarningAt;
 
     /// <summary>
     /// Whether a warning is waiting to go out
@@ -166,14 +167,17 @@ public sealed class ColdExtrusionInterlock(Model.ObjectModel model, HeatManager 
     /// <remarks>RepRapFirmware's <c>Tool::DisplayColdExtrusionWarnings</c>, called from <c>RepRap::Spin</c></remarks>
     private async Task DisplayWarningsAsync()
     {
-        long wait;
+        TimeSpan wait = TimeSpan.Zero;
         lock (_warningLock)
         {
-            wait = _lastWarningTicks + (long)WarningInterval.TotalMilliseconds - Environment.TickCount64;
+            if (_lastWarningAt is long lastWarningAt)
+            {
+                wait = WarningInterval - timeProvider.GetElapsedTime(lastWarningAt);
+            }
         }
-        if (wait > 0)
+        if (wait > TimeSpan.Zero)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(wait));
+            await Task.Delay(wait, timeProvider);
         }
 
         int[] tools;
@@ -182,7 +186,7 @@ public sealed class ColdExtrusionInterlock(Model.ObjectModel model, HeatManager 
             tools = [.. _notDrivenTools];
             _notDrivenTools.Clear();
             _warningPending = false;
-            _lastWarningTicks = Environment.TickCount64;
+            _lastWarningAt = timeProvider.GetTimestamp();
         }
 
         foreach (int tool in tools)

@@ -26,6 +26,10 @@ duet_realtime_core_add_test(iap_ready_line_tests IapReadyLineTests.cpp)
 target_link_libraries(iap_ready_line_tests PRIVATE duet_realtime_core)
 target_link_libraries(socket_transport_tests PRIVATE duet_realtime_core)
 
+# The local time base a bench can pin, the wake-ups that follow it and the activity a bench waits on
+duet_realtime_core_add_test(local_clock_tests LocalClockTests.cpp)
+target_link_libraries(local_clock_tests PRIVATE duet_motion)
+
 duet_realtime_core_add_test(step_timer_tests StepTimerTests.cpp)
 target_link_libraries(step_timer_tests PRIVATE duet_motion)
 

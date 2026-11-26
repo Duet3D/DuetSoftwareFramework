@@ -100,17 +100,6 @@ class StepTimer
 
 	static ClockStats GetClockStats() noexcept;
 
-	// --- Test seam ---------------------------------------------------------------------------
-
-	// Replace the local time source. Passing nullptr restores CLOCK_MONOTONIC. For tests, which
-	// need to drive the model from a clock they control.
-	using LocalClockSource = int64_t (*)() noexcept;
-	static void SetLocalClockSource(LocalClockSource source) noexcept;
-
-	// The local time base, in nanoseconds. Public so that whoever times an SPI transfer stamps it
-	// from the same source the model is fitted against.
-	static int64_t GetLocalTimeNs() noexcept;
-
 	// Samples needed before the fit is trusted, and the most it keeps. Exposed for the tests.
 	static constexpr unsigned int minSamplesToSync = 8;
 	static constexpr unsigned int maxSamples = 64;

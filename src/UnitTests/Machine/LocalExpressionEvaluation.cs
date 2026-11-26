@@ -1,4 +1,5 @@
-﻿using DuetAPI.ObjectModel;
+using System;
+using DuetAPI.ObjectModel;
 using DuetControlServer;
 using DuetControlServer.Codes;
 using DuetControlServer.Codes.Meta;
@@ -45,7 +46,7 @@ namespace UnitTests.Machine
         public void SetUp()
         {
             IOptions<Settings> settings = Options.Create(new Settings());
-            _model = new DcsModel(new TestLifetime(), NullLogger<DcsModel>.Instance, settings);
+            _model = new DcsModel(new TestLifetime(), NullLogger<DcsModel>.Instance, settings, TimeProvider.System);
             _filter = new DcsFilter(_model);
             _variableStore = new VariableStore(_model);
             _variables = new VariableSet();

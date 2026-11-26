@@ -70,14 +70,8 @@ public sealed class SensorManager : BackgroundService
     /// Constructor
     /// </summary>
     /// <param name="model">Object model</param>
-    public SensorManager(Model.ObjectModel model) : this(model, TimeProvider.System) { }
-
-    /// <summary>
-    /// Constructor
-    /// </summary>
-    /// <param name="model">Object model</param>
     /// <param name="timeProvider">Clock the reading timeouts are measured on</param>
-    internal SensorManager(Model.ObjectModel model, TimeProvider timeProvider)
+    public SensorManager(Model.ObjectModel model, TimeProvider timeProvider)
     {
         _model = model;
         _timeProvider = timeProvider;

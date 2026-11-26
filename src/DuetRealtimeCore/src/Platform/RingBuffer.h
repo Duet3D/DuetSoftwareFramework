@@ -133,16 +133,17 @@ namespace Duet::Sbc
 			return ByteSpan{m_buffer.data() + tail + kHeaderSize, recordLength};
 		}
 
-		// Consume the record most recently returned by Peek().
-		void Consume()
+		// Consume the record most recently returned by Peek(). False if there was none.
+		bool Consume()
 		{
 			if (m_pendingConsume == 0)
 			{
-				return;
+				return false;
 			}
 			const size_t tail = m_tail.load(std::memory_order_relaxed);
 			m_tail.store(tail + m_pendingConsume, std::memory_order_release);
 			m_pendingConsume = 0;
+			return true;
 		}
 
 		[[nodiscard]] bool IsEmpty() const

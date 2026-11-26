@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using DuetControlServer.Link.Native;
 using DuetControlServer.Motion.Native;
 using Microsoft.Extensions.Logging;
+using Nito.AsyncEx;
 
 namespace DuetControlServer.Motion;
 
@@ -79,7 +80,7 @@ internal sealed class MotionTracker(ILogger<MotionTracker> logger)
     /// <summary>
     /// Set when a move ends, whether it ran or not
     /// </summary>
-    public AutoResetEvent MoveEnded { get; } = new(false);
+    public AsyncAutoResetEvent MoveEnded { get; } = new(false);
 
     private static RingState[] CreateRings()
     {

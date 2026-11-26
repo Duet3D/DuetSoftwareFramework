@@ -105,10 +105,10 @@ public sealed class RenodeInstance : IAsyncDisposable
 
             Process process = await ProcessLauncher.StartAsync(startInfo);
             LogSink log = new(logPath, append: attempt > 1);
-            process.OutputDataReceived += (_, e) => log.Write(e.Data);
-            process.ErrorDataReceived += (_, e) => log.Write(e.Data);
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
+            // On dedicated threads: reading a pipe asynchronously blocks a thread-pool thread, which the
+            // DSF bench would take for DuetControlServer at work
+            CopyToLog(process.StandardOutput, log, "Renode stdout");
+            CopyToLog(process.StandardError, log, "Renode stderr");
 
             XmlRpcClient client = new(new Uri($"http://127.0.0.1:{port}/"), CommandTimeout);
             bool started = false;
@@ -236,7 +236,27 @@ public sealed class RenodeInstance : IAsyncDisposable
         throw new RenodeCommandException(command, $"printed \"{output}\", not a number");
     }
 
-    /// <inheritdoc/>
+    // Copy a stream of Renode's output to the log, line by line, until it ends
+    private static void CopyToLog(StreamReader output, LogSink log, string name)
+    {
+        new Thread(() =>
+        {
+            try
+            {
+                while (output.ReadLine() is string line)
+                {
+                    log.Write(line);
+                }
+            }
+            catch (Exception e) when (e is IOException or ObjectDisposedException)
+            {
+                // The process has gone
+            }
+        })
+        { IsBackground = true, Name = name }.Start();
+    }
+
+/// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         // A command that hangs holds the lock; Renode is killed rather than waited for

@@ -38,6 +38,7 @@ namespace Duet::Sbc
 			// The scope-trigger output has nothing to drive in an emulator, so it is left out
 			auto link = std::make_shared<Emulator::EmulatorLink>(
 				config.emulatorSocketPath, config.sbcConnectTimeout, config.sbcTransferTimeout);
+			Emulator::EmulatorLink::SetCurrent(link);
 			SbcHardware hardware;
 			hardware.spi = std::make_unique<Emulator::EmulatedSpiBus>(link);
 			hardware.transferReady = std::make_unique<Emulator::EmulatedInputLine>(link, Emulator::Line::TransferReady);

@@ -1,6 +1,8 @@
 #include <Interface/LinkService.h>
 
 #include <Motion/StepTimer.h>
+#include <Platform/Activity.h>
+#include <Platform/LocalClock.h>
 #include <Platform/ProcessHelpers.h>
 
 #include <poll.h>
@@ -8,7 +10,6 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cstring>
 
 namespace Duet::Sbc
@@ -16,13 +17,6 @@ namespace Duet::Sbc
 
 	namespace
 	{
-
-		int64_t NowNs()
-		{
-			return std::chrono::duration_cast<std::chrono::nanoseconds>(
-					   std::chrono::steady_clock::now().time_since_epoch())
-				.count();
-		}
 
 		// Ring capacities. The inbound ring must absorb a burst of incoming packets even if the managed
 		// dispatcher is briefly descheduled, so it is sized well beyond a single full transfer.
@@ -91,7 +85,10 @@ namespace Duet::Sbc
 		}
 
 		pollfd pfd{m_inboundEventFd, POLLIN, 0};
-		::poll(&pfd, 1, timeoutMs);
+		{
+			const Activity::WaitingOn waiting({&pfd, 1});
+			::poll(&pfd, 1, timeoutMs);
+		}
 		m_consumerWaiting.store(false, std::memory_order_relaxed);
 
 		uint64_t value = 0;
@@ -137,7 +134,7 @@ namespace Duet::Sbc
 	{
 		int64_t expected = 0;
 		// Only the first request since the last completed transfer sets the timestamp
-		m_pendingRequestNs.compare_exchange_strong(expected, NowNs(), std::memory_order_relaxed);
+		m_pendingRequestNs.compare_exchange_strong(expected, LocalClock::NowNs(), std::memory_order_relaxed);
 	}
 
 	void LinkService::RequestTransfer()
@@ -286,7 +283,11 @@ namespace Duet::Sbc
 		// The caller has already filled in the type; this just performs the scattered write
 		(void)type;
 		const ByteSpan fragments[2] = {header, tail};
-		m_inbound.WriteScattered(fragments);
+		if (m_inbound.WriteScattered(fragments))
+		{
+			// Counted until the managed dispatcher consumes it (DuetRT_ConsumeEvent)
+			Activity::EventPosted();
+		}
 
 		// Wake a parked consumer. Skipped entirely while the dispatcher is keeping up, so the real-time
 		// thread does not pay for a syscall on the hot path.
@@ -323,6 +324,8 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	void LinkService::Execute()
 	{
+		const Activity::Running running;
+
 		// Pin and prioritise the transfer thread. This is the whole reason the loop lives in C++: it can
 		// hold SCHED_FIFO on an isolated core without a managed runtime scheduling anything onto it.
 		if (m_config.isolateInterfaceThread && IsRaspberryPi())
@@ -426,7 +429,7 @@ namespace Duet::Sbc
 				// Everything staged into the transfer that has just completed is now the controller's
 				PostOutboundSeq(InboundEventType::OutboundDelivered, m_stagedSeq);
 
-				m_lastTransferNs = StepTimer::GetLocalTimeNs();
+				m_lastTransferNs = LocalClock::NowNs();
 				if (m_transport->IsConnected())
 				{
 					StepTimer::RecordMasterClockSample(m_transport->RxMasterClock(), m_lastTransferNs);
@@ -439,7 +442,7 @@ namespace Duet::Sbc
 				const int64_t requestNs = m_pendingRequestNs.exchange(0, std::memory_order_relaxed);
 				if (requestNs != 0 && m_onRequestServed)
 				{
-					m_onRequestServed(NowNs() - requestNs);
+					m_onRequestServed(LocalClock::NowNs() - requestNs);
 				}
 			}
 			catch (const TransferTimeout&)

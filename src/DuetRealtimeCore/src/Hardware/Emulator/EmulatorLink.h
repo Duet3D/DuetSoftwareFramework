@@ -5,10 +5,10 @@
 
 #include <Hardware/Emulator/EmulatorLinkFormats.h>
 #include <Hardware/SbcHardware.h>
+#include <Platform/Waker.h>
 
 #include <array>
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
 #include <deque>
 #include <memory>
@@ -21,14 +21,16 @@ namespace Duet::Sbc::Emulator
 {
 
 	// One connection to the emulator, shared by the bus and the lines that use it. A reader thread
-	// takes the emulator's frames off the socket as they arrive: line changes are queued as edge events
-	// on their line, and exchange results are handed to the exchange waiting for them.
+	// takes the emulator's frames off the socket as they arrive and holds them; the bench releases
+	// them one at a time once it has moved the local clock to their time (EmulatorLinkFormats.h).
+	// A released line change is queued as an edge on its line; a released exchange result is handed
+	// to the exchange waiting for it.
 	class EmulatorLink
 	{
 	  public:
 		// Connect to the emulator listening at `socketPath`, retrying for up to `connectTimeoutMs`
-		// while it starts. `exchangeTimeoutMs` bounds the wait for an exchange's result. Throws
-		// std::system_error if no connection can be made.
+		// while it starts. `exchangeTimeoutMs` bounds the wait for an exchange's result, in local
+		// time. Throws std::system_error if no connection can be made.
 		EmulatorLink(const std::string& socketPath, int connectTimeoutMs, int exchangeTimeoutMs);
 		~EmulatorLink();
 
@@ -37,9 +39,27 @@ namespace Duet::Sbc::Emulator
 		EmulatorLink(EmulatorLink&&) = delete;
 		EmulatorLink& operator=(EmulatorLink&&) = delete;
 
+		// The connected link, for the bench to drive through the CApi; null when none is connected
+		static std::shared_ptr<EmulatorLink> Current();
+
+		// Register a link as the current one, which SbcHardware does once it has made it
+		static void SetCurrent(const std::shared_ptr<EmulatorLink>& link);
+
 		// One chip-select cycle. Throws std::system_error if the link has failed or the emulator does
 		// not answer in time.
 		void Exchange(const uint8_t* tx, uint8_t* rx, size_t length);
+
+		// --- Lockstep, driven by the bench ---
+
+		// The emulated time of the oldest frame held, in nanoseconds; false if none is held
+		bool NextFrameTime(int64_t& ns);
+
+		// Deliver the oldest frame held. False if none is held.
+		bool ReleaseFrame();
+
+		// Exchanges sent to the emulator, and frames received from it
+		[[nodiscard]] uint32_t FramesSent() const noexcept { return m_framesSent.load(); }
+		[[nodiscard]] uint32_t FramesReceived() const noexcept { return m_framesReceived.load(); }
 
 		// --- Lines ---
 
@@ -70,7 +90,14 @@ namespace Duet::Sbc::Emulator
 			std::atomic<int> missedEdges{0};
 		};
 
+		struct HeldFrame
+		{
+			FrameHeader header;
+			std::vector<uint8_t> payload;
+		};
+
 		void ReaderLoop() noexcept;
+		void Deliver(HeldFrame& frame);
 		void OnLineLevel(Line line, bool level);
 		void Fail(const char* reason) noexcept;
 		void SendAll(const void* data, size_t length);
@@ -80,10 +107,17 @@ namespace Duet::Sbc::Emulator
 
 		std::array<LineState, NumLines> m_lines;
 
-		// The exchange in progress and its result, handed over by the reader thread
+		// Frames received and not yet released
+		std::mutex m_heldMutex;
+		std::deque<HeldFrame> m_held;
+		std::atomic<uint32_t> m_framesSent{0};
+		std::atomic<uint32_t> m_framesReceived{0};
+
+		// The exchange in progress and its result, handed over by ReleaseFrame
 		std::mutex m_exchangeMutex;
 		std::mutex m_resultMutex;
-		std::condition_variable m_resultReady;
+		Waker m_resultWaker;
+		Waker m_clockWaker{Waker::Clock::Follow};
 		std::vector<uint8_t> m_result;
 		bool m_haveResult = false;
 		uint16_t m_sequence = 0; // of the exchange in progress or last made

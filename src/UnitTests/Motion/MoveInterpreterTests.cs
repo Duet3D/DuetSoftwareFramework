@@ -33,7 +33,7 @@ public class MoveInterpreterTests
                                   MovementState State, MoveInterpreter Interpreter, BedCompensation Bed);
 
     private static DuetControlServer.Model.ObjectModel NewModel()
-        => new(null!, NullLogger<DuetControlServer.Model.ObjectModel>.Instance, Options.Create(new DuetControlServer.Settings()));
+        => new(null!, NullLogger<DuetControlServer.Model.ObjectModel>.Instance, Options.Create(new DuetControlServer.Settings()), TimeProvider.System);
 
     /// <summary>
     /// A three-axis Cartesian machine with one extruder, described the way config.g would
@@ -104,9 +104,9 @@ public class MoveInterpreterTests
 
         MoveBuilder builder = new(KinematicsAxes.Snapshot(move));
         MovementState state = new();
-        BedCompensation bed = new(model);
+        BedCompensation bed = new(model, TimeProvider.System);
         MoveInterpreter interpreter = new(model, builder, state, bed,
-                                          new EndstopCorrection(null!, null!, NullLogger<EndstopCorrection>.Instance),
+                                          new EndstopCorrection(null!, null!, TimeProvider.System, NullLogger<EndstopCorrection>.Instance),
                                           () => tool, closedSwitches ?? (_ => 0),
                                           extruderMovementAllowed ?? ((_, _, _) => true));
         return new Machine(model, builder, state, interpreter, bed);

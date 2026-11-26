@@ -23,7 +23,8 @@ namespace DuetControlServer.Motion;
 /// </para>
 /// </remarks>
 /// <param name="model">Object model</param>
-public sealed class BedCompensation(Model.ObjectModel model)
+/// <param name="timeProvider">Clock a saved height map is stamped from</param>
+public sealed class BedCompensation(Model.ObjectModel model, TimeProvider timeProvider)
 {
     /// <summary>The map in effect, or null if bed compensation is off</summary>
     private HeightMap? _map;
@@ -133,7 +134,7 @@ public sealed class BedCompensation(Model.ObjectModel model)
             return "No height map loaded";
         }
 
-        map.Write(writer, DateTime.Now);
+        map.Write(writer, timeProvider.GetLocalNow().DateTime);
         using (await model.AccessReadWriteAsync(cancellationToken))
         {
             model.Move.Compensation.File = fileName;

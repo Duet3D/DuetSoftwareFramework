@@ -69,18 +69,18 @@ internal sealed partial class GCodeHandler
         // homing macro
         if (watchesSomething)
         {
-            DateTime deadline = DateTime.UtcNow + StopReportGrace;
+            long waitStarted = timeProvider.GetTimestamp();
             while (!endstopCorrection.StopReportedForCurrentMove
-                   && DateTime.UtcNow < deadline
+                   && timeProvider.GetElapsedTime(waitStarted) < StopReportGrace
                    && !cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(RevertPollInterval, cancellationToken);
+                await Task.Delay(RevertPollInterval, timeProvider, cancellationToken);
             }
         }
 
         while (endstopCorrection.IsReverting && !cancellationToken.IsCancellationRequested)
         {
-            await Task.Delay(RevertPollInterval, cancellationToken);
+            await Task.Delay(RevertPollInterval, timeProvider, cancellationToken);
         }
     }
 

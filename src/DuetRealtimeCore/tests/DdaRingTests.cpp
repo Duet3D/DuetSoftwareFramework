@@ -14,6 +14,7 @@
 #include <Motion/MoveTiming.h>
 #include <Motion/StepTimer.h>
 #include <Motion/MotionSystem.h>
+#include <Platform/LocalClock.h>
 
 #include <TestSupport.h>
 
@@ -41,14 +42,13 @@ namespace
 
 	int64_t fakeNow = 0;
 
-	int64_t FakeClock() noexcept { return fakeNow; }
-
 	// Scale first, then divide: a nanoseconds-per-tick constant rounds down (1333 rather than
 	// 1333.33 at 750kHz) and the fake clock then runs 0.025% slow, which is enough to make a wait
 	// measured in whole ticks come up short.
 	void AdvanceTicks(uint32_t ticks) noexcept
 	{
 		fakeNow += ((int64_t)ticks * 1000000000) / stepClockRate;
+		Duet::Sbc::LocalClock::Pin(fakeNow);
 	}
 
 	// --- The sink the test reads ------------------------------------------------------------
@@ -708,8 +708,8 @@ namespace
 
 int main()
 {
+	Duet::Sbc::LocalClock::Pin(fakeNow);
 	StepTimer::Init();
-	StepTimer::SetLocalClockSource(FakeClock);
 	if (!theMove.Init())
 	{
 		std::printf("FAIL: could not initialise the motion system\n");
@@ -741,6 +741,6 @@ int main()
 	TestStoppingAnEmptyRingDoesNothing(ring, sink);
 	TestRingIsUsableAfterAStop(ring, sink);
 
-	StepTimer::SetLocalClockSource(nullptr);
+	Duet::Sbc::LocalClock::Unpin();
 	return TestSupport::Summarise("DDARing");
 }

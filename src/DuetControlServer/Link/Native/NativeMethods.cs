@@ -274,6 +274,18 @@ internal static partial class NativeMethods
     internal static partial int DuetRT_WaitForEvent(IntPtr handle, int timeoutMs);
 
     /// <summary>
+    /// The calling thread starts taking part in the activity a bench driving the SBC's clock waits on
+    /// </summary>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetRT_ActivityThreadStarted();
+
+    /// <summary>
+    /// The calling thread stops taking part in that activity
+    /// </summary>
+    [LibraryImport(LibraryName)]
+    internal static partial void DuetRT_ActivityThreadStopped();
+
+    /// <summary>
     /// Get the negotiated protocol version
     /// </summary>
     /// <param name="handle">Interface handle</param>

@@ -1,5 +1,6 @@
 #include <Interface/SPI/SpiTransfer.h>
 
+#include <Platform/LocalClock.h>
 #include <Storage/Crc.h>
 
 #include <poll.h>
@@ -30,12 +31,7 @@ namespace Duet::Sbc
 			return v;
 		}
 
-		using clock = std::chrono::steady_clock;
-
-		double ElapsedMs(clock::time_point start)
-		{
-			return std::chrono::duration<double, std::milli>(clock::now() - start).count();
-		}
+		constexpr int64_t nsPerMs = 1000000;
 
 	} // namespace
 
@@ -182,36 +178,25 @@ namespace Duet::Sbc
 				return inTransfer ? config.sbcTransferTimeout : config.sbcConnectionTimeout;
 			}();
 
-			const auto start = clock::now();
-			// Only the TfrRdy edge fd and the stop fd matter here; RequestTransfer wakeups are irrelevant
-			// during a transfer and are intentionally not watched, so they cannot perturb this wait.
-			pollfd fds[2];
+			const int64_t start = LocalClock::NowNs();
+			const int64_t deadline = start + timeout * nsPerMs;
+			// Only the TfrRdy edges matter here (PollUntil adds stop); RequestTransfer wakeups are
+			// irrelevant during a transfer and are intentionally not watched, so they cannot perturb this wait.
+			pollfd fds[1];
 			fds[0] = {m_transferReadyPin->Fd(), POLLIN, 0};
-			fds[1] = {m_stopEventFd, POLLIN, 0};
 
 			do
 			{
-				const int timeToWait = timeout - static_cast<int>(ElapsedMs(start));
-				if (timeToWait <= 0 || m_stop.load(std::memory_order_relaxed))
+				if (m_stop.load(std::memory_order_relaxed))
 				{
-					if (m_stop.load(std::memory_order_relaxed))
-					{
-						throw TransferTimeout("Transfer cancelled");
-					}
-					throw TransferTimeout(inTransfer ? "Transfer timeout while waiting for TfrRdy pin"
-													 : "Connection timeout while waiting for TfrRdy pin");
+					throw TransferTimeout("Transfer cancelled");
 				}
 
 				// Block (0% CPU) until the TfrRdy pin toggles, a stop arrives, or the timeout elapses
-				fds[0].revents = fds[1].revents = 0;
-				const int ready = ::poll(fds, 2, timeToWait);
-				if (ready < 0)
+				if (!PollUntil(fds, deadline))
 				{
-					if (errno == EINTR)
-					{
-						continue;
-					}
-					throw std::system_error(errno, std::generic_category(), "poll() failed waiting for TfrRdy");
+					throw TransferTimeout(inTransfer ? "Transfer timeout while waiting for TfrRdy pin"
+													 : "Connection timeout while waiting for TfrRdy pin");
 				}
 
 				// Drain the edge events that woke us and re-evaluate readiness (stop is handled at the top)
@@ -222,7 +207,7 @@ namespace Duet::Sbc
 
 			if (inTransfer)
 			{
-				const double waited = ElapsedMs(start);
+				const double waited = static_cast<double>(LocalClock::NowNs() - start) / nsPerMs;
 				m_maxPinWaitDuration = std::max(waited, m_maxPinWaitDuration);
 			}
 		}
@@ -504,8 +489,8 @@ namespace Duet::Sbc
 		}
 
 		// Keep-alive
-		const int timeToWait = config.sbcConnectionKeepAliveInterval - static_cast<int>(ElapsedMs(m_keepAliveStart));
-		if (timeToWait <= 0)
+		const int64_t keepAliveDue = m_keepAliveStartNs + config.sbcConnectionKeepAliveInterval * nsPerMs;
+		if (LocalClock::NowNs() >= keepAliveDue)
 		{
 			return true;
 		}
@@ -519,24 +504,13 @@ namespace Duet::Sbc
 		// the queue until the keep-alive fires (a spurious ~25 ms gap). Draining only after poll() keeps
 		// the signal edge-safe. A leftover count from RequestTransfers served by data-driven transfers
 		// merely causes one immediate, harmless extra wake-up before we settle.
-		pollfd fds[3];
+		pollfd fds[2];
 		fds[0] = {m_dataAvailablePin->Fd(), POLLIN, 0};
-		fds[1] = {m_requestEventFd, POLLIN, 0};
-		fds[2] = {m_stopEventFd, POLLIN, 0};
-		const int ready = ::poll(fds, 3, timeToWait);
-		if (ready < 0 && errno != EINTR)
-		{
-			throw std::system_error(errno, std::generic_category(), "poll() failed waiting for a transfer reason");
-		}
+		fds[1] = {m_requestWaker.Fd(), POLLIN, 0};
+		(void)PollUntil(fds, keepAliveDue);
 
 		// Consume the wake-ups and any DataAvailable edges so the next poll() blocks properly
-		uint64_t v = 0;
-		while (::read(m_requestEventFd, &v, sizeof(v)) > 0)
-		{
-		}
-		while (::read(m_stopEventFd, &v, sizeof(v)) > 0)
-		{
-		}
+		m_requestWaker.Drain();
 		while (m_dataAvailablePin->ReadEvent())
 		{
 		}

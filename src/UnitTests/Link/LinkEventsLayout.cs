@@ -75,7 +75,7 @@ public class LinkEventsLayout
         // fixture is here for and the one case it never looked at
         IEnumerable<Type> declared = typeof(InboundEventHeader).Assembly.GetTypes()
             .Where(type => type.Namespace == typeof(InboundEventHeader).Namespace
-                           && type.IsValueType && !type.IsEnum
+                           && type.IsValueType && !type.IsEnum && !type.IsByRefLike
                            && type.StructLayoutAttribute?.Size > 0);
 
         Assert.That(declared, Is.EquivalentTo(Records.Cast<object[]>().Select(record => record[0])));

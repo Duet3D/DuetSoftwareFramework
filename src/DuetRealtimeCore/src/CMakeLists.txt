@@ -27,6 +27,8 @@ set(DUET_MOTION_SOURCES
     Motion/ScheduleMoveBuilder.cpp
     Motion/SegmentBuilder.cpp
     Motion/StepTimer.cpp
+    Platform/Activity.cpp
+    Platform/LocalClock.cpp
     Platform/Log.cpp
     Platform/MemoryArena.cpp
 )

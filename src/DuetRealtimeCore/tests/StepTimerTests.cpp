@@ -13,6 +13,8 @@
 
 #include <Motion/StepTimer.h>
 
+#include <Platform/LocalClock.h>
+
 #include <cstdint>
 #include <vector>
 
@@ -21,9 +23,10 @@ namespace
 	// The clock StepTimer sees. Tests advance it explicitly.
 	int64_t fakeLocalNs = 0;
 
-	int64_t FakeClock() noexcept
+	void SetLocalNs(int64_t ns) noexcept
 	{
-		return fakeLocalNs;
+		fakeLocalNs = ns;
+		Duet::Sbc::LocalClock::Pin(ns);
 	}
 
 	constexpr double nominalTicksPerNs = (double)stepClockRate / 1.0e9;
@@ -42,8 +45,7 @@ namespace
 
 	void ResetClock()
 	{
-		fakeLocalNs = 1000000000;			// start away from zero so sign errors show up
-		StepTimer::SetLocalClockSource(FakeClock);
+		SetLocalNs(1000000000);			// start away from zero so sign errors show up
 		StepTimer::Init();
 	}
 
@@ -59,7 +61,7 @@ namespace
 
 		for (unsigned int i = 0; i < count; ++i)
 		{
-			fakeLocalNs = baseNs + (int64_t)(i + 1) * intervalNs;
+			SetLocalNs(baseNs + (int64_t)(i + 1) * intervalNs);
 
 			// The controller's clock is a function of true elapsed time...
 			const int64_t elapsed = fakeLocalNs - baseNs;
@@ -89,7 +91,7 @@ static void TestMonotonicUnderJitter()
 
 	for (unsigned int i = 0; i < 10 * samplesPerSecond; ++i)
 	{
-		fakeLocalNs = baseNs + (int64_t)(i + 1) * transferIntervalNs;
+		SetLocalNs(baseNs + (int64_t)(i + 1) * transferIntervalNs);
 		const auto ticks = (uint32_t)llrint((double)(fakeLocalNs - baseNs) * actualTicksPerNs);
 
 		// +/-150us of sampling jitter, an order of magnitude worse than a real transfer.
@@ -184,7 +186,7 @@ static void TestRejectsImplausibleSample()
 	CHECK(before.synced, "synced before the bad sample");
 
 	// One sample claiming the controller advanced by a second while 1ms of local time passed.
-	fakeLocalNs += StepTimer::minSampleSpacingNs;
+	SetLocalNs(fakeLocalNs + StepTimer::minSampleSpacingNs);
 	StepTimer::RecordMasterClockSample(0x40000000u, fakeLocalNs);
 
 	const StepTimer::ClockStats after = StepTimer::GetClockStats();
@@ -271,6 +273,6 @@ int main()
 	TestAdoptingTheControllersDelay();
 	TestConversions();
 
-	StepTimer::SetLocalClockSource(nullptr);
+	Duet::Sbc::LocalClock::Unpin();
 	return TestSupport::Summarise("step timer");
 }

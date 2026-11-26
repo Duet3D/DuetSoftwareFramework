@@ -1,3 +1,4 @@
+using System;
 using DuetControlServer;
 using DuetControlServer.Model;
 using Microsoft.Extensions.Hosting;
@@ -23,7 +24,7 @@ namespace UnitTests.Machine
             public void StopApplication() { }
         }
 
-        private static DcsModel CreateModel() => new(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()));
+        private static DcsModel CreateModel() => new(new TestLifetime(), NullLogger<DcsModel>.Instance, Options.Create(new Settings()), TimeProvider.System);
 
         private static Dictionary<string, object> SubDictionary(Dictionary<string, object> parent, string key)
         {

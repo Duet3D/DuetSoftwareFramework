@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -25,7 +26,7 @@ public class ColdExtrusionInterlockTests
     {
         StoppedLifetime lifetime = new();
         DuetControlServer.Model.ObjectModel model = new(lifetime, NullLogger<DuetControlServer.Model.ObjectModel>.Instance,
-                                                        Options.Create(new Settings()));
+                                                        Options.Create(new Settings()), TimeProvider.System);
         model.Heat.Heaters.Add(null);
         model.Heat.Heaters.Add(new Heater { Current = temperature });
         tool = new Tool { Number = 0 };
@@ -33,11 +34,11 @@ public class ColdExtrusionInterlockTests
         tool.Heaters.Add(1);
         model.Tools.Add(tool);
 
-        HeatManager heatManager = new(model, null!, null!, NullLogger<HeatManager>.Instance);
+        HeatManager heatManager = new(model, null!, null!, TimeProvider.System, NullLogger<HeatManager>.Instance);
         DuetControlServer.Utility.EventLogger eventLogger = new(null!, model, lifetime,
                                                                 NullLogger<DuetControlServer.Utility.EventLogger>.Instance,
-                                                                Options.Create(new Settings()));
-        return new Machine(model, new ColdExtrusionInterlock(model, heatManager, eventLogger));
+                                                                Options.Create(new Settings()), TimeProvider.System);
+        return new Machine(model, new ColdExtrusionInterlock(model, heatManager, eventLogger, TimeProvider.System));
     }
 
     [Test]

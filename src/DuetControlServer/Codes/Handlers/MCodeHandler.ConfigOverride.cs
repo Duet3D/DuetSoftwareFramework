@@ -66,7 +66,7 @@ internal partial class MCodeHandler
 
         StringBuilder builder = new();
         builder.AppendLine(CultureInfo.InvariantCulture,
-                           $"; config-override.g file generated in response to M500 at {DateTime.Now:yyyy-MM-dd HH:mm}");
+                           $"; config-override.g file generated in response to M500 at {timeProvider.GetLocalNow():yyyy-MM-dd HH:mm}");
         builder.AppendLine("; This is a system-generated file - do not edit");
 
         using (await model.AccessReadOnlyAsync(cancellationToken))

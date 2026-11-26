@@ -36,9 +36,10 @@ namespace DuetControlServer.Heat;
 /// <param name="model">Object model</param>
 /// <param name="linkInterface">Link interface, for the CAN messages a heater is configured with</param>
 /// <param name="eventLogger">Writes out what a board said outside the reply to a code</param>
+/// <param name="timeProvider">Clock the waits for heaters poll on</param>
 /// <param name="logger">Logger</param>
 public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInterface, Utility.EventLogger eventLogger,
-                                ILogger<HeatManager> logger)
+                                TimeProvider timeProvider, ILogger<HeatManager> logger)
 {
     /// <summary>
     /// Highest heater number a machine may have
@@ -363,7 +364,7 @@ public sealed class HeatManager(Model.ObjectModel model, LinkInterface linkInter
                 {
                     return true;
                 }
-                await Task.WhenAny(Task.Delay(WaitPollInterval, cancellationToken), waitEnded);
+                await Task.WhenAny(Task.Delay(WaitPollInterval, timeProvider, cancellationToken), waitEnded);
             }
             return false;
         }

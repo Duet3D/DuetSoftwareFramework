@@ -31,7 +31,7 @@ namespace DuetControlServer.Link.Expansion;
 /// interleave its samples into the first one's file
 /// </para>
 /// </remarks>
-internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver, Model.ObjectModel model,
+internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver, Model.ObjectModel model, TimeProvider timeProvider,
                                               ILogger<ClosedLoopDataCollector> logger)
 {
     /// <summary>Where the collected samples are written, as RepRapFirmware writes them</summary>
@@ -113,8 +113,8 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
         /// <summary>Sample number the next packet has to start at</summary>
         public int ExpectedSample { get; set; }
 
-        /// <summary>When the last packet arrived, which is what tells a stalled run from a slow one</summary>
-        public DateTime LastPacket { get; set; } = DateTime.UtcNow;
+        /// <summary>When the last packet arrived or the run started, which is what tells a stalled run from a slow one</summary>
+        public long LastPacket { get; set; }
     }
 
     /// <summary>
@@ -201,7 +201,7 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
                 // A collection whose board stopped sending is not one in progress, and saying so is
                 // the only way back without a restart (RRF ClosedLoop.cpp:129-142)
                 if (ReferenceEquals(_collection, Claimed)
-                    || DateTime.UtcNow - _collection.LastPacket < DataReceiveTimeout)
+                    || timeProvider.GetElapsedTime(_collection.LastPacket) < DataReceiveTimeout)
                 {
                     return new Message(MessageType.Error, "Closed loop data is already being collected");
                 }
@@ -223,7 +223,7 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
         string name = code.TryGetString('F', out string? given) && !string.IsNullOrWhiteSpace(given)
             ? given
             : string.Create(CultureInfo.InvariantCulture,
-                            $"{driver.Board}_{DateTime.UtcNow:yyyy-MM-dd_HH.mm.ss}.csv");
+                            $"{driver.Board}_{timeProvider.GetUtcNow():yyyy-MM-dd_HH.mm.ss}.csv");
         string virtualPath = $"{ClosedLoopDirectory}/{name}";
 
         StreamWriter writer;
@@ -251,7 +251,7 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
 
         lock (_lock)
         {
-            _collection = new Collection(writer, virtualPath, (ushort)filter, (byte)driver.Board, samples);
+            _collection = new Collection(writer, virtualPath, (ushort)filter, (byte)driver.Board, samples) { LastPacket = timeProvider.GetTimestamp() };
         }
 
         CanMessageStartClosedLoopDataCollection request = new()
@@ -305,7 +305,7 @@ internal sealed class ClosedLoopDataCollector(FilePathResolver filePathResolver,
                 return;
             }
             collection = _collection;
-            collection.LastPacket = DateTime.UtcNow;
+            collection.LastPacket = timeProvider.GetTimestamp();
         }
 
         // A packet that does not carry on from the last one means samples went missing, and a packet

@@ -1,11 +1,12 @@
 // The emulator link: the SBC's SPI bus and input lines carried over a socket to an emulated
 // controller (Hardware/Emulator). The peer here plays the emulator's side of EmulatorLinkFormats.h,
-// as the SBC link of the Renode SPI model does, so these check the frames, the edge bookkeeping
-// SpiTransfer relies on and the emulated time base without an emulator.
+// as the SBC link of the Renode SPI model does, and the test plays the bench that releases its
+// frames, so these check the frames, the lockstep holding and the edge bookkeeping SpiTransfer
+// relies on without an emulator.
 
-#include <Hardware/Emulator/EmulatedTimeBase.h>
 #include <Hardware/Emulator/EmulatorLink.h>
-#include <Motion/StepTimer.h>
+#include <Platform/Activity.h>
+#include <Platform/LocalClock.h>
 
 #include <TestSupport.h>
 
@@ -16,6 +17,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <thread>
@@ -122,12 +124,6 @@ namespace
 			Send(data.data(), data.size());
 		}
 
-		void SendTime()
-		{
-			const FrameHeader header{static_cast<uint8_t>(FrameType::Time), 0, 0, 0, emulatedTimeNs};
-			Send(&header, sizeof(header));
-		}
-
 	  private:
 		void Send(const void* data, size_t length) const { (void)::send(m_fd, data, length, MSG_NOSIGNAL); }
 
@@ -157,33 +153,99 @@ namespace
 		return ::poll(&pfd, 1, timeoutMs) == 1 && (pfd.revents & POLLIN) != 0;
 	}
 
+	// Wait, in real time, until the link has received `count` frames in all
+	bool WaitForFrames(const EmulatorLink& link, uint32_t count)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+		while (link.FramesReceived() < count)
+		{
+			if (std::chrono::steady_clock::now() >= deadline)
+			{
+				return false;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		return true;
+	}
+
+	// Wait, in real time, until the link has sent `count` exchanges in all
+	bool WaitForExchanges(const EmulatorLink& link, uint32_t count)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+		while (link.FramesSent() < count)
+		{
+			if (std::chrono::steady_clock::now() >= deadline)
+			{
+				return false;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		return true;
+	}
+
+	std::shared_ptr<EmulatorLink> Connect(FakeEmulator& emulator, const std::string& path, int timeoutMs = exchangeTimeoutMs)
+	{
+		std::thread accept([&] { emulator.Accept(); });
+		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, timeoutMs);
+		accept.join();
+		return link;
+	}
+
 	void AnExchangeReturnsWhatTheSlaveClockedBack()
 	{
 		const std::string path = SocketPath("exchange");
 		FakeEmulator emulator(path);
-		std::thread accept([&] { emulator.Accept(); });
-		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, exchangeTimeoutMs);
-		accept.join();
+		auto link = Connect(emulator, path);
 		EmulatedSpiBus bus(link);
 
 		const std::vector<uint8_t> tx{0x5F, 0x01, 0x02, 0xFE};
 		std::vector<uint8_t> rx(tx.size());
 		std::vector<uint8_t> received;
 		std::thread peer([&] { received = emulator.AnswerExchange(); });
-		bus.TransferFullDuplex(tx.data(), rx.data(), tx.size());
+		std::thread master([&] { bus.TransferFullDuplex(tx.data(), rx.data(), tx.size()); });
 		peer.join();
+		CHECK(WaitForFrames(*link, 1), "the result arrives");
+		CHECK(link->ReleaseFrame(), "and is released");
+		master.join();
 
+		CHECK(link->FramesSent() == 1, "the exchange is counted as sent");
 		CHECK(received == tx, "the emulator receives the bytes the master clocked out");
 		CHECK(rx == (std::vector<uint8_t>{0xA0, 0xFE, 0xFD, 0x01}), "the master receives the bytes the slave clocked back");
+	}
+
+	void FramesAreHeldUntilReleasedInOrder()
+	{
+		const std::string path = SocketPath("held");
+		FakeEmulator emulator(path);
+		auto link = Connect(emulator, path);
+		EmulatedInputLine transferReady(link, Line::TransferReady);
+
+		int64_t next = 0;
+		CHECK(!link->NextFrameTime(next), "nothing is held before the emulator sends");
+		emulator.emulatedTimeNs = 3000000;
+		emulator.SendLine(Line::TransferReady, true);
+		emulator.emulatedTimeNs = 4000000;
+		emulator.SendLine(Line::TransferReady, false);
+		CHECK(WaitForFrames(*link, 2), "both frames arrive");
+		CHECK(!transferReady.Read() && !PollsReadable(transferReady.Fd(), 0), "a frame that has arrived does nothing until it is released");
+		CHECK(link->NextFrameTime(next) && next == 3000000, "the oldest frame's emulated time is reported");
+
+		CHECK(link->ReleaseFrame(), "the first frame is released");
+		CHECK(transferReady.Read() && PollsReadable(transferReady.Fd(), 0), "and the line rises");
+		CHECK(link->NextFrameTime(next) && next == 4000000, "the next frame is the later one");
+		CHECK(link->ReleaseFrame(), "the second frame is released");
+		CHECK(!transferReady.Read(), "and the line falls");
+		CHECK(!link->ReleaseFrame(), "nothing more is held");
+		while (transferReady.ReadEvent())
+		{
+		}
 	}
 
 	void LineChangesAreEdgesThatPollWaitsFor()
 	{
 		const std::string path = SocketPath("lines");
 		FakeEmulator emulator(path);
-		std::thread accept([&] { emulator.Accept(); });
-		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, exchangeTimeoutMs);
-		accept.join();
+		auto link = Connect(emulator, path);
 		EmulatedInputLine transferReady(link, Line::TransferReady);
 		EmulatedInputLine dataAvailable(link, Line::DataAvailable);
 
@@ -192,7 +254,11 @@ namespace
 
 		emulator.SendLine(Line::TransferReady, false);
 		emulator.SendLine(Line::TransferReady, true);
-		CHECK(PollsReadable(transferReady.Fd(), 1000), "a rising edge wakes poll()");
+		CHECK(WaitForFrames(*link, 2), "the frames arrive");
+		while (link->ReleaseFrame())
+		{
+		}
+		CHECK(PollsReadable(transferReady.Fd(), 0), "a rising edge wakes poll()");
 		CHECK(transferReady.Read(), "the line reads high after its rising edge");
 		CHECK(transferReady.ReadEvent(), "the rising edge is queued");
 		CHECK(!transferReady.ReadEvent(), "a repeated level is not an edge");
@@ -202,28 +268,47 @@ namespace
 
 		emulator.SendLine(Line::TransferReady, false);
 		emulator.SendLine(Line::TransferReady, true);
-		// The two edges arrive separately, so poll() may wake on the falling one alone
-		int edgesConsumed = 0;
-		while (edgesConsumed < 2 && PollsReadable(transferReady.Fd(), 1000))
+		CHECK(WaitForFrames(*link, 4), "the next frames arrive");
+		while (link->ReleaseFrame())
 		{
-			while (transferReady.ReadEvent())
-			{
-				++edgesConsumed;
-			}
 		}
-		CHECK(edgesConsumed == 2, "the next edges wake poll()");
+		int edgesConsumed = 0;
+		while (transferReady.ReadEvent())
+		{
+			++edgesConsumed;
+		}
+		CHECK(edgesConsumed == 2, "the next edges are queued");
 		CHECK(transferReady.RisingSequenceNumber() > first, "a later rising edge has a larger sequence number");
 		CHECK(!PollsReadable(transferReady.Fd(), 0), "consuming every edge leaves nothing for poll()");
 		CHECK(transferReady.MissedEdges() == 0, "no edge was lost");
+	}
+
+	void AnEdgeCountsWhileAThreadWaitsOnItsLine()
+	{
+		const std::string path = SocketPath("activity");
+		FakeEmulator emulator(path);
+		auto link = Connect(emulator, path);
+		EmulatedInputLine transferReady(link, Line::TransferReady);
+
+		const int64_t before = Duet::Sbc::Activity::Pending();
+		emulator.SendLine(Line::TransferReady, true);
+		CHECK(WaitForFrames(*link, 1), "the frame arrives");
+		{
+			pollfd pfd{transferReady.Fd(), POLLIN, 0};
+			const Duet::Sbc::Activity::WaitingOn waiting({&pfd, 1});
+			CHECK(Duet::Sbc::Activity::Pending() == before, "a frame held for the bench is not activity");
+			(void)link->ReleaseFrame();
+			CHECK(Duet::Sbc::Activity::Pending() == before + 1, "a released edge is activity while a thread waits on its line");
+		}
+		CHECK(Duet::Sbc::Activity::Pending() == before, "and stops being activity when the thread stops waiting");
+		CHECK(transferReady.ReadEvent(), "the edge is queued for it");
 	}
 
 	void AnExchangeFailsOnceTheEmulatorHasGone()
 	{
 		const std::string path = SocketPath("closed");
 		FakeEmulator emulator(path);
-		std::thread accept([&] { emulator.Accept(); });
-		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, exchangeTimeoutMs);
-		accept.join();
+		auto link = Connect(emulator, path);
 		EmulatedSpiBus bus(link);
 
 		emulator.Close();
@@ -245,9 +330,7 @@ namespace
 	{
 		const std::string path = SocketPath("silent");
 		FakeEmulator emulator(path);
-		std::thread accept([&] { emulator.Accept(); });
-		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, 100);
-		accept.join();
+		auto link = Connect(emulator, path, 100);
 		EmulatedSpiBus bus(link);
 
 		const uint8_t tx[4] = {};
@@ -264,13 +347,46 @@ namespace
 		CHECK(threw, "an unanswered exchange times out");
 	}
 
+	void APinnedClockTimesAnExchangeOut()
+	{
+		const std::string path = SocketPath("pinned-timeout");
+		FakeEmulator emulator(path);
+		Duet::Sbc::LocalClock::Pin(1000000000);
+		auto link = Connect(emulator, path, 100);
+		EmulatedSpiBus bus(link);
+
+		const uint8_t tx[4] = {};
+		uint8_t rx[4] = {};
+		bool timedOut = false;
+		std::thread master(
+			[&]
+			{
+				try
+				{
+					bus.TransferFullDuplex(tx, rx, sizeof(tx));
+				}
+				catch (const std::system_error& e)
+				{
+					timedOut = e.code().value() == ETIMEDOUT;
+				}
+			});
+		CHECK(WaitForExchanges(*link, 1), "the exchange is sent");
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		CHECK(!timedOut, "real time passing does not time out an exchange on a pinned clock");
+		Duet::Sbc::LocalClock::Pin(1000000000 + 99000000);
+		std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		CHECK(!timedOut, "nor does the clock moving short of the timeout");
+		Duet::Sbc::LocalClock::Pin(1000000000 + 100000000);
+		master.join();
+		CHECK(timedOut, "the clock reaching the timeout times it out");
+		Duet::Sbc::LocalClock::Unpin();
+	}
+
 	void ALateResultIsNotTakenForTheNextExchange()
 	{
 		const std::string path = SocketPath("late-result");
 		FakeEmulator emulator(path);
-		std::thread accept([&] { emulator.Accept(); });
-		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, 100);
-		accept.join();
+		auto link = Connect(emulator, path, 100);
 		EmulatedSpiBus bus(link);
 
 		const std::vector<uint8_t> tx{1, 2};
@@ -289,55 +405,29 @@ namespace
 		peer.join();
 		CHECK(timedOut, "the first exchange times out");
 
-		std::thread answer(
-			[&]
-			{
-				// The first exchange's result arrives late, then the second's
-				emulator.SendResult(first.first.sequence, {0xEE, 0xEE});
-				const auto second = emulator.ReceiveExchange();
-				emulator.SendResult(second.first.sequence, {0x55, 0xAA});
-			});
-		bus.TransferFullDuplex(tx.data(), rx.data(), tx.size());
-		answer.join();
+		// The first exchange's result arrives late, then the second's
+		emulator.SendResult(first.first.sequence, {0xEE, 0xEE});
+		std::thread master([&] { bus.TransferFullDuplex(tx.data(), rx.data(), tx.size()); });
+		const auto second = emulator.ReceiveExchange();
+		emulator.SendResult(second.first.sequence, {0x55, 0xAA});
+		CHECK(WaitForFrames(*link, 2), "both results arrive");
+		while (link->ReleaseFrame())
+		{
+		}
+		master.join();
 		CHECK(rx == (std::vector<uint8_t>{0x55, 0xAA}), "the second exchange gets its own result, not the late one");
 	}
 
-	void TheStepTimerFollowsEmulatedTime()
+	void TheCurrentLinkIsTheOneRegistered()
 	{
-		const std::string path = SocketPath("time");
+		const std::string path = SocketPath("current");
 		FakeEmulator emulator(path);
-		std::thread accept([&] { emulator.Accept(); });
-		auto link = std::make_shared<EmulatorLink>(path, connectTimeoutMs, exchangeTimeoutMs);
-		accept.join();
-
-		constexpr int64_t emulatedNs = 5000000000;
-		emulator.emulatedTimeNs = emulatedNs;
-		emulator.SendTime();
-		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-		while (::StepTimer::GetLocalTimeNs() < emulatedNs && std::chrono::steady_clock::now() < deadline)
 		{
-			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			auto link = Connect(emulator, path);
+			EmulatorLink::SetCurrent(link);
+			CHECK(EmulatorLink::Current() == link, "the registered link is current");
 		}
-		const int64_t local = ::StepTimer::GetLocalTimeNs();
-		CHECK(local >= emulatedNs && local < emulatedNs + 100000000, "the local time base is the emulated time of the last frame");
-	}
-
-	void TheTimeBaseExtrapolatesAtTheEmulatorsRate()
-	{
-		EmulatedTimeBase timeBase;
-		CHECK(timeBase.At(1000) == 0, "the time is 0 before the first frame");
-
-		// A third of real time: 10ms of emulated time in 30ms
-		timeBase.OnSample(0, 0);
-		timeBase.OnSample(10000000, 30000000);
-		CHECK(timeBase.At(30000000) == 10000000, "a frame's own time is read at once");
-		const int64_t later = timeBase.At(45000000);
-		CHECK(later > 14900000 && later < 15100000, "15ms later, 5ms more has passed");
-		CHECK(timeBase.At(10000000000) == 10000000 + 20000000, "it runs no more than 20ms ahead of the last frame");
-
-		// A frame that says less time has passed than was extrapolated does not take the time back
-		timeBase.OnSample(12000000, 46000000);
-		CHECK(timeBase.At(46000000) == 30000000, "the time never goes backwards");
+		CHECK(EmulatorLink::Current() == nullptr, "a link that has gone is not current");
 	}
 
 	void TheLinkWaitsForAnEmulatorThatIsStillStarting()
@@ -360,6 +450,7 @@ namespace
 		}
 		catch (const std::system_error&)
 		{
+			// @intentional: CHECK below reports it
 		}
 		late.join();
 		CHECK(connected, "the link connects once the emulator listens, within the connect timeout");
@@ -381,12 +472,14 @@ namespace
 int main()
 {
 	AnExchangeReturnsWhatTheSlaveClockedBack();
+	FramesAreHeldUntilReleasedInOrder();
 	LineChangesAreEdgesThatPollWaitsFor();
+	AnEdgeCountsWhileAThreadWaitsOnItsLine();
 	AnExchangeFailsOnceTheEmulatorHasGone();
 	AnExchangeTheEmulatorDoesNotAnswerTimesOut();
+	APinnedClockTimesAnExchangeOut();
 	ALateResultIsNotTakenForTheNextExchange();
-	TheStepTimerFollowsEmulatedTime();
-	TheTimeBaseExtrapolatesAtTheEmulatorsRate();
+	TheCurrentLinkIsTheOneRegistered();
 	TheLinkWaitsForAnEmulatorThatIsStillStarting();
 	return TestSupport::Summarise("emulator link");
 }

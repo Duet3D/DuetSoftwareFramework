@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -37,11 +36,13 @@ namespace DuetControlServer.Files;
 /// <param name="serviceProvider">
 /// Resolves the job controller, which is built after this and reads it back
 /// </param>
+/// <param name="timeProvider">Clock the job's times are measured on</param>
 /// <param name="logger">Logger</param>
 internal sealed class JobMonitor(
     Model.ObjectModel model,
     HeatManager heatManager,
     IServiceProvider serviceProvider,
+    TimeProvider timeProvider,
     ILogger<JobMonitor> logger) : BackgroundService
 {
     /// <summary>
@@ -78,7 +79,10 @@ internal sealed class JobMonitor(
     /// <remarks>RepRapFirmware's <c>MinFilamentUsageForEstimation</c></remarks>
     private const float MinFilamentUsageForEstimation = 0.01f;
 
-    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly long _clockStarted = timeProvider.GetTimestamp();
+
+    /// <summary>Time since this was created</summary>
+    private TimeSpan Elapsed => timeProvider.GetElapsedTime(_clockStarted);
 
     // When the job started and what it has spent not printing since
     private TimeSpan _startedAt;
@@ -117,7 +121,7 @@ internal sealed class JobMonitor(
     public void SetSlicerTimeLeft(float secondsLeft)
     {
         _slicerTimeLeft = secondsLeft;
-        _slicerTimeLeftSetAt = _clock.Elapsed;
+        _slicerTimeLeftSetAt = Elapsed;
     }
 
     /// <inheritdoc/>
@@ -128,7 +132,7 @@ internal sealed class JobMonitor(
             try
             {
                 await UpdateAsync(stoppingToken);
-                await Task.Delay(UpdateInterval, stoppingToken);
+                await Task.Delay(UpdateInterval, timeProvider, stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -138,7 +142,7 @@ internal sealed class JobMonitor(
             {
                 // A figure that cannot be worked out must not stop it being worked out again
                 logger.LogError(e, "Failed to update the job progress");
-                await Task.Delay(UpdateInterval, CancellationToken.None);
+                await Task.Delay(UpdateInterval, timeProvider, CancellationToken.None);
             }
         }
     }
@@ -161,7 +165,7 @@ internal sealed class JobMonitor(
         bool simulating = state.IsSimulating;
         long filePosition = Controller.GetFilePosition(0);
 
-        TimeSpan now = _clock.Elapsed;
+        TimeSpan now = Elapsed;
 
         // Time spent paused is not time spent printing. Whatever the job has been waiting for, the
         // rate it was getting through the file before it stopped is still the rate to estimate from
@@ -241,7 +245,7 @@ internal sealed class JobMonitor(
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
     public ValueTask PublishAsync(CancellationToken cancellationToken)
-        => PublishAsync(_clock.Elapsed, Controller.GetFilePosition(0), cancellationToken);
+        => PublishAsync(Elapsed, Controller.GetFilePosition(0), cancellationToken);
 
     /// <summary>
     /// Write what the job has done and how long is left
@@ -537,7 +541,7 @@ internal sealed class JobMonitor(
     /// <remarks>Called by the start sequence, before the first code of the job is read</remarks>
     public void Start()
     {
-        TimeSpan now = _clock.Elapsed;
+        TimeSpan now = Elapsed;
         _running = true;
         _startedAt = _lastSnapshotAt = now;
         _totalPauseTime = _totalWarmUpTime = _lastSnapshotNonPrintingTime = TimeSpan.Zero;
@@ -564,7 +568,7 @@ internal sealed class JobMonitor(
             return 0;
         }
 
-        TimeSpan now = _clock.Elapsed;
+        TimeSpan now = Elapsed;
         int duration = (int)MathF.Round((float)(now - _startedAt - PauseTimeAt(now)).TotalSeconds);
         int warmUp = (int)MathF.Round((float)WarmUpTimeAt(now).TotalSeconds);
         _running = false;

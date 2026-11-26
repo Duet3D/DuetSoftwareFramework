@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -41,7 +42,7 @@ public class CodeFileStateTests
     private CodeFile NewFile()
     {
         IOptions<Settings> settings = Options.Create(new Settings());
-        DcsModel model = new(new TestLifetime(), NullLogger<DcsModel>.Instance, settings);
+        DcsModel model = new(new TestLifetime(), NullLogger<DcsModel>.Instance, settings, TimeProvider.System);
         model.State.MachineMode = DuetAPI.ObjectModel.MachineMode.CNC;
         return new CodeFile(new CodeFilePath("job.gcode", _path), CodeChannel.File, null!, null!, null!, model,
                             NullLoggerFactory.Instance, settings);

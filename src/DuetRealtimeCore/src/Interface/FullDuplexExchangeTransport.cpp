@@ -1,12 +1,14 @@
 #include <Interface/FullDuplexExchangeTransport.h>
 
+#include <Platform/Activity.h>
+#include <Platform/LocalClock.h>
 #include <Storage/Crc.h>
 
 #include <poll.h>
-#include <sys/eventfd.h>
-#include <unistd.h>
 
 #include <algorithm>
+#include <cerrno>
+#include <array>
 #include <cstring>
 #include <string>
 #include <system_error>
@@ -22,18 +24,19 @@ namespace Duet::Sbc
 			std::memcpy(p, &v, sizeof(v));
 		}
 
-		double ElapsedMs(std::chrono::steady_clock::time_point start)
+		double ElapsedMs(int64_t startNs)
 		{
-			return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+			return static_cast<double>(LocalClock::NowNs() - startNs) / 1.0e6;
 		}
+
+		// The most fds a transport waits on besides stop and the clock
+		constexpr size_t maxPollFds = 4;
 
 	} // namespace
 
 	FullDuplexExchangeTransport::FullDuplexExchangeTransport(const Config& config)
 		: config(config)
 		, bufferSize(config.bufferSize)
-		, m_requestEventFd(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
-		, m_stopEventFd(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC))
 	{
 		m_rxBuffer.assign(bufferSize, 0);
 		m_txBuffers.resize(kNumTxBuffers);
@@ -51,38 +54,19 @@ namespace Duet::Sbc
 		m_txHeader.crcData = 0;
 		m_txHeader.crcHeader = 0;
 
-		if (m_requestEventFd < 0 || m_stopEventFd < 0)
-		{
-			throw std::system_error(errno, std::generic_category(), "Cannot create wake eventfd");
-		}
-
-		m_keepAliveStart = clock::now();
+		m_keepAliveStartNs = LocalClock::NowNs();
 	}
 
 	FullDuplexExchangeTransport::~FullDuplexExchangeTransport()
 	{
 		Stop();
-		if (m_requestEventFd >= 0)
-		{
-			::close(m_requestEventFd);
-			m_requestEventFd = -1;
-		}
-		if (m_stopEventFd >= 0)
-		{
-			::close(m_stopEventFd);
-			m_stopEventFd = -1;
-		}
 	}
 
 	void FullDuplexExchangeTransport::Stop() noexcept
 	{
 		m_stop.store(true, std::memory_order_relaxed);
 		// Wake the interface thread if it is blocked in poll() (anywhere)
-		if (m_stopEventFd >= 0)
-		{
-			const uint64_t one = 1;
-			[[maybe_unused]] const ssize_t n = ::write(m_stopEventFd, &one, sizeof(one));
-		}
+		m_stopWaker.Signal();
 	}
 
 	void FullDuplexExchangeTransport::ThrowIfStopped()
@@ -106,11 +90,7 @@ namespace Duet::Sbc
 	void FullDuplexExchangeTransport::RequestTransfer()
 	{
 		// Wake the interface thread if it is blocked in WaitForTransferReason's poll()
-		if (m_requestEventFd >= 0)
-		{
-			const uint64_t one = 1;
-			[[maybe_unused]] const ssize_t n = ::write(m_requestEventFd, &one, sizeof(one));
-		}
+		m_requestWaker.Signal();
 	}
 
 	// ---------------------------------------------------------------------------
@@ -151,13 +131,13 @@ namespace Duet::Sbc
 				{
 					if (m_fullTransferTimerRunning)
 					{
-						const double elapsed = ElapsedMs(m_fullTransferStart);
+						const double elapsed = ElapsedMs(m_fullTransferStartNs);
 						m_maxFullTransferDelay = std::max(elapsed, m_maxFullTransferDelay);
 						m_fullTransferTimerRunning = false;
 					}
 					else
 					{
-						m_fullTransferStart = clock::now();
+						m_fullTransferStartNs = LocalClock::NowNs();
 						m_fullTransferTimerRunning = true;
 					}
 				}
@@ -189,7 +169,7 @@ namespace Duet::Sbc
 				m_txBufferIndex = (m_txBufferIndex + 1) % kNumTxBuffers;
 				m_rxPointer = m_txPointer = 0;
 				m_packetId = 0;
-				m_keepAliveStart = clock::now();
+				m_keepAliveStartNs = LocalClock::NowNs();
 				m_consecutiveErrors = 0;
 
 				OnTransferCompleted();
@@ -295,9 +275,44 @@ namespace Duet::Sbc
 		{
 			return;
 		}
-		// Sleep on the stop fd so Stop() cuts the backoff short
-		pollfd pfd{m_stopEventFd, POLLIN, 0};
-		::poll(&pfd, 1, ms);
+		// PollUntil watches the stop wake-up, so Stop() cuts the backoff short
+		const int64_t deadline = LocalClock::DeadlineAfterMs(ms);
+		while (!m_stop.load(std::memory_order_relaxed) && PollUntil({}, deadline))
+		{
+		}
+	}
+
+	bool FullDuplexExchangeTransport::PollUntil(std::span<pollfd> fds, int64_t deadlineNs)
+	{
+		const int timeout = LocalClock::PollTimeoutMs(deadlineNs);
+		if (timeout == 0)
+		{
+			return false;
+		}
+		if (fds.size() > maxPollFds)
+		{
+			throw std::system_error(EINVAL, std::generic_category(), "Too many fds to wait on");
+		}
+
+		std::array<pollfd, maxPollFds + 2> all{};
+		std::ranges::copy(fds, all.begin());
+		all[fds.size()] = {m_stopWaker.Fd(), POLLIN, 0};
+		all[fds.size() + 1] = {m_clockWaker.Fd(), POLLIN, 0};
+		int ready = 0;
+		{
+			const Activity::WaitingOn waiting({all.data(), fds.size() + 2});
+			ready = ::poll(all.data(), fds.size() + 2, timeout);
+		}
+		if (ready < 0 && errno != EINTR)
+		{
+			throw std::system_error(errno, std::generic_category(), "poll() failed");
+		}
+		for (size_t i = 0; i < fds.size(); i++)
+		{
+			fds[i].revents = (ready > 0) ? all[i].revents : 0;
+		}
+		m_clockWaker.Drain();
+		return true;
 	}
 
 	// ---------------------------------------------------------------------------

@@ -127,6 +127,7 @@ internal sealed class LinkService(
                 // The native loop places its own thread on an isolated core at real-time priority;
                 // this dispatcher deliberately stays an ordinary thread
                 nativeLink.Start();
+                using NativeActivity.RunningScope running = NativeActivity.Running();
                 Dispatch(stoppingToken);
                 tcs.SetResult();
             }

@@ -1,5 +1,6 @@
 #include <Interface/Socket/SocketTransport.h>
 
+#include <Platform/LocalClock.h>
 #include <Platform/RingBuffer.h>
 #include <Storage/Crc.h>
 
@@ -19,11 +20,12 @@ namespace Duet::Sbc
 	namespace
 	{
 
-		using clock = std::chrono::steady_clock;
+		constexpr int64_t nsPerMs = 1000000;
 
-		double ElapsedMs(clock::time_point start)
+		// Whole milliseconds of local time left until `deadlineNs`, rounded up; 0 or less once it has passed
+		int MsLeft(int64_t deadlineNs)
 		{
-			return std::chrono::duration<double, std::milli>(clock::now() - start).count();
+			return static_cast<int>((deadlineNs - LocalClock::NowNs() + nsPerMs - 1) / nsPerMs);
 		}
 
 	} // namespace
@@ -82,13 +84,21 @@ namespace Duet::Sbc
 			if (errno == EINPROGRESS)
 			{
 				// Wait for the connect to resolve, up to the connect timeout
-				pollfd fds[2];
+				const int64_t deadline = LocalClock::DeadlineAfterMs(config.sbcConnectTimeout);
+				pollfd fds[1];
 				fds[0] = {fd, POLLOUT, 0};
-				fds[1] = {m_stopEventFd, POLLIN, 0};
-				const int ready = ::poll(fds, 2, config.sbcConnectTimeout);
+				bool ready = false;
+				while (!m_stop.load(std::memory_order_relaxed) && PollUntil(fds, deadline))
+				{
+					if (fds[0].revents != 0)
+					{
+						ready = true;
+						break;
+					}
+				}
 				int soError = 0;
 				socklen_t soLen = sizeof(soError);
-				if (ready <= 0 || m_stop.load(std::memory_order_relaxed) ||
+				if (!ready || m_stop.load(std::memory_order_relaxed) ||
 					::getsockopt(fd, SOL_SOCKET, SO_ERROR, &soError, &soLen) != 0 || soError != 0)
 				{
 					::close(fd);
@@ -118,29 +128,26 @@ namespace Duet::Sbc
 	// ---------------------------------------------------------------------------
 	void SocketTransport::ReadExact(std::span<uint8_t> buffer, int timeoutMs)
 	{
-		const auto start = clock::now();
+		const int64_t deadline = LocalClock::DeadlineAfterMs(timeoutMs);
 		size_t done = 0;
 		while (done < buffer.size())
 		{
 			ThrowIfStopped();
-			const int timeToWait = timeoutMs - static_cast<int>(ElapsedMs(start));
-			if (timeToWait <= 0)
-			{
-				throw TransferTimeout("Timed out waiting for data from the controller socket");
-			}
-
-			pollfd fds[2];
+			pollfd fds[1];
 			fds[0] = {m_socketFd, POLLIN, 0};
-			fds[1] = {m_stopEventFd, POLLIN, 0};
-			const int ready = ::poll(fds, 2, timeToWait);
-			if (ready < 0)
+			bool waited = false;
+			try
 			{
-				if (errno == EINTR)
-				{
-					continue;
-				}
+				waited = PollUntil(fds, deadline);
+			}
+			catch (const std::system_error&)
+			{
 				CloseSocket();
 				throw TransferTimeout("poll() failed on the controller socket");
+			}
+			if (!waited)
+			{
+				throw TransferTimeout("Timed out waiting for data from the controller socket");
 			}
 			if ((fds[0].revents & POLLIN) == 0)
 			{
@@ -167,30 +174,27 @@ namespace Duet::Sbc
 
 	void SocketTransport::WriteAll(std::span<const uint8_t> data)
 	{
-		const auto start = clock::now();
+		const int64_t deadline = LocalClock::DeadlineAfterMs(config.sbcTransferTimeout);
 		size_t done = 0;
 		while (done < data.size())
 		{
 			ThrowIfStopped();
-			const int timeToWait = config.sbcTransferTimeout - static_cast<int>(ElapsedMs(start));
-			if (timeToWait <= 0)
+			pollfd fds[1];
+			fds[0] = {m_socketFd, POLLOUT, 0};
+			bool waited = false;
+			try
+			{
+				waited = PollUntil(fds, deadline);
+			}
+			catch (const std::system_error&)
+			{
+				CloseSocket();
+				throw TransferTimeout("poll() failed on the controller socket");
+			}
+			if (!waited)
 			{
 				CloseSocket();
 				throw TransferTimeout("Timed out writing to the controller socket");
-			}
-
-			pollfd fds[2];
-			fds[0] = {m_socketFd, POLLOUT, 0};
-			fds[1] = {m_stopEventFd, POLLIN, 0};
-			const int ready = ::poll(fds, 2, timeToWait);
-			if (ready < 0)
-			{
-				if (errno == EINTR)
-				{
-					continue;
-				}
-				CloseSocket();
-				throw TransferTimeout("poll() failed on the controller socket");
 			}
 			if ((fds[0].revents & POLLOUT) == 0 && (fds[0].revents & (POLLERR | POLLHUP)) == 0)
 			{
@@ -230,10 +234,10 @@ namespace Duet::Sbc
 
 	proto::SocketFrameHeader SocketTransport::ReadContentFrameHeader(int timeoutMs)
 	{
-		const auto start = clock::now();
+		const int64_t deadline = LocalClock::DeadlineAfterMs(timeoutMs);
 		for (;;)
 		{
-			const int timeToWait = timeoutMs - static_cast<int>(ElapsedMs(start));
+			const int timeToWait = MsLeft(deadline);
 			if (timeToWait <= 0)
 			{
 				throw TransferTimeout("Timed out waiting for a frame from the controller socket");
@@ -277,11 +281,11 @@ namespace Duet::Sbc
 	{
 		if (!m_ready)
 		{
-			const int timeout = ReadinessTimeout();
-			const auto start = clock::now();
+			const int64_t start = LocalClock::NowNs();
+			const int64_t deadline = start + ReadinessTimeout() * nsPerMs;
 			while (!m_ready)
 			{
-				const int timeToWait = timeout - static_cast<int>(ElapsedMs(start));
+				const int timeToWait = MsLeft(deadline);
 				if (timeToWait <= 0)
 				{
 					throw TransferTimeout("Transfer timeout while waiting for controller readiness");
@@ -303,7 +307,7 @@ namespace Duet::Sbc
 				}
 			}
 
-			const double waited = ElapsedMs(start);
+			const double waited = static_cast<double>(LocalClock::NowNs() - start) / nsPerMs;
 			m_maxPinWaitDuration = std::max(waited, m_maxPinWaitDuration);
 		}
 
@@ -495,9 +499,8 @@ namespace Duet::Sbc
 		}
 
 		// Keep-alive
-		const int timeToWait =
-			config.sbcConnectionKeepAliveInterval - static_cast<int>(ElapsedMs(m_keepAliveStart));
-		if (timeToWait <= 0)
+		const int64_t keepAliveDue = m_keepAliveStartNs + config.sbcConnectionKeepAliveInterval * nsPerMs;
+		if (LocalClock::NowNs() >= keepAliveDue)
 		{
 			return true;
 		}
@@ -506,19 +509,14 @@ namespace Duet::Sbc
 		// the peer, or the keep-alive timeout. The wake eventfd is deliberately not drained before
 		// poll(), for the same reason as the SPI transport: a RequestTransfer racing in after the
 		// caller's StageOutgoing must still wake this poll.
-		pollfd fds[3];
+		pollfd fds[2];
 		fds[0] = {m_socketFd, POLLIN, 0};
-		fds[1] = {m_requestEventFd, POLLIN, 0};
-		fds[2] = {m_stopEventFd, POLLIN, 0};
-		const int ready = ::poll(fds, 3, timeToWait);
-		if (ready < 0 && errno != EINTR)
-		{
-			throw std::system_error(errno, std::generic_category(), "poll() failed waiting for a transfer reason");
-		}
+		fds[1] = {m_requestWaker.Fd(), POLLIN, 0};
+		const bool ready = PollUntil(fds, keepAliveDue);
 
 		// A readable socket while idle carries Ready or DataAvailable notifications; absorb them so
 		// the flags are current for the re-check (and so the next poll() blocks properly)
-		if (ready > 0 && (fds[0].revents & (POLLIN | POLLERR | POLLHUP)) != 0)
+		if (ready && (fds[0].revents & (POLLIN | POLLERR | POLLHUP)) != 0)
 		{
 			try
 			{
@@ -552,13 +550,7 @@ namespace Duet::Sbc
 		}
 
 		// Consume the wake-ups so the next poll() blocks properly
-		uint64_t v = 0;
-		while (::read(m_requestEventFd, &v, sizeof(v)) > 0)
-		{
-		}
-		while (::read(m_stopEventFd, &v, sizeof(v)) > 0)
-		{
-		}
+		m_requestWaker.Drain();
 
 		// Proceed on stop so the caller can shut down; otherwise re-stage and retry
 		return m_stop.load(std::memory_order_relaxed);

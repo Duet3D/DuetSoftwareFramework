@@ -1,3 +1,4 @@
+using System;
 using DuetAPI;
 using DuetControlServer.Files;
 using DuetControlServer.Motion;
@@ -19,7 +20,7 @@ namespace UnitTests.Motion;
 public class JobResumePointTests
 {
     /// <summary>A planner with only the state a resume point is taken from</summary>
-    private static MovePlanner NewPlanner() => new(null!, null!, null!, NullLogger<MovePlanner>.Instance);
+    private static MovePlanner NewPlanner() => new(null!, null!, null!, TimeProvider.System, NullLogger<MovePlanner>.Instance);
 
     /// <summary>State the file was in when the code was read</summary>
     private static readonly CodeFileState FileState = CodeFileState.At(100) with { EndPosition = 120 };

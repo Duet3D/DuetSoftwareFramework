@@ -22,7 +22,7 @@ public class SensorManagerTests
     [SetUp]
     public void CreateManager()
     {
-        _model = new(new StoppedLifetime(), NullLogger<DuetControlServer.Model.ObjectModel>.Instance, Options.Create(new Settings()));
+        _model = new(new StoppedLifetime(), NullLogger<DuetControlServer.Model.ObjectModel>.Instance, Options.Create(new Settings()), TimeProvider.System);
         _clock = new ManualClock();
         _sensors = new SensorManager(_model, _clock);
     }
