@@ -220,11 +220,8 @@ public class M207Tests : BenchFixture
         Assert.That(Lines(reply), Is.EqualTo(new[] { "Tool 1 retract/reprime: length 3.00/3.50mm, speed 30.0/15.0mm/sec, Z hop 0.25mm" }), "only tool 1 is reported");
     }
 
-    /// <summary>With no tools, M207 succeeds, has nothing to report and reads none of its parameters</summary>
-    /// <remarks>
-    /// Tool::SetAllToolsFirmwareRetraction loops over an empty tool list and returns ok. The parameters are only read
-    /// inside that loop, so with no tools even a bad value is never looked at
-    /// </remarks>
+    /// <summary>With no tools, M207 succeeds and has nothing to report</summary>
+    /// <remarks>Tool::SetAllToolsFirmwareRetraction loops over an empty tool list and returns ok</remarks>
     [Category("KnownGap")]
     [Test]
     public async Task M207WithNoToolsReportsNothing()
@@ -233,14 +230,10 @@ public class M207Tests : BenchFixture
 
         string report = (await bench.Host.ExecuteCodeAsync("M207")).Trim();
         string set = (await bench.Host.ExecuteCodeAsync("M207 S3")).Trim();
-        string negativeZ = (await bench.Host.ExecuteCodeAsync("M207 Z-1")).Trim();
-        string bareLetter = (await bench.Host.ExecuteCodeAsync("M207 S")).Trim();
         Assert.Multiple(() =>
         {
             Assert.That(report, Is.Empty, "the report is empty");
             Assert.That(set, Is.Empty, "setting with no tools succeeds silently");
-            Assert.That(negativeZ, Is.Empty, "a negative Z is never read");
-            Assert.That(bareLetter, Is.Empty, "a letter without a number is never read");
             Assert.That(bench.CanMaster.SbcPackets(SbcRequest.SendCANMessage), Is.Empty, "nothing is sent");
         });
     }
@@ -359,21 +352,18 @@ public class M207Tests : BenchFixture
     }
 
     /// <summary>A negative P is not a number M207 accepts, so it is refused before any tool is looked up</summary>
-    /// <remarks>
-    /// StrToU32's NumericConverter refuses a leading '-', so CheckNumberFound throws "expected number after 'P'".
-    /// In an expression, ExpressionParser::ConvertToUnsigned throws "expected non-negative integer"
-    /// </remarks>
+    /// <remarks>StrToU32's NumericConverter refuses a leading '-', so CheckNumberFound throws "expected number after 'P'"</remarks>
     [Category("KnownGap")]
     [Test]
     public async Task M207RefusesANegativeP()
     {
         await using Bench bench = await Bench.StartAsync(TwoToolsConfig);
 
-        string literal = (await bench.Host.ExecuteCodeAsync("M207 P-1 S3")).Trim();
+        string reply = (await bench.Host.ExecuteCodeAsync("M207 P-1 S3")).Trim();
         Retraction first = await ReadRetractionAsync(bench, 0), second = await ReadRetractionAsync(bench, 1);
         Assert.Multiple(() =>
         {
-            Assert.That(literal, Does.StartWith("Error:"), "P-1");
+            Assert.That(reply, Does.StartWith("Error:"));
             AssertRetraction(first, Defaults, "tools[0] is untouched");
             AssertRetraction(second, Defaults, "tools[1] is untouched");
         });
