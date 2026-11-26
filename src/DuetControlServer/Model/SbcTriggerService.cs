@@ -33,7 +33,7 @@ public sealed class SbcTriggerService(
     {
         public required string Expression { get; init; }
         public required string[] WatchedPaths { get; init; }
-        public int Condition { get; init; }
+        public TriggerCondition Condition { get; init; }
         public bool LastResult { get; set; }
     }
 
@@ -135,7 +135,7 @@ public sealed class SbcTriggerService(
         }
         string triggerExpression = (string)pParam!;
 
-        int condition = code.TryGetInt('R', out int rParam) ? rParam : 0;
+        TriggerCondition condition = code.GetEnum<TriggerCondition>('R', TriggerCondition.Always);
 
         // Clear any existing pin-based RRF trigger for this slot to avoid duplicate firing
         Commands.Code clearCode = codeFactory.Create();
@@ -275,14 +275,27 @@ public sealed class SbcTriggerService(
         }
     }
 
+    /// <summary>When a trigger may fire, as the M581 R parameter selects it, numbered as RepRapFirmware's TriggerItem reads it</summary>
+    internal enum TriggerCondition
+    {
+        /// <summary>Whatever the machine is doing</summary>
+        Always = 0,
+
+        /// <summary>Only while a job is running</summary>
+        WhilePrinting = 1,
+
+        /// <summary>Only while no job is running</summary>
+        WhileNotPrinting = 2
+    }
+
     /// <summary>
     /// Returns true if the trigger condition (R parameter) allows firing given the current print status.
     /// </summary>
-    /// <param name="condition">0 = always, 1 = only while printing, 2 = only while not printing</param>
+    /// <param name="condition">The trigger's condition</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
-    private async Task<bool> IsTriggerConditionMetAsync(int condition, CancellationToken cancellationToken)
+    private async Task<bool> IsTriggerConditionMetAsync(TriggerCondition condition, CancellationToken cancellationToken)
     {
-        if (condition == 0)
+        if (condition == TriggerCondition.Always)
         {
             return true;
         }
@@ -293,7 +306,7 @@ public sealed class SbcTriggerService(
                 or MachineStatus.Pausing
                 or MachineStatus.Paused
                 or MachineStatus.Resuming;
-            return condition == 1 ? isPrinting : !isPrinting;
+            return condition == TriggerCondition.WhilePrinting ? isPrinting : !isPrinting;
         }
     }
 }

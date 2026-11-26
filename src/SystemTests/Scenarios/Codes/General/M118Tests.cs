@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Codes.Handlers;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.General;
@@ -30,5 +31,17 @@ public class M118Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M118 S\"M118 bench message\"");
         Assert.That(reply, Reply.IsSuccess("M118 bench message"),
                     "M118 S sends the message to the requesting channel (RRF GCodes2.cpp case 118, platform.Message with GenericMessage)");
+    }
+
+    /// <summary>A P that names no destination is refused</summary>
+    /// <remarks>GCodes2.cpp case 118 answers any other P with "Invalid message type"</remarks>
+    [TestCase(8)]
+    [TestCase(-1)]
+    public async Task M118RefusesAPThatNamesNoDestination(int destination)
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M118 P{destination} S\"hello\""),
+                    Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.MessageDestination>('P')));
     }
 }

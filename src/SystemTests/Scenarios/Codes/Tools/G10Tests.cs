@@ -6,6 +6,7 @@ using DuetControlServer.Heat;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using NUnit.Framework;
 using static SystemTests.Scenarios.Codes.Tools.ToolSetup;
 
@@ -178,7 +179,7 @@ public class G10Tests : BenchFixture
     }
 
     /// <summary>An L G10 does not know is refused, and neither a workplace nor a tool changes</summary>
-    /// <remarks>GCodes2.cpp case 10 answers any other L with badOrMissingParameter, "Bad or missing parameter"</remarks>
+    /// <remarks>GCodes2.cpp case 10 refuses any L other than 1, 2 and 20</remarks>
     [Test]
     public async Task G10WithAnUnknownLIsRefused()
     {
@@ -189,7 +190,7 @@ public class G10Tests : BenchFixture
         float toolOffset = await bench.Host.ReadModelAsync(model => model.Tools[0]!.Offsets.FirstOrDefault());
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Reply.IsError("Bad or missing parameter"), "L3 is no form of G10");
+            Assert.That(reply, Reply.IsError(CodeErrors.InvalidEnumValue<GCodeHandler.G10Form>('L')), "L3 is no form of G10");
             Assert.That(workplace, Is.EqualTo(new[] { 0f, 0f, 0f }), "no workplace was set");
             Assert.That(toolOffset, Is.Zero, "nor tool 0's offset");
         });

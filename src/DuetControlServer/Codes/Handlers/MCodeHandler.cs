@@ -487,6 +487,19 @@ internal partial class MCodeHandler(
         throw new OperationCanceledException();
     }
 
+    /// <summary>How M20 lists the files, as its S parameter selects, numbered as RepRapFirmware's GCodes2.cpp case 20 reads it</summary>
+    internal enum FileListFormat
+    {
+        /// <summary>One file per line</summary>
+        Text = 0,
+
+        /// <summary>The JSON file list RepRapFirmware's GetFilesResponse builds</summary>
+        Json = 2,
+
+        /// <summary>The JSON file list with sizes and dates that GetFilelistResponse builds</summary>
+        JsonFileList = 3
+    }
+
     /// <summary>
     /// M20: list the files on the SD card
     /// </summary>
@@ -514,14 +527,14 @@ internal partial class MCodeHandler(
 
         // Check if JSON file lists were requested
         int startAt = Math.Max(code.GetInt('R', defaultValue: 0), 0),
-            type = code.GetInt('S', defaultValue: 0),
             maxItems = code.GetInt('C', defaultValue: -1);
-        if (type == 2)
+        FileListFormat format = code.GetEnum<FileListFormat>('S', FileListFormat.Text);
+        if (format == FileListFormat.Json)
         {
             string json = FileLists.GetFiles(virtualDirectory, physicalDirectory, startAt, true, maxSize, maxItems, code.ExplicitLineNumber);
             return new Message(MessageType.Success, json);
         }
-        if (type == 3)
+        if (format == FileListFormat.JsonFileList)
         {
             string json = FileLists.GetFileList(virtualDirectory, physicalDirectory, startAt, maxSize, maxItems, code.ExplicitLineNumber);
             return new Message(MessageType.Success, json);
@@ -1111,6 +1124,16 @@ internal partial class MCodeHandler(
         }
     }
 
+    /// <summary>How M39 reports the card, as its S parameter selects, numbered as RepRapFirmware's GCodes2.cpp case 39 reads it</summary>
+    internal enum CardInfoFormat
+    {
+        /// <summary>A line of text</summary>
+        Text = 0,
+
+        /// <summary>A JSON object</summary>
+        Json = 2
+    }
+
     /// <summary>
     /// M39: report information about an SD card
     /// </summary>
@@ -1122,7 +1145,7 @@ internal partial class MCodeHandler(
         using (await model.AccessReadOnlyAsync(cancellationToken))
         {
             int index = code.GetInt('P', defaultValue: 0);
-            if (code.GetInt('S', defaultValue: 0) == 2)
+            if (code.GetEnum<CardInfoFormat>('S', CardInfoFormat.Text) == CardInfoFormat.Json)
             {
                 if (index < 0 || index >= model.Volumes.Count)
                 {
@@ -1376,6 +1399,34 @@ internal partial class MCodeHandler(
         }
     }
 
+    /// <summary>Where M118 sends its message, as its P parameter selects, numbered as RepRapFirmware's GCodes2.cpp case 118 reads it</summary>
+    internal enum MessageDestination
+    {
+        /// <summary>Every input that takes generic messages</summary>
+        Generic = 0,
+
+        /// <summary>The USB port</summary>
+        Usb = 1,
+
+        /// <summary>The UART port</summary>
+        Uart = 2,
+
+        /// <summary>HTTP clients</summary>
+        Http = 3,
+
+        /// <summary>Telnet clients</summary>
+        Telnet = 4,
+
+        /// <summary>The second auxiliary port</summary>
+        Aux2 = 5,
+
+        /// <summary>The MQTT broker</summary>
+        Mqtt = 6,
+
+        /// <summary>The second USB channel</summary>
+        Usb2 = 7
+    }
+
     /// <summary>
     /// M118 P6: publish an MQTT message
     /// </summary>
@@ -1384,7 +1435,7 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandlePublishMqttAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.TryGetInt('P', out int pParam) && pParam == 6)
+        if (code.GetEnum<MessageDestination>('P', MessageDestination.Generic) == MessageDestination.Mqtt)
         {
             if (await codeProcessor.FlushAsync(code, cancellationToken: cancellationToken))
             {
@@ -1816,6 +1867,28 @@ internal partial class MCodeHandler(
     }
 
     /// <summary>
+    /// A network protocol as the M586 P parameter selects it, numbered as RepRapFirmware's NetworkDefs.h numbers them
+    /// </summary>
+    /// <remarks>The object model's <see cref="NetworkProtocol"/> names more protocols and does not number them so</remarks>
+    internal enum NetworkProtocolSelection
+    {
+        /// <summary>HTTP</summary>
+        Http = 0,
+
+        /// <summary>FTP</summary>
+        Ftp = 1,
+
+        /// <summary>Telnet</summary>
+        Telnet = 2,
+
+        /// <summary>Multicast discovery</summary>
+        MulticastDiscovery = 3,
+
+        /// <summary>MQTT</summary>
+        Mqtt = 4
+    }
+
+    /// <summary>
     /// M586: configure the network protocols
     /// </summary>
     /// <param name="code">The code</param>
@@ -1828,7 +1901,7 @@ internal partial class MCodeHandler(
         {
             return mqtt.Configure(code);
         }
-        else if (code.TryGetInt('P', out int pParam) && pParam == 4)
+        else if (code.TryGetEnum('P', out NetworkProtocolSelection protocol) && protocol == NetworkProtocolSelection.Mqtt)
         {
             return await mqtt.ConfigureProtocolAsync(code);
         }
@@ -1898,7 +1971,7 @@ internal partial class MCodeHandler(
     /// <returns>The result, or null to let the code carry on</returns>
     private async ValueTask<Message> HandleEventLoggingAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (!code.TryGetInt('S', out int sParam))
+        if (!code.TryGetEnum('S', out RrfLogLevel level))
         {
             using (await model.AccessReadOnlyAsync(cancellationToken))
             {
@@ -1910,14 +1983,13 @@ internal partial class MCodeHandler(
             }
         }
 
-        if (sParam > 0 && sParam < 4)
+        if (level != RrfLogLevel.Off)
         {
-            EventLogLevel logLevel = sParam switch
+            EventLogLevel logLevel = level switch
             {
-                1 => EventLogLevel.Warn,
-                2 => EventLogLevel.Info,
-                3 => EventLogLevel.Debug,
-                _ => EventLogLevel.Off
+                RrfLogLevel.Warn => EventLogLevel.Warn,
+                RrfLogLevel.Info => EventLogLevel.Info,
+                _ => EventLogLevel.Debug
             };
 
             string defaultLogFile = EventLogger.DefaultLogFile;
@@ -1936,6 +2008,28 @@ internal partial class MCodeHandler(
             await eventLogger.StopAsync();
         }
         return new Message();
+    }
+
+    /// <summary>
+    /// A log level as the M929 S parameter selects it
+    /// </summary>
+    /// <remarks>
+    /// RepRapFirmware's LogLevel numbering, which config files depend on. The object model's
+    /// <see cref="EventLogLevel"/> is ordered the other way round, so it is not read directly
+    /// </remarks>
+    internal enum RrfLogLevel
+    {
+        /// <summary>Logging is off</summary>
+        Off = 0,
+
+        /// <summary>Warnings and errors</summary>
+        Warn = 1,
+
+        /// <summary>Information as well</summary>
+        Info = 2,
+
+        /// <summary>Everything, debug messages included</summary>
+        Debug = 3
     }
 
     /// <summary>

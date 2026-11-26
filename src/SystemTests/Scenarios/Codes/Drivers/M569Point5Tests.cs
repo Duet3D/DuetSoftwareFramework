@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using DuetControlServer.Link.Expansion;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
@@ -227,6 +228,22 @@ public class M569Point5Tests : BenchFixture
             Assert.That(bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} {parameters} D{Filter}")
                              .Result,
                         Reply.IsError());
+            Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
+        });
+    }
+
+    /// <summary>An A that names no collection mode is refused, and nothing is asked of the board</summary>
+    /// <remarks>ClosedLoop.cpp:148 reads A with <c>TryGetLimitedUIValue</c>: 0 starts at once and 1 on the next move</remarks>
+    [TestCase(2)]
+    [TestCase(-1)]
+    public async Task M569Point5RefusesAnAThatNamesNoMode(int mode)
+    {
+        await using Bench bench = await Bench.StartAsync(DriversRig.Config);
+
+        string reply = await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)} S200 A{mode} D{Filter}");
+        Assert.Multiple(() =>
+        {
+            Assert.That(reply, Reply.IsError(CodeErrors.InvalidEnumValue<ClosedLoopDataCollector.CollectionMode>('A')));
             Assert.That(bench.CanMaster.CanMessages<CanMessageStartClosedLoopDataCollection>(), Is.Empty);
         });
     }

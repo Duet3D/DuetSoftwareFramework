@@ -34,6 +34,7 @@ internal static class CodeErrors
     public static string InvalidEnumValue(char letter, params long[] valid) => $"valid parameter values for '{letter}' are {string.Join(", ", valid)}";
 
     /// <summary>A value that names none of an enumeration's members, which are the values the parameter takes</summary>
+    /// <remarks>The list follows the enumeration, so a scenario still writes the values it sends as numbers</remarks>
     public static string InvalidEnumValue<T>(char letter) where T : struct, Enum
         => InvalidEnumValue(letter, [.. Enum.GetValues<T>().Select(member => Convert.ToInt64(member, CultureInfo.InvariantCulture)).Distinct().Order()]);
 

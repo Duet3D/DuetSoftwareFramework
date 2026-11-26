@@ -2444,11 +2444,8 @@ internal partial class MCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleEndstopConfigAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        // S defaults to a switch on an input pin, which is what almost every endstop is. The wording
-        // is RepRapFirmware's own (EndstopsManager::HandleM574), which names what was wrong rather
-        // than which end of the range it fell off
-        RrfEndstopType endstopType = code.GetEnum<RrfEndstopType>('S', RrfEndstopType.InputPin,
-                                                                  errorString: _ => "Invalid endstop input type");
+        // S defaults to a switch on an input pin, which is what almost every endstop is
+        RrfEndstopType endstopType = code.GetEnum<RrfEndstopType>('S', RrfEndstopType.InputPin);
 
         // K names the Z probe that stands in for the endstop. It is read whether or not S asked for
         // one, as RepRapFirmware does, so that a number out of range is refused rather than reaching
@@ -2662,7 +2659,7 @@ internal partial class MCodeHandler
     /// differently and has no equivalent of the retired first entry
     /// </remarks>
     /// TODO standardise with EndstopType
-    private enum RrfEndstopType
+    internal enum RrfEndstopType
     {
         /// <summary>Retired: used to select an active-low input</summary>
         ActiveLow = 0,

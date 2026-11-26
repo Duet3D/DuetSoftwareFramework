@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.Files;
@@ -53,5 +54,16 @@ public class M20Tests : BenchFixture
             Assert.That(sys, Reply.IsSuccess("\"pause.g\""),
                         "M20 P\"0:/sys\" lists every file the system directory holds");
         });
+    }
+
+    /// <summary>An S that names no form of listing is refused</summary>
+    /// <remarks>GCodes2.cpp case 20 lists as text for any S but 2 and 3; DSF refuses it instead</remarks>
+    [TestCase(1)]
+    [TestCase(4)]
+    public async Task M20RefusesAnSThatNamesNoFormat(int format)
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M20 S{format}"), Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.FileListFormat>('S')));
     }
 }

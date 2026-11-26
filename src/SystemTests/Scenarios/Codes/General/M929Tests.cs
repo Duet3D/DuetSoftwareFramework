@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using NUnit.Framework;
@@ -52,5 +53,17 @@ public class M929Tests : BenchFixture
                             "M929 S0 clears state.logFile (RRF Platform::GetLogFileName returns null while inactive)");
             });
         }
+    }
+
+    /// <summary>An S that names no log level is refused</summary>
+    /// <remarks>RRF Platform::ConfigureLogging reads S with GetLimitedUIValue against LogLevel::NumValues</remarks>
+    [TestCase(4)]
+    [TestCase(-1)]
+    public async Task M929RefusesAnSThatNamesNoLogLevel(int level)
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M929 S{level}"),
+                    Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.RrfLogLevel>('S')));
     }
 }

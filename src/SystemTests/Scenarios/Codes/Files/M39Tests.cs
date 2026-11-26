@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DuetAPI;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using NUnit.Framework;
 using static SystemTests.Scenarios.Codes.Files.FileSetup;
 
@@ -50,5 +51,16 @@ public class M39Tests : BenchFixture
                         Is.EqualTo((long)await bench.Host.ReadNumberAsync(model => model.Volumes[0].Capacity)),
                         "M39 S2 reports the same capacity as volumes[0].capacity");
         });
+    }
+
+    /// <summary>An S that names no form of report is refused</summary>
+    /// <remarks>GCodes2.cpp case 39 reports as text for any S but 2; DSF refuses it instead</remarks>
+    [TestCase(1)]
+    [TestCase(3)]
+    public async Task M39RefusesAnSThatNamesNoFormat(int format)
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M39 S{format}"), Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.CardInfoFormat>('S')));
     }
 }

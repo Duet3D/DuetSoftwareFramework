@@ -62,8 +62,6 @@ internal sealed partial class GCodeHandler(
     Files.ConfigOverrideTracker configOverride,
     ILogger<GCodeHandler> logger) : ICodeHandler
 {
-
-
     /// <summary>
     /// Process a G-code that should be interpreted by the control server
     /// </summary>

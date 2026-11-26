@@ -69,6 +69,7 @@ These are reported differently:
 - Any bad parameter of `M669`. Nothing of the code is applied, where RepRapFirmware may already have selected the geometry.
 - `M572 D` and `M915 E` with an extruder that does not exist. Nothing of the code is applied.
 - A negative value for an extruder in `M92`, `M201`, `M203`, `M205`, `M350`, `M566`, `M906`, `M913` or `M917`.
+- `M20 S`, `M39 S` and `M581.1 R` with a value that selects nothing. RepRapFirmware lists or reports as text, or keeps a trigger that never fires.
 
 DSF accepts one thing RepRapFirmware does not: `M584 X` with no driver releases the drivers of X. The axis stays.
 

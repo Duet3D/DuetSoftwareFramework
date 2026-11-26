@@ -46,7 +46,7 @@ public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
             _clientOptionsBuilder = _clientOptionsBuilder
                 .WithWillTopic(code.GetString('T'))
                 .WithWillPayload(willMessage)
-                .WithWillQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('Q', defaultValue: 0))
+                .WithWillQualityOfServiceLevel(code.GetEnum<MQTTnet.Protocol.MqttQualityOfServiceLevel>('Q', MQTTnet.Protocol.MqttQualityOfServiceLevel.AtMostOnce))
                 .WithWillRetain(code.GetBool('R', defaultValue: false));
         }
 
@@ -56,7 +56,7 @@ public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
             if (!string.IsNullOrEmpty(subscribeTopic))
             {
                 _subscribeOptions = new MqttClientSubscribeOptionsBuilder()
-                    .WithTopicFilter(subscribeTopic, (MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('O'))
+                    .WithTopicFilter(subscribeTopic, code.GetEnum<MQTTnet.Protocol.MqttQualityOfServiceLevel>('O'))
                     .Build();
             }
             else
@@ -164,7 +164,7 @@ public class MQTT(EventLogger logger, IHostApplicationLifetime lifetime)
             var messageBuilder = new MqttApplicationMessageBuilder()
                 .WithTopic(code.GetString('T'))
                 .WithPayload(code.GetString('S'))
-                .WithQualityOfServiceLevel((MQTTnet.Protocol.MqttQualityOfServiceLevel)code.GetInt('Q', defaultValue: 0))
+                .WithQualityOfServiceLevel(code.GetEnum<MQTTnet.Protocol.MqttQualityOfServiceLevel>('Q', MQTTnet.Protocol.MqttQualityOfServiceLevel.AtMostOnce))
                 .WithRetainFlag(code.GetBool('R', defaultValue: false));
             await _client.PublishAsync(messageBuilder.Build(), code.CancellationToken);
         }

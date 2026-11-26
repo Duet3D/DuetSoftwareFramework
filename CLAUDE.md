@@ -179,6 +179,7 @@ These rules apply to every feature, port or fix, not only to RRF ports. The aim 
 - Fix a defect where it lives, in the shared mechanism, not in the one caller where it showed up, and check that mechanism's other callers for the same defect. A `// TODO` noting the same problem in several places is a sign that the fix belongs in shared code.
 - Be robust to failure part-way: a code refused after it has written some settings must leave the object model, and everything derived from it (the planner, the expansion boards), consistent with each other.
 - Shared mechanisms get unit tests of their own. Behaviour a user can observe gets system scenarios, as described under Tests.
+- A G-code parameter that selects one of a set of values (a mode, type, action or form of the code, not a count, index or quantity) is read with `GetEnum`/`TryGetEnum` into an enum that names each value, numbered as RRF numbers them. Its refusal is the readers' standard wording, never a handler's own `errorString`. Scenarios write these parameter values explicitly without using the enum in the G-code, so that renumbering the enum, which changes what a user's value does, fails them. They compare an object model field of the enum's type with its members, and expect `CodeErrors.InvalidEnumValue<T>` for a value outside the enum, whose list of values may follow it. Where RRF accepts values outside the set, refusing them is an acceptable deviation from RRF behaviour.
 
 ## Code conventions
 

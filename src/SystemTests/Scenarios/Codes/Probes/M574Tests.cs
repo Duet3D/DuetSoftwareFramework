@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
+using DuetControlServer.Codes.Handlers;
 using DuetControlServer.Link;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
@@ -83,7 +84,7 @@ public class M574Tests : BenchFixture
                     "M574 S5 sets sensors.endstops[0].type to motorStallEncoder "
                     + "(RRF StallDetectionEndstop::GetEndstopType)");
 
-        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S6"), Reply.IsError("Invalid endstop input type"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M574 X1 S6"), Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.RrfEndstopType>('S')),
                     "S6 names no mechanism, so it is refused rather than stored");
     }
 

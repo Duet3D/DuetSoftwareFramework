@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Codes.Handlers;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.General;
@@ -56,5 +57,16 @@ public class M586Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M586.4 C\"benchclient\" U\"user\" K\"pass\"");
         Assert.That(reply, Reply.IsEmpty, "M586.4 configures the MQTT client without a report (RRF MqttClient::Configure)");
+    }
+
+    /// <summary>A P that names no protocol is refused</summary>
+    /// <remarks>Network::EnableProtocol refuses a protocol past NumSelectableProtocols</remarks>
+    [Test]
+    public async Task M586RefusesAPThatNamesNoProtocol()
+    {
+        await using Bench bench = await Bench.StartAsync();
+
+        Assert.That(await bench.Host.ExecuteCodeAsync("M586 P5 S1"),
+                    Reply.IsError(CodeErrors.InvalidEnumValue<MCodeHandler.NetworkProtocolSelection>('P')));
     }
 }

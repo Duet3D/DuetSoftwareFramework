@@ -14,6 +14,19 @@ namespace DuetControlServer.Codes.Handlers;
 /// </summary>
 internal sealed partial class GCodeHandler
 {
+    /// <summary>The form of G10 its L parameter selects, numbered as RepRapFirmware's GCodes2.cpp case 10 reads it</summary>
+    internal enum G10Form
+    {
+        /// <summary>Set a tool's offsets</summary>
+        ToolOffsets = 1,
+
+        /// <summary>Set a workplace's origin</summary>
+        WorkplaceOrigin = 2,
+
+        /// <summary>Set a workplace's origin such that the current position has the given coordinates</summary>
+        WorkplaceOriginAtPosition = 20
+    }
+
     /// <summary>
     /// G10: set tool offsets or workplace coordinates, or retract
     /// </summary>
@@ -29,14 +42,13 @@ internal sealed partial class GCodeHandler
     /// </remarks>
     private async ValueTask<Message> HandleToolOffsetsAsync(Commands.Code code, CancellationToken cancellationToken)
     {
-        if (code.TryGetUInt('L', out uint l))
+        if (code.TryGetEnum('L', out G10Form form))
         {
-            return l switch
+            return form switch
             {
-                1 => await SetToolOffsetsAsync(code, cancellationToken),
-                2 => await SetWorkplaceOffsetsAsync(code, relativeToPosition: false, cancellationToken),
-                20 => await SetWorkplaceOffsetsAsync(code, relativeToPosition: true, cancellationToken),
-                _ => new Message(MessageType.Error, "Bad or missing parameter")
+                G10Form.ToolOffsets => await SetToolOffsetsAsync(code, cancellationToken),
+                G10Form.WorkplaceOrigin => await SetWorkplaceOffsetsAsync(code, relativeToPosition: false, cancellationToken),
+                _ => await SetWorkplaceOffsetsAsync(code, relativeToPosition: true, cancellationToken)
             };
         }
 

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
+using DuetControlServer.Model;
 using NUnit.Framework;
 
 namespace SystemTests.Scenarios.Codes.General;
@@ -59,5 +60,17 @@ public class M581Tests : BenchFixture
         await bench.Host.WaitForGlobalAsync("trigRan", 1, timeoutMs: 5_000);
         Assert.That(await bench.Host.GlobalAsync("trigRan"), Is.EqualTo(1),
                     "the expression's false-to-true transition ran trigger2.g once (RRF GCodes::CheckTriggers)");
+    }
+
+    /// <summary>An R that names no condition is refused</summary>
+    /// <remarks>TriggerItem::Configure stores any R, and a trigger whose R is not 0, 1 or 2 never fires; DSF refuses it instead</remarks>
+    [TestCase(3)]
+    [TestCase(-1)]
+    public async Task M581Dot1RefusesAnRThatNamesNoCondition(int condition)
+    {
+        await using Bench bench = await Bench.StartAsync("global fireTrigger = false");
+
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M581.1 T2 P\"global.fireTrigger\" R{condition}"),
+                    Reply.IsError(CodeErrors.InvalidEnumValue<SbcTriggerService.TriggerCondition>('R')));
     }
 }
