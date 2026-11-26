@@ -158,7 +158,8 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
     /// <para>
     /// The pause is a feedhold: nobody typed it, and the reasons an event pauses - a heater that has
     /// faulted, filament that has run out, a driver reporting an error - are all cases where running
-    /// the rest of the queue prints air or damages the part.
+    /// the rest of the queue prints air or damages the part. In a macro that cannot be restarted the
+    /// feedhold would lose moves that nothing reads again, so there the moves queued are made.
     /// </para>
     /// <para>
     /// A driver error runs no macro. RepRapFirmware routes it to <c>eventPausing2</c> rather than
@@ -174,7 +175,7 @@ internal sealed class EventProcessor(EventQueue queue, MacroRunner macroRunner, 
         PauseMacro macro = type == EventType.DriverError ? PauseMacro.None : PauseMacro.Pause;
         Message result = await jobController.PauseAsync(new PauseRequest(CodeChannel.Autopause, reason, macro,
                                                                          Synchronous: false, ReportPosition: false,
-                                                                         InAnyMacro: false),
+                                                                         InAnyMacro: true),
                                                         cancellationToken);
         if (result.Type == MessageType.Error)
         {

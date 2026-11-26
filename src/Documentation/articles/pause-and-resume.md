@@ -99,7 +99,7 @@ While the job is in a macro, whether the macro can be restarted decides how the 
 | `M25` in the macro | held at the `M25` | held at the `M25` |
 | `M226`, `M600`, `M601` in the macro | held at the code | deferred to the end of the macro |
 | `M25` from a console or interface | feedhold, and the resume runs the macro again | deferred to the end of the macro |
-| An event's default action | feedhold, and the resume runs the macro again | deferred to the end of the macro |
+| An event's default action | feedhold, and the resume runs the macro again | held at the next code of the macro |
 
 `M226`, `M600` and `M601` are refused outside a job file with "use M226/600/601 only within a file
 being printed". `M25` on the second file channel returns without doing anything: the restore point
@@ -107,6 +107,8 @@ and the interpreter state belong to the first channel, so a fork of the job neit
 records anything.
 
 **A pause that holds the macro** leaves it on the stack with the codes it has read, and the resume carries on at the next of them (`JobMacroHold`). Nothing is dropped, rewound or run again: the moves queued so far are made, and the job file is stopped at the end of the code that called the macro, however the macro ends. The resume reads the codes behind it again. The macros that the pause and the resume run on the job's channel are not held. While the job is paused, the movement lock of the codes that called the macro is suspended, so that other inputs can move. `M0` drops the macro, and so does `M26` when the job is resumed.
+
+An event does not hold a macro that runs under a code holding the movement lock, such as a tool change or homing. It waits for that code to end, and pauses before the next code of the macro that called it or, if there is none, before the next code of the job. It also waits for the code that the macro is on, so a long wait in the macro delays it.
 
 **A deferred pause** waits for the job to leave a macro that has not declared itself pausable
 (`M98 R1` from inside the macro, and `InterpreterStateStack.CanRestartMacros`, which walks every
@@ -117,7 +119,7 @@ the macro is cancelled where it would have been started and the pause lands at t
 RepRapFirmware makes the same check in `StartNextGCode`, before it starts the next command from the
 file.
 
-One pause serves every request made before it begins. If the job is held in the macro while an `M600` is deferred, the `M600` still pauses the job at the end of the macro, unless `M26` moves the job out of it.
+One pause serves every request made before it begins. If the job is held in the macro while an `M600` is deferred, the `M600` still pauses the job at the end of the macro, unless `M26` moves the job out of it. After a `driver_error`, the pause runs no macro, whichever request it begins with.
 
 The `M25` that asked suspends any movement lock its channel holds, because the macro has to move, and is answered, with no text, when the macro has ended and the pause begins, or when the job ends first. Another `M25` in the meantime replies `Pausing is already pending`. The pause macro runs on the job's own channel, as for the `M226` RepRapFirmware runs in its place.
 

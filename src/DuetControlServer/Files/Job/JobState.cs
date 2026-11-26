@@ -111,8 +111,14 @@ internal sealed record JobState
     /// <summary>Why the run that is ending ended, written once by the transition that ended it</summary>
     public PrintStoppedReason? StopReason { get; init; }
 
-    /// <summary>A pause asked for while the job was inside a macro it cannot be interrupted in</summary>
+    /// <summary>A pause that waits for the macro the job is in to end</summary>
     public PauseRequest? PendingPause { get; init; }
+
+    /// <summary>A pause that waits for the code the macro of the job is on to end</summary>
+    public PauseRequest? PendingPauseInMacro { get; init; }
+
+    /// <summary>Whether a pause has been asked for and not begun</summary>
+    public bool IsPausePending => PendingPause is not null || PendingPauseInMacro is not null;
 
     /// <summary>A file selected from inside the job, taken up once this run is torn down</summary>
     public NextSelection? NextFile { get; init; }

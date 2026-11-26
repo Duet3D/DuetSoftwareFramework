@@ -306,7 +306,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             {
                 builder.Append(", simulating");
             }
-            if (state.PendingPause is not null)
+            if (state.IsPausePending)
             {
                 builder.Append(", pause pending");
             }
@@ -334,6 +334,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         JobCommand.SetFilePosition c => OnSetFilePositionAsync(c),
         JobCommand.Fork c => OnForkAsync(c),
         JobCommand.ReaderStopped c => OnReaderStoppedAsync(c),
+        JobCommand.MacroHeld c => OnMacroHeldAsync(c),
         JobCommand.ReaderFinished c => OnReaderFinishedAsync(c),
         JobCommand.ReaderFailed c => OnReaderFailedAsync(c),
         JobCommand.SequenceCompleted c => OnSequenceCompletedAsync(c),
@@ -498,6 +499,18 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         // way. RepRapFirmware's deferredPauseCommandPending
         if (inMacro && !canRestart)
         {
+            if (request.InAnyMacro)
+            {
+                // Answered now, as the events that follow wait for the reply
+                command.Reply(new Message());
+                await PublishAsync(state with { PendingPauseInMacro = (state.PendingPauseInMacro ?? request).Serving(request) });
+                if (state.PendingPauseInMacro is null)
+                {
+                    state.Stream(0)?.Reader.HoldMacroOrFreezeAtBoundary();
+                }
+                return;
+            }
+
             if (state.PendingPause is PauseRequest held &&
                 (held.Macro == PauseMacro.FilamentChange || request.Macro != PauseMacro.FilamentChange))
             {
@@ -509,9 +522,9 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
 
             await PublishAsync(state with { PendingPause = request });
             state.Stream(0)?.Reader.FreezeAtBoundary();
-            if (request.Synchronous || request.Channel == CodeChannel.Autopause)
+            if (request.Synchronous)
             {
-                // The macro the pause has to wait for is running the code that asked, or events wait for the reply
+                // The macro the pause has to wait for is running the code that asked
                 command.Reply(new Message());
             }
             else
@@ -553,13 +566,16 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             }
         }
 
+        request = request.Serving(_state.PendingPauseInMacro);
+
         // This pause serves every request made before it, except that a filament change asked for in the macro the
         // job stops in has still to be made when the macro ends
         bool keepPending = inMacro && _state.PendingPause?.Macro == PauseMacro.FilamentChange;
         await PublishAsync(_state with
         {
             Phase = JobPhase.Pausing,
-            PendingPause = keepPending ? _state.PendingPause : null
+            PendingPause = keepPending ? _state.PendingPause : null,
+            PendingPauseInMacro = null
         });
         AnswerHeldPause();
 
@@ -661,7 +677,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
                 return;
 
             default:
-                await PublishAsync(state with { Phase = JobPhase.Aborting, PendingPause = null });
+                await PublishAsync(state with { Phase = JobPhase.Aborting, PendingPause = null, PendingPauseInMacro = null });
                 await DropPendingPauseAsync(state);
                 if (_sequence is null)
                 {
@@ -698,7 +714,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         if (state.Stream(command.Stream) is JobStream stream)
         {
             await stream.Reader.SetPositionAsync(command.Position, _lifetime.ApplicationStopping);
-            if (stream.Index == 0 && state.PendingPause is not null)
+            if (stream.Index == 0 && state.IsPausePending)
             {
                 // A filament change that waits for the end of the macro the job is moved out of
                 await PublishAsync(state with { PendingPause = null });
@@ -756,7 +772,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     /// <returns>Asynchronous task</returns>
     private async ValueTask CarryOnFromBoundaryAsync(JobStream stream)
     {
-        if (stream.Index == 0 && _state.PendingPause is PauseRequest request)
+        if (stream.Index == 0 && (_state.PendingPause ?? _state.PendingPauseInMacro) is PauseRequest request)
         {
             // The macro was let finish, so the File channel is inside none by construction and
             // nothing was submitted past the last code's moves. The ring drains to rest at the
@@ -769,6 +785,18 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
         // The job was paused in the macro that has ended, and the codes read ahead of it were dropped
         await stream.Reader.RewindAsync(null, _lifetime.ApplicationStopping);
         await stream.Reader.RunAsync(restartMacro: false, RunToken, _lifetime.ApplicationStopping);
+    }
+
+    /// <summary>
+    /// The macro of a stream has come to rest where a pause was waiting for it to
+    /// </summary>
+    private async ValueTask OnMacroHeldAsync(JobCommand.MacroHeld command)
+    {
+        if (_state.Phase == JobPhase.Running && _state.PendingPauseInMacro is PauseRequest request)
+        {
+            await BeginPauseAsync(null, request with { Channel = CodeChannel.File, Synchronous = true }, inMacro: true);
+        }
+        command.Reply(new Message());
     }
 
     /// <summary>
@@ -961,7 +989,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     {
         JobState state = _state;
         await DropPendingPauseAsync(state);
-        await PublishAsync(state with { Phase = JobPhase.Finishing, StopReason = reason, PendingPause = null });
+        await PublishAsync(state with { Phase = JobPhase.Finishing, StopReason = reason, PendingPause = null, PendingPauseInMacro = null });
         StopReading(_state);
 
         _logger.LogInformation(reason switch
@@ -1013,6 +1041,7 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
             Phase = JobPhase.Finishing,
             StopReason = PrintStoppedReason.NormalCompletion,
             PendingPause = null,
+            PendingPauseInMacro = null,
             NextFile = new NextSelection(next, Start: true)
         });
         StopReading(_state);
@@ -1154,7 +1183,15 @@ internal sealed class JobController : BackgroundService, IAsyncDiagnostics
     private async ValueTask DropPendingPauseAsync(JobState state)
     {
         AnswerHeldPause();
-        if (state.PendingPause is not null)
+        if (state.PendingPauseInMacro is not null)
+        {
+            // Nor does it hold the macros any longer
+            foreach (JobStream stream in state.Streams)
+            {
+                stream.Reader.MacroHold.Release();
+            }
+        }
+        if (state.IsPausePending)
         {
             await _eventLogger.LogOutputAsync(MessageType.Warning,
                                               "Pause request dropped because the job ended before it could be actioned");

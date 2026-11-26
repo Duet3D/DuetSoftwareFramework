@@ -52,7 +52,17 @@ public enum PauseMacro
 /// for the macro to end
 /// </param>
 internal sealed record PauseRequest(CodeChannel Channel, PrintPausedReason Reason, PauseMacro Macro,
-                                    bool Synchronous, bool ReportPosition, bool InAnyMacro);
+                                    bool Synchronous, bool ReportPosition, bool InAnyMacro)
+{
+    /// <summary>
+    /// This request, made so that the pause serves the request of an event too
+    /// </summary>
+    /// <param name="other">Request of an event, or null</param>
+    /// <returns>The request to pause with</returns>
+    /// <remarks>An event whose pause runs no macro is a driver error, after which nothing may move the machine</remarks>
+    public PauseRequest Serving(PauseRequest? other)
+        => other?.Macro == PauseMacro.None ? this with { Macro = PauseMacro.None, Reason = other.Reason } : this;
+}
 
 /// <summary>
 /// Where one stream carries on from, as a pause worked it out
@@ -130,6 +140,9 @@ internal abstract record JobCommand
 
     /// <summary>A stream has stopped where it was told to stop</summary>
     public sealed record ReaderStopped(int Stream) : JobCommand;
+
+    /// <summary>The macro a stream is in has come to rest where it was told to</summary>
+    public sealed record MacroHeld(int Stream) : JobCommand;
 
     /// <summary>A stream has run out of codes and the last of them has completed</summary>
     public sealed record ReaderFinished(int Stream) : JobCommand;

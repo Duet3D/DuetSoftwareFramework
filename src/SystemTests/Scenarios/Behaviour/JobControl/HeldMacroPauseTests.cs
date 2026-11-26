@@ -9,14 +9,15 @@ namespace SystemTests.Scenarios.Behaviour.JobControl;
 
 /// <summary>
 /// Pauses that stop the job inside a macro and carry on in it after the resume: a pause a restartable
-/// macro of the job asks for, and M25 in any macro of the job
+/// macro of the job asks for, M25 in any macro of the job, and the default pause of an event raised while
+/// the job is in a macro that cannot be restarted
 /// </summary>
 /// <remarks>
 /// RRF GCodes::DoSynchronousPause (GCodes.cpp) keeps the machine state of the macro. M25 reaches it without
-/// the CanRestartMacro check of M226, M600 and M601 (GCodes2.cpp)
+/// the CanRestartMacro check of M226, M600 and M601 (GCodes2.cpp). The event pause is a difference from RRF
 /// </remarks>
 [TestFixture]
-[GCode("M25", "M26", "M98", "M226", "M600", "M601")]
+[GCode("M25", "M26", "M98", "M226", "M600", "M601", "M957")]
 public class HeldMacroPauseTests : BenchFixture
 {
     /// <summary>How long a job that must not read on is given to prove otherwise</summary>
@@ -322,6 +323,26 @@ public class HeldMacroPauseTests : BenchFixture
         });
     }
 
+    /// <summary>A macro that is resumed after an event may end the job with M0, and the next job is not held</summary>
+    [Test]
+    public async Task M0InAMacroAfterAnEventPause()
+    {
+        await using Bench bench = await StartAsync("set global.macroRuns = global.macroRuns + 1\nG4 P500\nM0\n");
+        bench.Host.Sd.WriteGCode("second.gcode", "M98 P\"0:/macros/second.g\"\n");
+        bench.Host.Sd.WriteMacro("second.g", "set global.jobAfter = 5\n");
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await ResumeToTheEndAsync(bench);
+        Assert.That(await bench.Host.GlobalAsync("stopRan"), Is.EqualTo(1));
+
+        await bench.Host.ExecuteCodeAsync("M32 \"0:/gcodes/second.gcode\"");
+        await bench.Host.WaitForGlobalAsync("jobAfter", 5);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Idle);
+    }
+
     /// <summary>M26 while the job is paused in a macro drops the macro and moves the job</summary>
     [Test]
     public async Task M26WhilePausedInAMacro()
@@ -495,6 +516,193 @@ public class HeldMacroPauseTests : BenchFixture
             Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((60.0, 20.0)), "the macro carried on at the pause point");
             Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(1));
         });
+    }
+
+    /// <summary>A driver error keeps the pause from moving the machine, whichever request the pause begins with</summary>
+    /// <param name="first">Event raised first</param>
+    /// <param name="second">Event raised before the macro has come to rest</param>
+    [TestCase("heater_fault", "driver_error")]
+    [TestCase("driver_error", "heater_fault")]
+    public async Task DriverErrorAndAnotherEvent(string first, string second)
+    {
+        await using Bench bench = await StartAsync(MacroAround("G4 P800"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync($"M957 E\"{first}\" D0 B1");
+        await bench.Host.ExecuteCodeAsync($"M957 E\"{second}\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await AssertPausedInMacroAsync(bench, pauses: 0);
+
+        await ResumeToTheEndAsync(bench);
+        await AssertMacroRanOnceAsync(bench);
+    }
+
+    /// <summary>A driver error that waits for a tool change keeps the M25 of its macro from moving the machine</summary>
+    [Test]
+    public async Task DriverErrorBeforeTheM25OfAToolChangeMacro()
+    {
+        await using Bench bench = await StartAsync("", """
+            G90
+            T0
+            set global.jobAfter = global.jobAfter + 1
+            """, "M563 P0 D0");
+        bench.Host.Sd.WriteSys("tpre0.g", MacroAround("G4 P800\nM25"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M957 E\"driver_error\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await AssertPausedInMacroAsync(bench, pauses: 0);
+
+        await ResumeToTheEndAsync(bench);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroEnd"), Is.EqualTo(1));
+            Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(1), "the pause served both requests");
+        });
+    }
+
+    /// <summary>An event pauses the job in a plain macro, where the moves queued so far end, and the resume carries on in it</summary>
+    [TestCase("heater_fault", 1)]
+    [TestCase("filament_error", 1)]
+    [TestCase("driver_error", 0)]
+    public async Task EventInAPlainMacro(string eventName, int pauses)
+    {
+        await using Bench bench = await StartAsync(MacroAround("G4 P500"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync($"M957 E\"{eventName}\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await AssertPausedInMacroAsync(bench, pauses);
+
+        await ResumeToTheEndAsync(bench);
+        await AssertMacroRanOnceAsync(bench);
+    }
+
+    /// <summary>The job carries on reading after a macro an event paused it in, in the loop that called the macro</summary>
+    [Test]
+    public async Task EventInAMacroCalledInALoop()
+    {
+        await using Bench bench = await StartAsync("set global.macroRuns = global.macroRuns + 1\nG90\nG4 P300\nset global.macroEnd = global.macroEnd + 1\n", """
+            while iterations < 3
+                M98 P"0:/macros/outer.g"
+                set global.jobAfter = iterations + 1
+            G1 X10 Y10 F6000
+            G60 S3
+            """);
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 2);
+        await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroEnd"), Is.EqualTo(1));
+            Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(1));
+        });
+
+        await ResumeToTheEndAsync(bench);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(3));
+            Assert.That(await bench.Host.GlobalAsync("macroEnd"), Is.EqualTo(3));
+            Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(3));
+            Assert.That(await bench.Host.RestorePointAsync(3), Is.EqualTo((10.0, 10.0)));
+        });
+    }
+
+    /// <summary>An event in a restartable macro stops the machine at once, and the resume runs the macro again</summary>
+    [Test]
+    public async Task EventInARestartableMacro()
+    {
+        await using Bench bench = await StartAsync(MacroAround("G4 P500", "M98 R1"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That(await bench.Host.GlobalAsync("afterPause"), Is.Zero);
+
+        await ResumeToTheEndAsync(bench);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("macroRuns"), Is.EqualTo(2));
+            Assert.That(await bench.Host.GlobalAsync("macroEnd"), Is.EqualTo(1));
+        });
+    }
+
+    /// <summary>An event during a tool change pauses after it, because the tool change holds the movement lock</summary>
+    /// <remarks>RRF GCodes::DoAsynchronousPause waits for the lock too (LockAllMovement)</remarks>
+    [Test]
+    public async Task EventDuringAToolChange()
+    {
+        await using Bench bench = await StartAsync("", """
+            G90
+            T0
+            set global.jobAfter = global.jobAfter + 1
+            """, "M563 P0 D0\nglobal postRan = 0");
+        bench.Host.Sd.WriteSys("tpre0.g", MacroAround("G4 P500"));
+        bench.Host.Sd.WriteSys("tpost0.g", "set global.postRan = global.postRan + 1\n");
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("postRan"), Is.EqualTo(1), "the tool change was completed");
+            Assert.That(await bench.Host.ReadModelAsync(model => model.State.CurrentTool), Is.Zero);
+            Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.Zero);
+            Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1));
+        });
+
+        await ResumeToTheEndAsync(bench);
+        Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.EqualTo(1));
+    }
+
+    /// <summary>One pause serves an M25 that waits for the macro and an event that does not</summary>
+    [Test]
+    public async Task EventWhileAnM25IsPending()
+    {
+        await using Bench bench = await StartAsync(MacroAround("G4 P500"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        Task<string> pending = bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1", CodeChannel.Telnet);
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.That((await pending).Trim(), Is.Empty, "the M25 is answered when the job pauses");
+        await AssertPausedInMacroAsync(bench);
+
+        await ResumeToTheEndAsync(bench);
+        await AssertMacroRanOnceAsync(bench);
+    }
+
+    /// <summary>An event that pauses the job in a macro leaves an M600 that waits for the macro to the end of it</summary>
+    [Test]
+    public async Task EventWhileAnM600IsPending()
+    {
+        await using Bench bench = await StartAsync(MacroAround("M600\nset global.macroRuns = 2\nG4 P500\nset global.macroRuns = 1"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 2);
+        await bench.Host.ExecuteCodeAsync("M957 E\"heater_fault\" D0 B1");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        await AssertPausedInMacroAsync(bench);
+
+        await bench.Host.ExecuteCodeAsync("M24");
+        await bench.Host.WaitForPauseAtAsync(50.0, 50.0);
+        Assert.Multiple(async () =>
+        {
+            Assert.That(await bench.Host.GlobalAsync("filChangeRan"), Is.EqualTo(1));
+            Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.EqualTo(1));
+            Assert.That(await bench.Host.GlobalAsync("jobAfter"), Is.Zero);
+        });
+
+        await ResumeToTheEndAsync(bench);
+        await AssertMacroRanOnceAsync(bench);
     }
 
     /// <summary>A pause in a macro that both streams of a forked job are in holds it on both of them</summary>

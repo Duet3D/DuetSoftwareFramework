@@ -174,6 +174,38 @@ internal sealed class JobReader
         => await Task.WhenAny(MacroHold.WaitUntilReachedAsync(), _readTask ?? Task.CompletedTask).WaitAsync(cancellationToken);
 
     /// <summary>
+    /// Stop this stream at the next code of the macro it is in, or at the end of the code that called the macro
+    /// </summary>
+    /// <remarks>
+    /// The reader reports <c>MacroHeld</c> or <c>Stopped</c>, whichever comes first. A macro may have dispatched its
+    /// last code already, or run under a code that holds the movement lock
+    /// </remarks>
+    public void HoldMacroOrFreezeAtBoundary()
+    {
+        FreezeAtBoundary();
+        MacroHold.Request(evenIfLocked: false);
+        _ = ReportMacroHeldAsync(MacroHold.WaitUntilReachedAsync());
+    }
+
+    /// <summary>
+    /// Say that the macro has come to rest
+    /// </summary>
+    /// <param name="held">Task of the hold</param>
+    /// <returns>Asynchronous task</returns>
+    private async Task ReportMacroHeldAsync(Task held)
+    {
+        try
+        {
+            await held;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        await Post(new JobCommand.MacroHeld(Index));
+    }
+
+    /// <summary>
     /// Abandon the macro this stream is held in, so that the code that called it ends
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
