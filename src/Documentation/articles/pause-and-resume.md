@@ -119,7 +119,7 @@ the macro is cancelled where it would have been started and the pause lands at t
 RepRapFirmware makes the same check in `StartNextGCode`, before it starts the next command from the
 file.
 
-One pause serves every request made before it begins. If the job is held in the macro while an `M600` is deferred, the `M600` still pauses the job at the end of the macro, unless `M26` moves the job out of it. After a `driver_error`, the pause runs no macro, whichever request it begins with.
+One pause serves every request made before it begins. `M600` takes the place of a deferred pause that is not for a filament change. If the job is held in the macro while an `M600` is deferred, the `M600` still pauses the job at the end of the macro, unless `M26` moves the job out of it. After a `driver_error`, the pause runs no macro, whichever request it begins with.
 
 The `M25` that asked suspends any movement lock its channel holds, because the macro has to move, and is answered, with no text, when the macro has ended and the pause begins, or when the job ends first. Another `M25` in the meantime replies `Pausing is already pending`. The pause macro runs on the job's own channel, as for the `M226` RepRapFirmware runs in its place.
 

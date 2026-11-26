@@ -705,6 +705,29 @@ public class HeldMacroPauseTests : BenchFixture
         await AssertMacroRanOnceAsync(bench);
     }
 
+    /// <summary>An M600 takes the place of an M25 that waits for the same macro, and one pause serves both</summary>
+    /// <remarks>RRF keeps the first request, so the M600 is lost although its comment says that it takes priority</remarks>
+    [Test]
+    public async Task M600ReplacesAPendingM25()
+    {
+        await using Bench bench = await StartAsync(MacroAround("G4 P500\nM600"));
+
+        await StartJobAsync(bench);
+        await bench.Host.WaitForGlobalAsync("macroRuns", 1);
+        Task<string> pending = bench.Host.ExecuteCodeAsync("M25");
+        await bench.Host.WaitForStatusAsync(MachineStatus.Paused);
+        Assert.Multiple(async () =>
+        {
+            Assert.That((await pending).Trim(), Is.Empty, "the M25 is answered when the job pauses");
+            Assert.That(await bench.Host.GlobalAsync("filChangeRan"), Is.EqualTo(1));
+            Assert.That(await bench.Host.GlobalAsync("pauseRan"), Is.Zero);
+            Assert.That(await bench.Host.RestorePointAsync(1), Is.EqualTo((50.0, 50.0)));
+        });
+
+        await ResumeToTheEndAsync(bench);
+        await AssertMacroRanOnceAsync(bench);
+    }
+
     /// <summary>A pause in a macro that both streams of a forked job are in holds it on both of them</summary>
     [TestCase("M25", "")]
     [TestCase("M226", "M98 R1")]
