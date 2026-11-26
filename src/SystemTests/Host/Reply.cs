@@ -53,7 +53,8 @@ internal static class Reply
 /// <summary>A reply of one of the given severities, containing every text given</summary>
 internal sealed class ReplyConstraint(MessageType[] types, string?[]? containing, bool empty = false) : Constraint
 {
-    private readonly string[] _containing = containing?.OfType<string>().ToArray() ?? [];
+    // Trimmed like the reply, so that one reply can be expected inside another
+    private readonly string[] _containing = containing?.OfType<string>().Select(text => text.Trim()).ToArray() ?? [];
 
     private int? _column;
 

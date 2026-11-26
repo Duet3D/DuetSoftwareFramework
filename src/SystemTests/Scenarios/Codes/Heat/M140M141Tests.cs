@@ -456,12 +456,12 @@ public class M140M141Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M140")).Trim(), Is.EqualTo("No bed heater has been configured for slot 0"), "an empty slot");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M140"), Reply.IsSuccess("No bed heater has been configured for slot 0"), "an empty slot");
 
         await bench.Host.ExecuteCodeAsync("M141 P1 H3:7");
         bench.CanMaster.InjectHeatersStatus(srcAddress: Machines.DriverBoard, heaterNumber: 3, HeaterMode.Off, currentTemperature: 21.5f);
         await bench.Host.WaitForNumberAsync(model => model.Heat.Heaters[3]?.Current, 21.5, "heater 3's temperature");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M141 P1")).Trim(), Is.EqualTo("Chamber heaters for slot 1: 3 (21.5°C) 7 (-273.1°C)"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M141 P1"), Reply.IsSuccess("Chamber heaters for slot 1: 3 (21.5°C) 7 (-273.1°C)"),
                     "the slot's heaters");
     }
 }

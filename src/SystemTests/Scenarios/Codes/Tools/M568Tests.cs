@@ -66,7 +66,7 @@ public class M568Tests : BenchFixture
         string reply = (await host.ExecuteCodeAsync("M568 P0")).Trim();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "bare M568 reports the tool (RRF SetOrReportOffsets)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "bare M568 reports the tool (RRF SetOrReportOffsets)");
             Assert.That(reply, Reply.IsSuccess("Tool 0 is Off, active temperatures: 210.0, standby temperatures: 180.0"), "bare M568 reports the model temperatures (RRF SetOrReportOffsets)");
         });
     }
@@ -581,7 +581,7 @@ public class M568Tests : BenchFixture
         Tool tool = await ReadToolAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "M568 reports the tool");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "M568 reports the tool");
             Assert.That(tool.Active, Is.Empty, "tools[0].active stays empty");
             Assert.That(tool.Standby, Is.Empty, "tools[0].standby stays empty");
         });
@@ -600,7 +600,7 @@ public class M568Tests : BenchFixture
         Tool tool = await ReadToolAsync(bench, 0);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "M568 reports the tool");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "M568 reports the tool");
             Assert.That(tool.SpindleRpm, Is.EqualTo(0), "tools[0].spindleRpm is unchanged");
             Assert.That(TemperatureMessages(bench), Is.Empty, "nothing is sent");
         });

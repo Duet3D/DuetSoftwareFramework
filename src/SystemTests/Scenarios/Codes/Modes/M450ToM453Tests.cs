@@ -31,14 +31,14 @@ public class M450ToM453Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.FFF), "the machine starts in FFF mode (RRF MachineType::fff default)");
-            Assert.That((await host.ExecuteCodeAsync("M450")).Trim(), Is.EqualTo("PrinterMode:FFF"), "M450 reports the mode (RRF GCodes2.cpp M450 case)");
+            Assert.That(await host.ExecuteCodeAsync("M450"), Reply.IsSuccess("PrinterMode:FFF"), "M450 reports the mode (RRF GCodes2.cpp M450 case)");
         });
 
         await host.ExecuteCodeAsync("M453");
         Assert.Multiple(async () =>
         {
             Assert.That(await host.ReadModelAsync(model => model.State.MachineMode), Is.EqualTo(MachineMode.CNC), "M453 sets state.machineMode to CNC (RRF GCodes2.cpp M453 case)");
-            Assert.That((await host.ExecuteCodeAsync("M450")).Trim(), Is.EqualTo("PrinterMode:CNC"), "M450 reports the new mode (RRF GCodes2.cpp M450 case)");
+            Assert.That(await host.ExecuteCodeAsync("M450"), Reply.IsSuccess("PrinterMode:CNC"), "M450 reports the new mode (RRF GCodes2.cpp M450 case)");
         });
 
         await host.ExecuteCodeAsync("M451");

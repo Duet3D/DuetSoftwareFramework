@@ -292,7 +292,7 @@ public class M950PortTests : BenchFixture
         (byte board, CanMessageM950Gpio query) = bench.CanMaster.LastCanMessage<CanMessageM950Gpio>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo(report), "the board's report is the reply");
+            Assert.That(reply, Reply.IsSuccess(report), "the board's report is the reply");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard));
             Assert.That(query.P, Is.EqualTo(3), "the query names the port");
             Assert.That(query.C, Is.Null, "and nothing else");
@@ -314,7 +314,7 @@ public class M950PortTests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync("M950 P7");
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo("GPIO/servo port 7 has no pin"));
+            Assert.That(reply, Reply.IsSuccess("GPIO/servo port 7 has no pin"));
             Assert.That(bench.CanMaster.CanMessages<CanMessageM950Gpio>(), Is.Empty);
         });
     }

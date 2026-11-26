@@ -221,8 +221,8 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
-                    Is.EqualTo($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} E{DriversRig.ClosedLoopDriver(0)}, 3 axes visible"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584"),
+                    Reply.IsSuccess($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} E{DriversRig.ClosedLoopDriver(0)}, 3 axes visible"));
     }
 
     /// <summary>
@@ -237,8 +237,8 @@ public class M584Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync($"M584 E{DriversRig.ClosedLoopDriver(0)}");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
-                    Is.EqualTo($"Driver assignments: E{DriversRig.ClosedLoopDriver(0)} none, 0 axes visible"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584"),
+                    Reply.IsSuccess($"Driver assignments: E{DriversRig.ClosedLoopDriver(0)} none, 0 axes visible"));
     }
 
     /// <summary>
@@ -268,8 +268,8 @@ public class M584Tests : BenchFixture
             Assert.That(bench.CanMaster.CanMessages(), Is.Empty, "hiding an axis is nothing the boards need to know");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
-                    Is.EqualTo($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} E{DriversRig.ClosedLoopDriver(0)}, 2 axes visible"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584"),
+                    Reply.IsSuccess($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} E{DriversRig.ClosedLoopDriver(0)}, 2 axes visible"));
 
         Assert.That(await bench.Host.ExecuteCodeAsync("M584 P3"), Reply.IsEmpty);
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints.Select(point => point.Coords.Count).ToArray()),
@@ -429,8 +429,8 @@ public class M584Tests : BenchFixture
         {
             Assert.That(created.Rotational, Is.EqualTo(rotational), "rotational");
             Assert.That(created.ContinuousRotation, Is.EqualTo(continuous), "continuous");
-            Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
-                        Is.EqualTo($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} "
+            Assert.That(await bench.Host.ExecuteCodeAsync("M584"),
+                        Reply.IsSuccess($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} "
                                    + $"{(rotational ? "(r)" : "")}{(continuous ? "(c)" : "")}{letter}{DriversRig.MainDriver(3)} E{DriversRig.ClosedLoopDriver(0)}, 4 axes visible"),
                         "the report marks a rotational axis (r) and a continuous one (c) before its drivers");
         });
@@ -626,8 +626,8 @@ public class M584Tests : BenchFixture
         Assert.That(bench.CanMaster.LastCanMessage<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>().Message.DriversToUpdate, Is.EqualTo(0b11000),
                     "and so does its microstepping");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
-                    Is.EqualTo($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)} E{DriversRig.ClosedLoopDriver(0)}, 3 axes visible"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M584"),
+                    Reply.IsSuccess($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(3)}:{DriversRig.MainDriver(4)} E{DriversRig.ClosedLoopDriver(0)}, 3 axes visible"),
                     "and the report joins them with a colon");
     }
 
@@ -685,8 +685,8 @@ public class M584Tests : BenchFixture
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes.Select(axis => axis.Letter).ToArray()),
                         Is.EqualTo(new[] { 'X', 'Y', 'Z', 'a', 'g', 'm' }));
-            Assert.That((await bench.Host.ExecuteCodeAsync("M584")).TrimEnd(),
-                        Is.EqualTo($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} "
+            Assert.That(await bench.Host.ExecuteCodeAsync("M584"),
+                        Reply.IsSuccess($"Driver assignments: X{DriversRig.MainDriver(0)} Y{DriversRig.MainDriver(1)} Z{DriversRig.MainDriver(2)} "
                                    + $"a{DriversRig.MainDriver(3)} g{DriversRig.MainDriver(4)} m{DriversRig.MainDriver(5)} E{DriversRig.ClosedLoopDriver(0)}, 6 axes visible"),
                         "a lower case axis is linear: only A to D default to rotational");
         });
@@ -850,7 +850,7 @@ public class M584Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M584");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.StartWith("Driver assignments:"),
+            Assert.That(report, Reply.IsSuccess("Driver assignments:"),
                         "bare M584 reports the driver assignments (RRF GCodes3.cpp DoDriveMapping report branch)");
             Assert.That(report, Reply.IsSuccess($"X{Expansion.Driver(Machines.DriverBoard, Machines.XDriver)}",
                                                  $"Y{Expansion.Driver(Machines.DriverBoard, Machines.YDriver)}",

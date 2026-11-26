@@ -29,13 +29,13 @@ public class M376Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M376 H10");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Compensation.FadeHeight), Is.EqualTo(10).Within(1e-3),
                     "M376 H sets move.compensation.fadeHeight (RRF Move::SetTaperHeight)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M376")).Trim(), Is.EqualTo("Bed compensation taper height is 10.0mm"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M376"), Reply.IsSuccess("Bed compensation taper height is 10.0mm"),
                     "bare M376 reports the taper height in RRF's format (GCodes2.cpp case 376)");
 
         await bench.Host.ExecuteCodeAsync("M376 H0");
         Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Compensation.FadeHeight), Is.Null,
                     "M376 H0 disables the taper: move.compensation.fadeHeight reports null (RRF useTaper = h > 1.0)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M376")).Trim(), Is.EqualTo("Bed compensation is not tapered"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M376"), Reply.IsSuccess("Bed compensation is not tapered"),
                     "bare M376 with the taper disabled reports so (GCodes2.cpp case 376)");
     }
 }

@@ -122,7 +122,7 @@ public class M997ExpansionBoardTests : BenchFixture
         (byte updateBoard, CanMessageUpdateYourFirmware update) = bench.CanMaster.LastCanMessage<CanMessageUpdateYourFirmware>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo($"Board {Board} starting firmware update"), "the board's own reply is the result");
+            Assert.That(reply, Reply.IsSuccess($"Board {Board} starting firmware update"), "the board's own reply is the result");
 
             Assert.That(infoBoard, Is.EqualTo(Board));
             Assert.That(info.Type, Is.EqualTo(CanMessageReturnInfo.TypeBoardName));

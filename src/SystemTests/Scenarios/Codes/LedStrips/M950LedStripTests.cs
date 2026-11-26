@@ -207,7 +207,7 @@ public class M950LedStripTests : BenchFixture
         (_, CanMessageM950Led sent) = bench.CanMaster.LastCanMessage<CanMessageM950Led>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo(report));
+            Assert.That(reply, Reply.IsSuccess(report));
             Assert.That(sent.E, Is.EqualTo(0));
             Assert.That(sent.C, Is.Null);
             Assert.That(sent.K, Is.Null);

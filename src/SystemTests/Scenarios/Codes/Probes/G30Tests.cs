@@ -535,7 +535,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(Invariant($"Stopped at height {bed:F3} mm")));
+            Assert.That(reply, Reply.IsSuccess(Invariant($"Stopped at height {bed:F3} mm")));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight), Is.EqualTo(bed).Within(1e-3f));
             Assert.That(await bench.Host.ReadAxisAsync('Z', axis => axis.Homed), Is.False, "S-1 only measures");
         });
@@ -556,7 +556,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(Invariant($"Stopped at height {Bed - h:F3} mm")));
+            Assert.That(reply, Reply.IsSuccess(Invariant($"Stopped at height {Bed - h:F3} mm")));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.LastStopHeight), Is.EqualTo(Bed - h).Within(1e-3f));
         });
     }
@@ -673,7 +673,7 @@ public class G30Tests : BenchFixture
         (double user, _) = await SettledZAsync(bench, expected);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(Invariant($"Z probe trigger height set to {Bed:F3} mm")));
+            Assert.That(reply, Reply.IsSuccess(Invariant($"Z probe trigger height set to {Bed:F3} mm")));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.Probes[0]!.TriggerHeight), Is.EqualTo(Bed).Within(1e-3f),
                         "sensors.probes[0].triggerHeight");
             Assert.That(report, Reply.IsSuccess(Invariant($"trigger height {Bed:F3}")), "G31 reports it");
@@ -747,7 +747,7 @@ public class G30Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(Invariant($"Stopped at height {Bed:F3} mm")));
+            Assert.That(reply, Reply.IsSuccess(Invariant($"Stopped at height {Bed:F3} mm")));
             Assert.That(Dives(bench, before).Select(dive => ArmedOn(dive, 1)), Has.All.True, "the dive stops on probe 1");
             Assert.That(MonitorChanges(bench, monitorsBefore).Select(change => change.Message.Handle.All).ToArray(),
                         Has.Length.EqualTo(2).And.All.EqualTo(RemoteProbes.HandleFor(1).All), "probe 1's board is told");
@@ -1275,7 +1275,7 @@ public class G30Tests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(first, Reply.IsEmpty);
-            Assert.That(second, Is.EqualTo(Invariant($"G32 bed probe heights: {error0:F3} {error1:F3}, mean {(error0 + error1) / 2:F3}, deviation from mean {(error1 - error0) / 2:F3}")));
+            Assert.That(second, Reply.IsSuccess(Invariant($"G32 bed probe heights: {error0:F3} {error1:F3}, mean {(error0 + error1) / 2:F3}, deviation from mean {(error1 - error0) / 2:F3}")));
             Assert.That(moves.Select(move => (StepsOf(move, Machines.XDriver), StepsOf(move, Machines.YDriver), StepsOf(move, ZDriver))),
                         Is.EqualTo(new[]
                         {
@@ -1314,8 +1314,8 @@ public class G30Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(first, Reply.IsEmpty);
-            Assert.That(report, Is.EqualTo("G32 bed probe heights: 0.300 -0.200, mean 0.050, deviation from mean 0.250"));
-            Assert.That(afterClearing, Is.EqualTo("G32 bed probe heights: 0.100, mean 0.100, deviation from mean 0.000"),
+            Assert.That(report, Reply.IsSuccess("G32 bed probe heights: 0.300 -0.200, mean 0.050, deviation from mean 0.250"));
+            Assert.That(afterClearing, Reply.IsSuccess("G32 bed probe heights: 0.100, mean 0.100, deviation from mean 0.000"),
                         "the report cleared the heights it reported");
             Assert.That(MovesSince(bench, before), Is.Empty, "nothing is probed");
         });

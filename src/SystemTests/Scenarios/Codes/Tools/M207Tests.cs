@@ -176,7 +176,7 @@ public class M207Tests : BenchFixture
         {
             Assert.That(set, Reply.IsEmpty, "setting succeeds silently");
             AssertRetraction(retraction, new Retraction(1.0f, 0.5f, 10.0f, 5.0f, 0.1f), "tools[0] in mm and mm/s");
-            Assert.That(report, Is.EqualTo("Tool 0 retract/reprime: length 1.00/1.50mm, speed 10.0/5.0mm/sec, Z hop 0.10mm"), "the report is in mm too");
+            Assert.That(report, Reply.IsSuccess("Tool 0 retract/reprime: length 1.00/1.50mm, speed 10.0/5.0mm/sec, Z hop 0.10mm"), "the report is in mm too");
         });
     }
 

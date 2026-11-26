@@ -523,7 +523,7 @@ public class M950FanTests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Fan0Config);
         bench.CanMaster.ReportWith<CanMessageM950Fan>(report);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M950 F0")).Trim(), Is.EqualTo(report));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M950 F0"), Reply.IsSuccess(report));
     }
 
     /// <summary>

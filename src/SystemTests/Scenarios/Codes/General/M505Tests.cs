@@ -30,7 +30,7 @@ public class M505Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
         string omSys = await bench.Host.ReadModelAsync(model => model.Directories.System);
         Assert.That(omSys, Is.EqualTo("0:/sys/"), "directories.system defaults to 0:/sys/ (RRF RepRap.cpp directories table)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M505")).Trim(), Is.EqualTo($"Sys file path is {omSys}"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M505"), Reply.IsSuccess($"Sys file path is {omSys}"),
                     "M505 without P reports directories.system (RRF GCodes2.cpp case 505)");
 
         await bench.Host.ExecuteCodeAsync("M470 P\"0:/sys2\"");
@@ -39,7 +39,7 @@ public class M505Tests : BenchFixture
 
         omSys = await bench.Host.ReadModelAsync(model => model.Directories.System);
         Assert.That(omSys, Does.StartWith("0:/sys2"), "M505 P sets directories.system (RRF Platform::SetSysDir)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M505")).Trim(), Is.EqualTo($"Sys file path is {omSys}"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M505"), Reply.IsSuccess($"Sys file path is {omSys}"),
                     "M505's report follows directories.system after the change (RRF GCodes2.cpp case 505)");
     }
 
@@ -57,7 +57,7 @@ public class M505Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
         string omWeb = await bench.Host.ReadModelAsync(model => model.Directories.Web);
         Assert.That(omWeb, Is.EqualTo("0:/www/"), "directories.web defaults to 0:/www/ (RRF RepRap.cpp directories table)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M505.1")).Trim(), Is.EqualTo($"HTTP file path is {omWeb}"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M505.1"), Reply.IsSuccess($"HTTP file path is {omWeb}"),
                     "M505.1 without P reports directories.web (RRF GCodes2.cpp case 505)");
 
         await bench.Host.ExecuteCodeAsync("M470 P\"0:/www2\"");
@@ -66,7 +66,7 @@ public class M505Tests : BenchFixture
 
         omWeb = await bench.Host.ReadModelAsync(model => model.Directories.Web);
         Assert.That(omWeb, Does.StartWith("0:/www2"), "M505.1 P sets directories.web (RRF Platform::SetWebDir)");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M505.1")).Trim(), Is.EqualTo($"HTTP file path is {omWeb}"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M505.1"), Reply.IsSuccess($"HTTP file path is {omWeb}"),
                     "M505.1's report follows directories.web after the change (RRF GCodes2.cpp case 505)");
     }
 }

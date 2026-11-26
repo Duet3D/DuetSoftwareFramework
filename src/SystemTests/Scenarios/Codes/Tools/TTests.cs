@@ -53,7 +53,7 @@ public class TTests : BenchFixture
         DcsTestHost host = bench.Host;
 
         string replyNone = (await host.ExecuteCodeAsync("T")).Trim();
-        Assert.That(replyNone, Is.EqualTo("No tool is selected"), "bare T with state.currentTool -1 (RRF GCodes::HandleTcode)");
+        Assert.That(replyNone, Reply.IsSuccess("No tool is selected"), "bare T with state.currentTool -1 (RRF GCodes::HandleTcode)");
 
         await host.ExecuteCodeAsync("T0");
         string replySelected = (await host.ExecuteCodeAsync("T")).Trim();
@@ -61,7 +61,7 @@ public class TTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(0), "T0 sets state.currentTool (RRF MovementState::SelectTool)");
-            Assert.That(replySelected, Is.EqualTo("Tool 0 is selected"), "bare T reports the selected tool (RRF GCodes::HandleTcode)");
+            Assert.That(replySelected, Reply.IsSuccess("Tool 0 is selected"), "bare T reports the selected tool (RRF GCodes::HandleTcode)");
         });
     }
 
@@ -332,11 +332,11 @@ public class TTests : BenchFixture
         Assert.Multiple(async () =>
         {
             Assert.That(await host.ExecuteCodeAsync("T T1"), Reply.IsEmpty, "T T1 replies nothing");
-            Assert.That((await host.ExecuteCodeAsync("T")).Trim(), Is.EqualTo("Tool 1 is selected"), "T T1 selected tool 1");
+            Assert.That(await host.ExecuteCodeAsync("T"), Reply.IsSuccess("Tool 1 is selected"), "T T1 selected tool 1");
             Assert.That(await host.GlobalAsync("tpost1At"), Is.EqualTo(2), "T T1 is a full tool change, macros included");
 
             Assert.That(await host.ExecuteCodeAsync("T T0"), Reply.IsEmpty, "T T0 replies nothing");
-            Assert.That((await host.ExecuteCodeAsync("T")).Trim(), Is.EqualTo("Tool 0 is selected"), "T T0 selected tool 0");
+            Assert.That(await host.ExecuteCodeAsync("T"), Reply.IsSuccess("Tool 0 is selected"), "T T0 selected tool 0");
 
             await host.ExecuteCodeAsync("T{state.currentTool + 1}");
             Assert.That(await host.ReadModelAsync(model => model.State.CurrentTool), Is.EqualTo(1), "T{expression} selects the tool it evaluates to");
@@ -363,7 +363,7 @@ public class TTests : BenchFixture
         Assert.That(await host.ExecuteCodeAsync("T R1"), Reply.IsEmpty, "T R1 replies nothing");
         Assert.Multiple(async () =>
         {
-            Assert.That((await host.ExecuteCodeAsync("T")).Trim(), Is.EqualTo("Tool 1 is selected"), "T R1 selected the tool G60 S1 recorded");
+            Assert.That(await host.ExecuteCodeAsync("T"), Reply.IsSuccess("Tool 1 is selected"), "T R1 selected the tool G60 S1 recorded");
             Assert.That(await host.ReadModelAsync(model => model.Tools[0]!.State), Is.EqualTo(ToolState.Standby), "tool 0 went to standby");
             Assert.That(await host.ReadModelAsync(model => model.Tools[1]!.State), Is.EqualTo(ToolState.Active), "tool 1 is active");
             Assert.That(await host.ReadModelAsync(model => model.Move.MotionSystems[0].PreviousTool), Is.EqualTo(0), "previousTool");
@@ -446,7 +446,7 @@ public class TTests : BenchFixture
             Assert.That(await host.ReadModelAsync(model => model.Move.MotionSystems[0].RestorePoints[2].ToolNumber), Is.EqualTo(0),
                         "restore point 2 recorded tool 0");
             Assert.That(TemperatureMessages(bench), Is.EqualTo(new[] { HeaterOn(0, Tool0Standby) }), "tool 0's heater went to its standby temperature");
-            Assert.That((await host.ExecuteCodeAsync("T")).Trim(), Is.EqualTo("No tool is selected"), "bare T agrees");
+            Assert.That(await host.ExecuteCodeAsync("T"), Reply.IsSuccess("No tool is selected"), "bare T agrees");
         });
     }
 

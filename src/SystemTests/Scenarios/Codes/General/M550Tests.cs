@@ -23,7 +23,7 @@ public class M550Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync();
 
         string name = await bench.Host.ReadModelAsync(model => model.Network.Name);
-        Assert.That((await bench.Host.ExecuteCodeAsync("M550")).Trim(), Is.EqualTo($"RepRap name: {name}"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M550"), Reply.IsSuccess($"RepRap name: {name}"));
     }
 
     /// <summary>

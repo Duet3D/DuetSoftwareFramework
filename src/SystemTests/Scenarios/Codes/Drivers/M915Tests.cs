@@ -130,7 +130,7 @@ public class M915Tests : BenchFixture
                 message => message.S is null ? boardReport : string.Empty)).StartAsync();
 
         string reply = await bench.Host.ExecuteCodeAsync($"M915 P{Expansion.Driver(DriversRig.MainDriverBoard, 0)}");
-        Assert.That(reply.TrimEnd(), Is.EqualTo(boardReport));
+        Assert.That(reply, Reply.IsSuccess(boardReport));
     }
 
     /// <summary>
@@ -292,7 +292,7 @@ public class M915Tests : BenchFixture
 
             Assert.That(asked.d, Is.EqualTo(0b111000));
             Assert.That(IsReport(asked), Is.True, "the report request carries the bitmap and nothing else");
-            Assert.That(report.TrimEnd(), Is.EqualTo(BoardReport(DriversRig.MainDriverBoard, 0b111000)));
+            Assert.That(report, Reply.IsSuccess(BoardReport(DriversRig.MainDriverBoard, 0b111000)));
         });
     }
 
@@ -465,7 +465,7 @@ public class M915Tests : BenchFixture
             Assert.That(sent.Select(message => (message.Board, message.Message.d)),
                         Is.EqualTo(new (byte, ushort?)[] { (DriversRig.MainDriverBoard, 0b111), (DriversRig.ClosedLoopBoard, 1) }));
             Assert.That(sent.Select(message => IsReport(message.Message)), Is.All.True);
-            Assert.That(reply.TrimEnd(), Is.EqualTo(BoardReport(DriversRig.MainDriverBoard, 0b111) + "\n"
+            Assert.That(reply, Reply.IsSuccess(BoardReport(DriversRig.MainDriverBoard, 0b111) + "\n"
                                                     + BoardReport(DriversRig.ClosedLoopBoard, 1)));
         });
     }

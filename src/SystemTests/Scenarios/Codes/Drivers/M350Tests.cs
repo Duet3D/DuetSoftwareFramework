@@ -82,8 +82,8 @@ public class M350Tests : BenchFixture
         });
 
         await bench.Host.ExecuteCodeAsync("M350 E16 I0");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350")).TrimEnd(),
-                    Is.EqualTo("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350"),
+                    Reply.IsSuccess("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16"),
                     "the report suffixes (on) for an interpolating drive and nothing for one that is "
                     + "not (m350-microstepping-for-extruder.yaml)");
     }
@@ -101,8 +101,8 @@ public class M350Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.WithoutDriveSettings);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350")).TrimEnd(),
-                    Is.EqualTo("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16(on)"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350"),
+                    Reply.IsSuccess("Microstepping - X:16(on), Y:16(on), Z:16(on), E:16(on)"));
     }
 
     /// <summary>
@@ -147,7 +147,7 @@ public class M350Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Is.EqualTo(report), "the same report a bare M350 gives");
+            Assert.That(reply, Reply.IsSuccess(report), "the same report a bare M350 gives");
             Assert.That(bench.CanMaster.CanMessages<CanMessageMultipleDrivesRequestStepsPerUnitAndMicrostepping>(), Is.Empty);
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[0].Microstepping.Interpolated), Is.True,
                         "I alone does not touch any drive");
@@ -166,7 +166,7 @@ public class M350Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(config);
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M350")).TrimEnd(), Is.EqualTo(expected));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M350"), Reply.IsSuccess(expected));
     }
 
     private static readonly TestCaseData[] Reports =

@@ -185,8 +185,8 @@ public class M205M566Tests : BenchFixture
             }
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M566")).TrimEnd(),
-                    Does.EndWith($"E: {string.Join(":", expected.Select(Jerk))}, jerk policy: 0"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M566"),
+                    Reply.IsSuccess($"E: {string.Join(":", expected.Select(Jerk))}, jerk policy: 0"),
                     "the report lists every extruder, colon separated (RRF GCodes2.cpp case 566)");
     }
 
@@ -351,12 +351,12 @@ public class M205M566Tests : BenchFixture
         string expectedJerks = $"X: {Jerk(Machines.XyJerk * 60)}, Y: {Jerk(Machines.XyJerk * 60)}, Z: {Jerk(Machines.ZJerk * 60)}, E: {Jerk(Machines.EJerk * 60)}";
 
         await bench.Host.ExecuteCodeAsync("M205 X1 Y1");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M566")).TrimEnd(),
-                    Is.EqualTo($"Maximum jerk rates (mm/min): {expectedJerks}, jerk policy: 0"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M566"),
+                    Reply.IsSuccess($"Maximum jerk rates (mm/min): {expectedJerks}, jerk policy: 0"));
 
         await bench.Host.ExecuteCodeAsync("M566 P1");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M566")).TrimEnd(),
-                    Is.EqualTo($"Maximum jerk rates (mm/min): {expectedJerks}, jerk policy: 1"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M566"),
+                    Reply.IsSuccess($"Maximum jerk rates (mm/min): {expectedJerks}, jerk policy: 1"));
     }
 
     /// <summary>

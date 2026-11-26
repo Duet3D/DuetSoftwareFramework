@@ -65,7 +65,7 @@ public class M307Tests : BenchFixture
         string reply = (await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.EqualTo("Heater 2 is disabled because its model is undefined"),
+            Assert.That(reply, Reply.IsSuccess("Heater 2 is disabled because its model is undefined"),
                         "M307 H reports a disabled model as such (RRF Heater::SetOrReportModel)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageHeaterModelV3>(), Is.Empty, "a report sends nothing to the board");
         });
@@ -123,7 +123,7 @@ public class M307Tests : BenchFixture
             Assert.That(heaterModel.PID.D, Is.EqualTo(0.196).Within(1e-3), "pid.d at 100C (regression m307-set-heater-model)");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Is.EqualTo(
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess(
             "Heater 2: heating rate 2.500, cooling rate 0.350/0.150, dead time 5.50, max PWM 1.00, mode PID, calibrated at 0.0V\n"
             + "Predicted max temperature rise 429°C\n"
             + "PID parameters: heating P13.0 I0.326 D50.0, steady P13.0 I0.769 D50.0"),
@@ -156,7 +156,7 @@ public class M307Tests : BenchFixture
             Assert.That(heaterModel.PID.P, Is.EqualTo(0.052406).Within(1e-6), "pid.p (regression m307-legacy-gain-and-time-constant)");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Is.EqualTo(
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess(
             "Heater 2: heating rate 2.429, cooling rate 0.714, dead time 5.50, max PWM 1.00, mode PID, calibrated at 0.0V\n"
             + "Predicted max temperature rise 340°C\n"
             + "PID parameters: heating P13.4 I0.482 D51.4, steady P13.4 I0.949 D51.4"),
@@ -215,10 +215,10 @@ public class M307Tests : BenchFixture
     {
         await using Bench bench = await StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2 E1.5")).TrimEnd(),
-                    Is.EqualTo("Heater 2 is disabled because its model is undefined"), "E without K only reports");
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2 E1.5"),
+                    Reply.IsSuccess("Heater 2 is disabled because its model is undefined"), "E without K only reports");
         await bench.Host.ExecuteCodeAsync("M307 H2 B0");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2 F10")).TrimEnd(), Does.StartWith("Heater 2: heating rate 2.430"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2 F10"), Reply.IsSuccess("Heater 2: heating rate 2.430"),
                     "an unknown parameter only reports (regression m307-inverse-temperature-control)");
         Assert.That(bench.CanMaster.CanMessages<CanMessageHeaterModelV3>(), Has.Count.EqualTo(1), "only B0 was sent");
     }
@@ -244,14 +244,14 @@ public class M307Tests : BenchFixture
             Assert.That((await ReadHeaterModelAsync(bench)).PID.I, Is.EqualTo(0.003412).Within(1e-6),
                         "pid.i is recalculated at 100C (regression m307-disable-heater-model)");
         });
-        Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Is.EqualTo(
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess(
             "Heater 2: heating rate 2.430, cooling rate 0.560, dead time 5.50, max PWM 1.00, mode bang-bang, calibrated at 0.0V\n"
             + "Predicted max temperature rise 296°C"),
             "a bang-bang model reports no PID parameters (regression m307-disable-heater-model)");
 
         await bench.Host.ExecuteCodeAsync("M307 H2 B0");
         Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.BasicModel.UsePid, Is.True, "B0 sends usePid on");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Is.EqualTo(
+        Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess(
             "Heater 2: heating rate 2.430, cooling rate 0.560, dead time 5.50, max PWM 1.00, mode PID, calibrated at 0.0V\n"
             + "Predicted max temperature rise 296°C\n"
             + "PID parameters: heating P13.4 I0.405 D51.4, steady P13.4 I0.870 D51.4"),
@@ -276,7 +276,7 @@ public class M307Tests : BenchFixture
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.Inverted, Is.EqualTo(inverted), "message inverted");
             Assert.That((await ReadHeaterModelAsync(bench)).Inverted, Is.EqualTo(inverted), "model.inverted");
             Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"),
-                        inverted ? Reply.IsSuccess("mode PID, reverse control, calibrated") : Does.Not.Contain("reverse control"),
+                        inverted ? Reply.IsSuccess("mode PID, reverse control, calibrated") : Reply.IsSuccess().And.Not.Contain("reverse control"),
                         "the report says reverse control when inverted (regression m307-inverse-temperature-control)");
         });
 
@@ -297,7 +297,7 @@ public class M307Tests : BenchFixture
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.BasicModel.StandardVoltage,
                         Is.EqualTo(24.0).Within(1e-6), "V is sent as standardVoltage");
             Assert.That((await ReadHeaterModelAsync(bench)).StandardVoltage, Is.EqualTo(24.0).Within(1e-6), "V sets model.standardVoltage");
-            Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Is.EqualTo(
+            Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess(
                 "Heater 2: heating rate 2.500, cooling rate 0.350, dead time 5.50, max PWM 1.00, mode PID, calibrated at 24.0V\n"
                 + "Predicted max temperature rise 429°C\n"
                 + "PID parameters: heating P13.0 I0.311 D50.0, steady P13.0 I0.752 D50.0"),
@@ -327,7 +327,7 @@ public class M307Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("M307 H2 R0.5 K0.15 D10 V24");
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M307 H2")).TrimEnd(), Does.StartWith(
+            Assert.That(await bench.Host.ExecuteCodeAsync("M307 H2"), Reply.IsSuccess(
                 "Heater 2: heating rate 0.500, cooling rate 0.150, dead time 10.00, max PWM 1.00, mode bang-bang\n"),
                 "a bed heater's report has no calibration voltage, and B keeps the default bed model's bang-bang");
             Assert.That(bench.CanMaster.LastCanMessage<CanMessageHeaterModelV3>().Message.BasicModel.TypicalTemperature,

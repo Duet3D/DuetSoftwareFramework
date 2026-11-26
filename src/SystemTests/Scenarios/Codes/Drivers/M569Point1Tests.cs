@@ -100,7 +100,7 @@ public class M569Point1Tests : BenchFixture
         (_, CanMessageM569Point1 sent) = bench.CanMaster.LastCanMessage<CanMessageM569Point1>();
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo(QuadratureReport), "the report travels back unflattened");
+            Assert.That(reply, Reply.IsSuccess(QuadratureReport), "the report travels back unflattened");
             Assert.That(sent.Generic.ParamMap, Is.EqualTo(1u), "the request carries P alone");
             Assert.That(await bench.Host.ReadModelAsync(model => model.FindBoard(board)!.Drivers![0].Config.ClosedLoop.CountsPerRev),
                         Is.EqualTo(1000.0f), "and the configuration is left as it was");

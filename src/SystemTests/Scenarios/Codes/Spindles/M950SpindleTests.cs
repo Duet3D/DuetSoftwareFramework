@@ -53,7 +53,7 @@ public class M950SpindleTests : BenchFixture
         string reply = (await host.ExecuteCodeAsync("M950 R0")).Trim();
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Spindle 0"), "bare M950 R reports the spindle (RRF Spindle::Configure)");
+            Assert.That(reply, Reply.IsSuccess("Spindle 0"), "bare M950 R reports the spindle (RRF Spindle::Configure)");
             Assert.That(reply, Reply.IsSuccess("rpm min 4000, max 12000"), "the reported range matches the model (RRF Spindle::Configure)");
         });
     }
@@ -119,7 +119,7 @@ public class M950SpindleTests : BenchFixture
         });
 
         string report = (await bench.Host.ExecuteCodeAsync("M950 R0")).Trim();
-        Assert.That(report, Is.EqualTo(
+        Assert.That(report, Reply.IsSuccess(
             $"Spindle 0: type enaDir, enable pin {enablePort}, rpm pin {pwmPort} frequency 100Hz, rpm min 1000, max 12000"));
     }
 
@@ -215,7 +215,7 @@ public class M950SpindleTests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M950 R1")).Trim(), Is.EqualTo("Spindle 1 is not configured"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M950 R1"), Reply.IsSuccess("Spindle 1 is not configured"));
     }
 
     /// <summary>A spindle number past MaxSpindles is refused before the port is looked at</summary>

@@ -111,7 +111,7 @@ public class M569Tests : BenchFixture
         (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.TrimEnd(), Is.EqualTo(ClosedLoopBoardReport),
+            Assert.That(reply, Reply.IsSuccess(ClosedLoopBoardReport),
                         "the board's report is what the code answers with");
             Assert.That(sentTo, Is.EqualTo(DriversRig.ClosedLoopBoard), "the query goes to the board P names");
             Assert.That(sent.P, Is.EqualTo(0), "carrying only the driver number");
@@ -475,7 +475,7 @@ public class M569Tests : BenchFixture
                 (byte sentTo, CanMessageM569 sent) = bench.CanMaster.LastCanMessage<CanMessageM569>();
                 Assert.Multiple(() =>
                 {
-                    Assert.That(reply.TrimEnd(), Is.EqualTo($"Driver {Expansion.Driver(board, driver)} runs forwards"),
+                    Assert.That(reply, Reply.IsSuccess($"Driver {Expansion.Driver(board, driver)} runs forwards"),
                                 "the reply is the report of the driver asked about");
                     Assert.That(sentTo, Is.EqualTo(board));
                     Assert.That(sent.P, Is.EqualTo(driver));

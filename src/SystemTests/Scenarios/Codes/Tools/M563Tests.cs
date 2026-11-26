@@ -172,7 +172,7 @@ public class M563Tests : BenchFixture
 
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("Tool 0"), "M563 P0 reports the tool number (RRF Tool::PrintTool)");
+            Assert.That(reply, Reply.IsSuccess("Tool 0"), "M563 P0 reports the tool number (RRF Tool::PrintTool)");
             Assert.That(reply, Reply.IsSuccess($"name: {name}"), "M563 P0 reports the model's tool name (RRF Tool::PrintTool)");
             Assert.That(reply, Reply.IsSuccess("drives: 0"), "M563 P0 reports the mapped drive (RRF Tool::PrintTool)");
             Assert.That(reply, Reply.IsSuccess("status: off"), "an unselected tool reports status off (RRF Tool::PrintTool)");

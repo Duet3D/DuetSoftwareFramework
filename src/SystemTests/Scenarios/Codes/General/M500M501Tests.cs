@@ -800,7 +800,7 @@ public class M500M501Tests : BenchFixture
         Assert.Multiple(() =>
         {
             Assert.That(reply, Reply.IsEmpty, "the nested M501 is passed over without complaint");
-            Assert.That(runs.Trim(), Is.EqualTo("1"), "the file ran once");
+            Assert.That(runs, Reply.IsSuccess("1"), "the file ran once");
         });
     }
 

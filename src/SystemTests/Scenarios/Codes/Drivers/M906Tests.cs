@@ -108,8 +108,8 @@ public class M906Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
         string reply = await bench.Host.ExecuteCodeAsync("M906");
-        Assert.That(reply.TrimEnd(),
-                    Is.EqualTo("Motor current (mA) - X:400, Y:400, Z:400, E:800, idle factor 30%, timeout 30.0 sec"),
+        Assert.That(reply,
+                    Reply.IsSuccess("Motor current (mA) - X:400, Y:400, Z:400, E:800, idle factor 30%, timeout 30.0 sec"),
                     "the wording and ordering configuration tools parse (RRF GCodes2.cpp case 906)");
     }
 
@@ -165,8 +165,8 @@ public class M906Tests : BenchFixture
                     "X and Z, Y's driver on each of its boards, and one request per extruder");
         Assert.That(sent.Select(m => m.Message.Values[0]), Is.All.EqualTo(500.0f));
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906")).TrimEnd(),
-                    Is.EqualTo("Motor current (mA) - X:500, Y:500, Z:500, E:500:500:500, idle factor 30%, timeout 30.0 sec"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906"),
+                    Reply.IsSuccess("Motor current (mA) - X:500, Y:500, Z:500, E:500:500:500, idle factor 30%, timeout 30.0 sec"));
     }
 
     /// <summary>
@@ -280,8 +280,8 @@ public class M906Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M584 E");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M906")).TrimEnd(),
-                    Is.EqualTo("Motor current (mA) - X:400, Y:400, Z:400, E, idle factor 30%, timeout 30.0 sec"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M906"),
+                    Reply.IsSuccess("Motor current (mA) - X:400, Y:400, Z:400, E, idle factor 30%, timeout 30.0 sec"));
     }
 
     /// <summary>

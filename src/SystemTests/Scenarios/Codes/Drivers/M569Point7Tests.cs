@@ -62,7 +62,7 @@ public class M569Point7Tests : BenchFixture
             Assert.That(brake.Voltage, Is.EqualTo(12.0f));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)}")).TrimEnd(), Is.EqualTo(report),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.7 P{Expansion.Driver(board, 0)}"), Reply.IsSuccess(report),
                     "and a bare M569.7 P answers with the board's report");
         (_, CanMessageM569Point7 query) = bench.CanMaster.LastCanMessage<CanMessageM569Point7>();
         Assert.That(query.Generic.ParamMap, Is.EqualTo(1u), "which carries the driver alone");

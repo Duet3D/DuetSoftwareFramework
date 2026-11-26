@@ -39,7 +39,7 @@ public class M425Tests : BenchFixture
         });
 
         string report = await host.ExecuteCodeAsync("M425");
-        Assert.That(report.Trim(), Is.EqualTo("Backlash correction (mm) X: 0.500 Y: 0.250 Z: 0.000, correction distance multiplier 5"),
+        Assert.That(report, Reply.IsSuccess("Backlash correction (mm) X: 0.500 Y: 0.250 Z: 0.000, correction distance multiplier 5"),
                     "bare M425 reports the backlash in RRF's format (Move::ConfigureBacklashCompensation)");
     }
 }

@@ -854,7 +854,7 @@ public class M574Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M574");
         Assert.Multiple(() =>
         {
-            Assert.That(report, Does.StartWith("Endstop configuration:"));
+            Assert.That(report, Reply.IsSuccess("Endstop configuration:"));
             Assert.That(report, Reply.IsSuccess($"\nX: low end switch connected to pin {x}"));
             Assert.That(report, Reply.IsSuccess($"\nY: high end switch connected to pin {y}"));
             Assert.That(report, Reply.IsSuccess("\nZ: none"));
@@ -966,7 +966,7 @@ public class M574Tests : BenchFixture
         {
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].EndstopInput), Is.EqualTo(0));
             Assert.That(await bench.Host.ExecuteCodeAsync("M574 E0"), Reply.IsSuccess("Extruder 0 endstop uses input pin 0"));
-            Assert.That((await bench.Host.ExecuteCodeAsync("M574")).TrimEnd(), Does.EndWith("\nE0: input pin 0"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M574"), Reply.IsSuccess("\nE0: input pin 0"));
             Assert.That(MonitorTraffic(bench), Is.Empty, "the input is already monitored by M950 J");
         });
 

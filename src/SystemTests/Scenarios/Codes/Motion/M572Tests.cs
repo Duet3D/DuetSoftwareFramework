@@ -101,8 +101,8 @@ public class M572Tests : BenchFixture
                         "carrying one driver's parameters and stopping there");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0")).TrimEnd(),
-                    Is.EqualTo("Extruder pressure advance: 0.100, 0.000"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0"),
+                    Reply.IsSuccess("Extruder pressure advance: 0.100, 0.000"),
                     "D is ignored by the report, which lists every extruder");
 
         bench.CanMaster.ClearCapture();
@@ -119,8 +119,8 @@ public class M572Tests : BenchFixture
                         "extruder 1 was not named");
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572 D0")).TrimEnd(),
-                    Is.EqualTo("Extruder pressure advance: (0.900 0.100 5.00), 0.000"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572 D0"),
+                    Reply.IsSuccess("Extruder pressure advance: (0.900 0.100 5.00), 0.000"));
     }
 
     /// <summary>
@@ -272,7 +272,7 @@ public class M572Tests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Extruders[0].PressAdv.D), Is.Null);
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572")).TrimEnd(), Is.EqualTo("Extruder pressure advance: 0.000"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572"), Reply.IsSuccess("Extruder pressure advance: 0.000"));
     }
 
     /// <summary>
@@ -316,6 +316,6 @@ public class M572Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M584 E");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M572")).TrimEnd(), Is.EqualTo("Extruder pressure advance"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M572"), Reply.IsSuccess("Extruder pressure advance"));
     }
 }

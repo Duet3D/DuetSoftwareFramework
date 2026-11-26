@@ -424,7 +424,7 @@ public class GeneratedMoveTransformTests : BenchFixture
         ScheduledMove[] lifts = moves.Except(dives).Except(travels).ToArray();
         Assert.Multiple(async () =>
         {
-            Assert.That(reply, Does.StartWith("4 points probed"));
+            Assert.That(reply, Reply.IsSuccess("4 points probed"));
             Assert.That(moves.Select(move => StepsOf(move, UBoard, UDriver)), Has.All.Zero,
                         "U, the tool's other carriage, never moves");
             Assert.That(travels.Select(move => StepsOf(move, XDriver)), Is.EqualTo(new[] { 1600, 1600, 0, -1600 }).Within(1),
@@ -506,7 +506,7 @@ public class GeneratedMoveTransformTests : BenchFixture
                                        .ToArray();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Does.StartWith("Stopped at height"));
+            Assert.That(reply, Reply.IsSuccess("Stopped at height"));
             Assert.That(between, Has.Length.EqualTo(3), "the lift, the macro's move and the move to the dive height");
             Assert.That(StepsOf(between[0], ZDriver), Is.EqualTo(1 * ZStepsPerMm).Within(1), "the lift to the dive height");
             Assert.That(StepsOf(between[1], ZDriver), Is.EqualTo(1 * ZStepsPerMm),

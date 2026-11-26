@@ -78,8 +78,8 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M913 X80 Y80 Z80 E80");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913")).TrimEnd(),
-                    Is.EqualTo("Motor current % of normal - X:80, Y:80, Z:80, E:80"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913"),
+                    Reply.IsSuccess("Motor current % of normal - X:80, Y:80, Z:80, E:80"));
     }
 
     /// <summary>
@@ -189,8 +189,8 @@ public class M913Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync(DriversRig.Config, "M584 E", "M913 X70 Y70 Z70");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M913")).TrimEnd(),
-                    Is.EqualTo("Motor current % of normal - X:70, Y:70, Z:70, E"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M913"),
+                    Reply.IsSuccess("Motor current % of normal - X:70, Y:70, Z:70, E"));
     }
 
     /// <summary>

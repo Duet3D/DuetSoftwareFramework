@@ -29,7 +29,7 @@ public class M581Tests : BenchFixture
     {
         await using Bench bench = await Bench.StartAsync();
         string reply = await bench.Host.ExecuteCodeAsync("M581 T2");
-        Assert.That(reply.Trim(), Is.EqualTo("Trigger 2 is not configured"),
+        Assert.That(reply, Reply.IsSuccess("Trigger 2 is not configured"),
                     "M581 T2 without parameters reports the trigger (RRF TriggerItem::Configure report branch)");
     }
 

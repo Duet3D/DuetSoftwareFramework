@@ -331,7 +331,7 @@ public class M950HeaterTests : BenchFixture
         (byte board, CanMessageM950Heater query) = bench.CanMaster.LastCanMessage<CanMessageM950Heater>();
         Assert.Multiple(() =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo(report), "the board's report is the reply");
+            Assert.That(reply, Reply.IsSuccess(report), "the board's report is the reply");
             Assert.That(board, Is.EqualTo(Machines.DriverBoard));
             Assert.That(query.H, Is.EqualTo(HeaterNumber), "the query names the heater");
             Assert.That(query.C, Is.Null, "and nothing else");

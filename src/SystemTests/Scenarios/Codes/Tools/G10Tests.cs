@@ -120,7 +120,7 @@ public class G10Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Machines.Xyz);
         await bench.Host.ExecuteCodeAsync("G10 L2 P2 X10 Y10 Z0");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("G10 L2 P2")).Trim(), Is.EqualTo("Origin of workplace 2: X10.00 Y10.00 Z0.00"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("G10 L2 P2"), Reply.IsSuccess("Origin of workplace 2: X10.00 Y10.00 Z0.00"));
     }
 
     /// <summary>G10 L20 sets the origin so that the current position has the given coordinates in the workplace</summary>
@@ -136,7 +136,7 @@ public class G10Tests : BenchFixture
         await bench.Host.ExecuteCodeAsync("G92 X20 Y5 Z0");
 
         Assert.That(await bench.Host.ExecuteCodeAsync("G10 L20 P2 X0 Y0 Z0"), Reply.IsEmpty, "G10 L20 replies with nothing");
-        Assert.That((await bench.Host.ExecuteCodeAsync("G10 L2 P2")).Trim(), Is.EqualTo("Origin of workplace 2: X20.00 Y5.00 Z0.00"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("G10 L2 P2"), Reply.IsSuccess("Origin of workplace 2: X20.00 Y5.00 Z0.00"),
                     "the origin is where the machine is, less the coordinates given");
     }
 
@@ -213,7 +213,7 @@ public class G10Tests : BenchFixture
         {
             Assert.That(origin[0], Is.EqualTo(25.4f).Within(1e-4f), "X is stored in mm");
             Assert.That(origin[3], Is.EqualTo(90f).Within(1e-4f), "A is stored in degrees, unconverted");
-            Assert.That(report, Is.EqualTo("Origin of workplace 2: X1.00 Y0.00 Z0.00 A90.00"), "the report is in the units it was set in");
+            Assert.That(report, Reply.IsSuccess("Origin of workplace 2: X1.00 Y0.00 Z0.00 A90.00"), "the report is in the units it was set in");
         });
     }
 
@@ -228,7 +228,7 @@ public class G10Tests : BenchFixture
         float hidden = await bench.Host.ReadModelAsync(model => model.Move.Axes[3].WorkplaceOffsets[1]);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Is.EqualTo("Origin of workplace 2: X0.00 Y0.00 Z0.00"), "nothing was set, so the visible axes are reported");
+            Assert.That(reply, Reply.IsSuccess("Origin of workplace 2: X0.00 Y0.00 Z0.00"), "nothing was set, so the visible axes are reported");
             Assert.That(hidden, Is.Zero, "move.axes[3].workplaceOffsets[1] is untouched");
         });
     }

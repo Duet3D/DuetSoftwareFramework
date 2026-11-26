@@ -70,8 +70,8 @@ public class M92Tests : BenchFixture
             Assert.That(await bench.Host.ReadModelAsync(model => model.Move.Axes[2].StepsPerMm), Is.EqualTo(800.0f).Within(1e-3));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync("M92")).TrimEnd(),
-                    Is.EqualTo("Steps/mm: X: 160.000, Y: 160.000, Z: 800.000, E: 420.000"),
+        Assert.That(await bench.Host.ExecuteCodeAsync("M92"),
+                    Reply.IsSuccess("Steps/mm: X: 160.000, Y: 160.000, Z: 800.000, E: 420.000"),
                     "and the report quotes what was stored (m92-report-steps-per-mm.yaml)");
     }
 

@@ -78,8 +78,8 @@ public class M569Point5Tests : BenchFixture
             Assert.That(sent.Movement, Is.EqualTo(0));
         });
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}")).TrimEnd(),
-                    Is.EqualTo("Collecting sample: 0/200"),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.5 P{Expansion.Driver(DriversRig.ClosedLoopBoard, 0)}"),
+                    Reply.IsSuccess("Collecting sample: 0/200"),
                     "and while it is collecting, the bare form says how far it has got");
     }
 

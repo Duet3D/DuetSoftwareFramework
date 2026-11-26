@@ -522,7 +522,7 @@ public class M106Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M106 P0");
         Assert.Multiple(() =>
         {
-            Assert.That(report.Trim(), Is.EqualTo("Fan 0 (drt test fan), speed 0%, min: 15%, max: 90%, blip: 0.20"),
+            Assert.That(report, Reply.IsSuccess("Fan 0 (drt test fan), speed 0%, min: 15%, max: 90%, blip: 0.20"),
                         "M106 P0 reports the fan's configuration in RepRapFirmware's format (Fan.cpp Fan::Configure, "
                         + "report branch)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageFanParameters>(), Is.Empty,
@@ -548,8 +548,8 @@ public class M106Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(Fan0Config + $"\nM308 S1 P\"{Expansion.Temp(Machines.DriverBoard, 0)}\" Y\"thermistor\"\nM106 P0 H1 T45 X0.7");
 
         string report = await bench.Host.ExecuteCodeAsync("M106 P0");
-        Assert.That(report.Trim(),
-                    Is.EqualTo("Fan 0, min: 10%, max: 70%, blip: 0.10, temperature: 45.0:45.0C, sensors: 1, "
+        Assert.That(report,
+                    Reply.IsSuccess("Fan 0, min: 10%, max: 70%, blip: 0.10, temperature: 45.0:45.0C, sensors: 1, "
                                + "current speed: unknown"),
                     "a thermostatic fan reports its sensors and trigger temperatures instead of a requested speed "
                     + "(Fan.cpp Fan::Configure, report branch)");

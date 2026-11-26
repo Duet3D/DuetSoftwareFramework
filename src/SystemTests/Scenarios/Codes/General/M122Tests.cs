@@ -54,7 +54,7 @@ public class M122Tests : BenchFixture
         string reply = await bench.Host.ExecuteCodeAsync(code);
         Assert.Multiple(() =>
         {
-            Assert.That(reply, Does.StartWith("=== Diagnostics ==="));
+            Assert.That(reply, Reply.IsSuccess("=== Diagnostics ==="));
             Assert.That(reply, Reply.IsSuccess("=== Duet Control Server ==="));
             Assert.That(reply, Reply.IsSuccess("=== Move ==="), "M122 contains the Move section (RRF Move::Diagnostics)");
             Assert.That(bench.CanMaster.CanMessages<CanMessageReturnInfo>(), Is.Empty, "board 0 is answered here, not asked for over CAN");

@@ -179,8 +179,8 @@ public class M970Tests : BenchFixture
         await using Bench bench = await Bench.StartAsync(DriversRig.Config);
 
         await bench.Host.ExecuteCodeAsync("M970 X1");
-        Assert.That((await bench.Host.ExecuteCodeAsync("M970")).TrimEnd(),
-                    Is.EqualTo("Axis step mode - X:1, Y:0, Z:0, E:0"));
+        Assert.That(await bench.Host.ExecuteCodeAsync("M970"),
+                    Reply.IsSuccess("Axis step mode - X:1, Y:0, Z:0, E:0"));
     }
 
     /// <summary>
@@ -213,10 +213,10 @@ public class M970Tests : BenchFixture
 
         Assert.Multiple(async () =>
         {
-            Assert.That((await bench.Host.ExecuteCodeAsync("M970.1")).TrimEnd(),
-                        Is.EqualTo("Axis phase step Kv - X:2000.000000, Y:0.000000, Z:0.000000, E:0.000000"));
-            Assert.That((await bench.Host.ExecuteCodeAsync("M970.2")).TrimEnd(),
-                        Is.EqualTo("Axis phase step Ka - X:0.000000, Y:60000.000000, Z:60000.000000, E:0.000000"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M970.1"),
+                        Reply.IsSuccess("Axis phase step Kv - X:2000.000000, Y:0.000000, Z:0.000000, E:0.000000"));
+            Assert.That(await bench.Host.ExecuteCodeAsync("M970.2"),
+                        Reply.IsSuccess("Axis phase step Ka - X:0.000000, Y:60000.000000, Z:60000.000000, E:0.000000"));
         });
     }
 

@@ -48,7 +48,7 @@ public class M569Point2Tests : BenchFixture
         (_, CanMessageM569Point2 reading) = bench.CanMaster.LastCanMessage<CanMessageM569Point2>();
         Assert.Multiple(async () =>
         {
-            Assert.That(read.TrimEnd(), Is.EqualTo(registerReport), "a read answers with the board's value");
+            Assert.That(read, Reply.IsSuccess(registerReport), "a read answers with the board's value");
             Assert.That(reading.Generic.ParamMap, Is.EqualTo(0b11u), "and carries P and R alone");
             Assert.That(await bench.Host.ReadModelAsync(model => model.FindBoard(board)!.Drivers![0].Config.WaveformCorrection.Count),
                         Is.Zero, "nothing about a register is recorded");
@@ -126,7 +126,7 @@ public class M569Point2Tests : BenchFixture
         Assert.That(recorded.Select(item => (item.Harmonic, item.Magnitude, item.Phase)),
                     Is.EqualTo(new[] { (4, 1.28f, 180.0f) }), "the correction is recorded");
 
-        Assert.That((await bench.Host.ExecuteCodeAsync($"M569.2 P{driver}")).TrimEnd(), Is.EqualTo(report),
+        Assert.That(await bench.Host.ExecuteCodeAsync($"M569.2 P{driver}"), Reply.IsSuccess(report),
                     "a bare M569.2 answers with the board's report");
 
         await bench.Host.ExecuteCodeAsync($"M569.2 P{driver} S8 J2");

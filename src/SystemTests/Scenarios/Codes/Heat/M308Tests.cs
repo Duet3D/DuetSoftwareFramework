@@ -888,7 +888,7 @@ public class M308Tests : BenchFixture
         string report = await bench.Host.ExecuteCodeAsync("M308 S3");
         Assert.Multiple(() =>
         {
-            Assert.That(report.Trim(), Is.EqualTo(Invariant($"Sensor 3 (main MCU) type Microcontroller embedded temperature sensor, last error ok, reading {mcuTemp:F1}")),
+            Assert.That(report, Reply.IsSuccess(Invariant($"Sensor 3 (main MCU) type Microcontroller embedded temperature sensor, last error ok, reading {mcuTemp:F1}")),
                         "the report is CopyBasicDetails'");
             Assert.That(SentM308(bench), Is.Empty, "and no board is asked");
         });

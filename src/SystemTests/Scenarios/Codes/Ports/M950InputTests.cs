@@ -169,7 +169,7 @@ public class M950InputTests : BenchFixture
         (_, CanMessageChangeInputMonitorV1 sent) = bench.CanMaster.LastCanMessage<CanMessageChangeInputMonitorV1>();
         Assert.Multiple(async () =>
         {
-            Assert.That(reply.Trim(), Is.EqualTo("Pin 1.io2.in, pullup enabled, active: true"));
+            Assert.That(reply, Reply.IsSuccess("Pin 1.io2.in, pullup enabled, active: true"));
             Assert.That(sent.Action, Is.EqualTo(CanMessageChangeInputMonitorV1.ActionReturnPinName));
             Assert.That(await bench.Host.ReadModelAsync(model => model.Sensors.GpIn[InputNumber]!.Value), Is.EqualTo(1),
                         "and sensors.gpIn[1].value takes the state the board answered with");

@@ -81,7 +81,7 @@ public class M557Tests : BenchFixture
         });
 
         string report = await host.ExecuteCodeAsync("M557");
-        Assert.That(report.Trim(), Is.EqualTo("Grid: X20.0:180.0, Y20.0:180.0, radius -1.0, X spacing 40.0, Y spacing 40.0, 25 points"),
+        Assert.That(report, Reply.IsSuccess("Grid: X20.0:180.0, Y20.0:180.0, radius -1.0, X spacing 40.0, Y spacing 40.0, 25 points"),
                     "bare M557 reports the grid in RRF's format (GridDefinition::PrintParameters)");
 
         await host.ExecuteCodeAsync("M557 X0:100 Y0:100 P5");
@@ -139,14 +139,14 @@ public class M557Tests : BenchFixture
         Assert.That(await host.ExecuteCodeAsync("M557 X0:100 Y0:120 S50:60"), Reply.IsEmpty, "M557 with a spacing pair succeeds silently");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'Y', 0, 100, 0, 120, 50, 60, -1)),
                     "S50:60 sets spacings[0] to 50 and spacings[1] to 60");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:100.0, Y0.0:120.0, radius -1.0, X spacing 50.0, Y spacing 60.0, 9 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X0.0:100.0, Y0.0:120.0, radius -1.0, X spacing 50.0, Y spacing 60.0, 9 points"));
 
         Assert.That(await host.ExecuteCodeAsync("M557 X0:100 Y0:100"), Reply.IsEmpty, "M557 with ranges alone succeeds");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'Y', 0, 100, 0, 100, 20, 20, -1)),
                     "with neither S nor P the spacing is RRF's DefaultGridSpacing of 20mm");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:100.0, Y0.0:100.0, radius -1.0, X spacing 20.0, Y spacing 20.0, 36 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X0.0:100.0, Y0.0:100.0, radius -1.0, X spacing 20.0, Y spacing 20.0, 36 points"));
     }
 
     /// <summary>
@@ -182,13 +182,13 @@ public class M557Tests : BenchFixture
             Assert.That(pair.Spacing0, Is.EqualTo(10 * 0.9999).Within(1e-4), "P3:5 gives X 3 points over 20mm");
             Assert.That(pair.Spacing1, Is.EqualTo(10 * 0.9999).Within(1e-4), "and Y 5 points over 40mm");
         });
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:20.0, Y0.0:40.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 15 points"),
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X0.0:20.0, Y0.0:40.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 15 points"),
                     "the report matches the m557-grid-point-counts reference");
 
         await host.ExecuteCodeAsync("M557 X0:20 Y0:20 P2:2");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:20.0, Y0.0:20.0, radius -1.0, X spacing 20.0, Y spacing 20.0, 4 points"),
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X0.0:20.0, Y0.0:20.0, radius -1.0, X spacing 20.0, Y spacing 20.0, 4 points"),
                     "the report matches the m557-report-grid reference");
 
         await host.ExecuteCodeAsync("M557 X0:20 Y0:20 P3 S5");
@@ -213,8 +213,8 @@ public class M557Tests : BenchFixture
 
         string reply = await host.ExecuteCodeAsync("M557 X0:300 Y0:300 S10");
         Assert.That(reply, Reply.IsEmpty, "31 x 31 = 961 points is within RRF's MB6HC limit");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:300.0, Y0.0:300.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 961 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X0.0:300.0, Y0.0:300.0, radius -1.0, X spacing 10.0, Y spacing 10.0, 961 points"));
         
         Assert.That(await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P41:2"), Reply.IsEmpty, "max points in axis0 is accepted");
         Assert.That(await host.ExecuteCodeAsync("M557 X0:200 Y0:200 P2:41"), Reply.IsEmpty, "max points in axis1 is accepted");
@@ -248,8 +248,8 @@ public class M557Tests : BenchFixture
             Assert.That(withSpacing.Spacing1, Is.EqualTo(25), "spacings[1] is S");
             Assert.That(withSpacing.Radius, Is.EqualTo(50), "radius is R");
         });
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X-25.0:25.1, Y-25.0:25.1, radius 50.0, X spacing 25.0, Y spacing 25.0, 9 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X-25.0:25.1, Y-25.0:25.1, radius 50.0, X spacing 25.0, Y spacing 25.0, 9 points"));
 
         Assert.That(await host.ExecuteCodeAsync("M557 R50"), Reply.IsEmpty, "M557 R alone succeeds");
         GridSnapshot withoutSpacing = await ReadGridAsync(host);
@@ -262,8 +262,8 @@ public class M557Tests : BenchFixture
             Assert.That(withoutSpacing.Min1, Is.EqualTo(-40).Within(1e-4), "mins[1] likewise");
             Assert.That(withoutSpacing.Max1, Is.EqualTo(40.1).Within(1e-4), "maxs[1] likewise");
         });
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X-40.0:40.1, Y-40.0:40.1, radius 50.0, X spacing 20.0, Y spacing 20.0, 25 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X-40.0:40.1, Y-40.0:40.1, radius 50.0, X spacing 20.0, Y spacing 20.0, 25 points"));
     }
 
     /// <summary>
@@ -294,8 +294,8 @@ public class M557Tests : BenchFixture
             Assert.That(grid.Spacing1, Is.EqualTo(2 * 49.9 / 3).Within(1e-3), "4 points along Y");
             Assert.That(grid.Radius, Is.EqualTo(50), "radius is R");
         });
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X-47.0:47.1, Y-49.9:50.0, radius 50.0, X spacing 23.5, Y spacing 33.3, 20 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X-47.0:47.1, Y-49.9:50.0, radius 50.0, X spacing 23.5, Y spacing 33.3, 20 points"));
     }
 
     /// <summary>
@@ -316,8 +316,8 @@ public class M557Tests : BenchFixture
         Assert.That(await host.ExecuteCodeAsync("M557 X0:100 Y0:100 R50 S20"), Reply.IsEmpty, "M557 with ranges and R succeeds");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('X', 'Y', 0, 100, 0, 100, 20, 20, 50)),
                     "the ranges are kept as given and the radius recorded");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: X0.0:100.0, Y0.0:100.0, radius 50.0, X spacing 20.0, Y spacing 20.0, 36 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: X0.0:100.0, Y0.0:100.0, radius 50.0, X spacing 20.0, Y spacing 20.0, 36 points"));
     }
 
     /// <summary>
@@ -339,14 +339,14 @@ public class M557Tests : BenchFixture
         Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "a U/V grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('U', 'V', 0, BaselineMax, 0, BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: U0.0:20.0, V0.0:20.0, radius -1.0, U spacing 10.0, V spacing 10.0, 9 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: U0.0:20.0, V0.0:20.0, radius -1.0, U spacing 10.0, V spacing 10.0, 9 points"));
 
         Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} W0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "a U/W grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('U', 'W', 0, BaselineMax, 0, BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: U0.0:20.0, W0.0:20.0, radius -1.0, U spacing 10.0, W spacing 10.0, 9 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: U0.0:20.0, W0.0:20.0, radius -1.0, U spacing 10.0, W spacing 10.0, 9 points"));
 
         await host.ExecuteCodeAsync("M557 R50 S25");
         GridSnapshot radial = await ReadGridAsync(host);
@@ -368,14 +368,14 @@ public class M557Tests : BenchFixture
 
         Assert.That(await host.ExecuteCodeAsync($"M557 A0:{BaselineMax} B0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "an A/B grid is accepted");
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: A0.0:20.0, B0.0:20.0, radius -1.0, A spacing 10.0, B spacing 10.0, 9 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: A0.0:20.0, B0.0:20.0, radius -1.0, A spacing 10.0, B spacing 10.0, 9 points"));
 
         Assert.That(await host.ExecuteCodeAsync($"M557 A0:{BaselineMax} C0:{BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "an A/C grid is accepted");
         Assert.That(await ReadGridAsync(host), Is.EqualTo(new GridSnapshot('A', 'C', 0, BaselineMax, 0, BaselineMax, BaselineSpacing, BaselineSpacing, -1)));
-        Assert.That((await host.ExecuteCodeAsync("M557")).Trim(),
-                    Is.EqualTo("Grid: A0.0:20.0, C0.0:20.0, radius -1.0, A spacing 10.0, C spacing 10.0, 9 points"));
+        Assert.That(await host.ExecuteCodeAsync("M557"),
+                    Reply.IsSuccess("Grid: A0.0:20.0, C0.0:20.0, radius -1.0, A spacing 10.0, C spacing 10.0, 9 points"));
 
         Assert.That(await host.ExecuteCodeAsync($"M557 X0:{BaselineMax} A0:{2 * BaselineMax} S{BaselineSpacing}"), Reply.IsEmpty,
                     "an X/A grid is accepted");
@@ -418,7 +418,7 @@ public class M557Tests : BenchFixture
         await host.ExecuteCodeAsync($"M557 X0:{BaselineMax} Y0:{BaselineMax} S{BaselineSpacing}");
         GridSnapshot before = await ReadGridAsync(host);
 
-        Assert.That((await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax}")).Trim(), Is.EqualTo(BaselineReport),
+        Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax}"), Reply.IsSuccess(BaselineReport),
                     "with no other parameter it reports the grid");
         Assert.That(await host.ExecuteCodeAsync($"M557 U0:{BaselineMax} V0:{BaselineMax} S{BaselineSpacing}"), Reply.IsError(),
                     "with S it is refused, having no ranges");
@@ -537,7 +537,7 @@ public class M557Tests : BenchFixture
         {
             Assert.That(reply, Reply.IsError(), $"{code} is refused: {why}");
             Assert.That(after, Is.EqualTo(before), "move.compensation.probeGrid keeps the grid it had");
-            Assert.That(report.Trim(), Is.EqualTo(BaselineReport), "and M557 still reports it");
+            Assert.That(report, Reply.IsSuccess(BaselineReport), "and M557 still reports it");
         });
     }
 }
