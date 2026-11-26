@@ -102,8 +102,28 @@ public static class BoardTypes
         DirectionPinsArray = "DirectionPins"
     };
 
+    /// <summary>The Duet 3 Tool 1RR (SAME51G19A), a tool board with one driver</summary>
+    public static readonly BoardType Tool1rr = new()
+    {
+        Name = "TOOL1RR",
+        FirmwarePreset = "Duet3Firmware_TOOL1RR",
+        Mcu = McuFamily.Same5x,
+        Platform = "TOOL1RR.repl",
+        Models = [.. CommonModels, .. Same5xModels],
+        Svds = new Dictionary<string, string> { ["svd_same51"] = Same5xSvd("ATSAME51G19A") },
+        ApplicationAddress = 0x10000,
+        BootloaderPreset = "Duet3Bootloader-SAME5x",
+        CanController = "can0",
+        // CANlib's CanId::ToolBoardDefaultAddress
+        DefaultAddress = 121,
+        SerialNumberWords = [0x008061FC, 0x00806010, 0x00806014, 0x00806018],
+        ConfigurationHeader = "src/Duet3Expansion/src/Config/TOOL1RR.h",
+        StepPinsArray = "StepPins",
+        DirectionPinsArray = "DirectionPins"
+    };
+
     /// <summary>Every board type, main boards first</summary>
-    public static IReadOnlyList<BoardType> All { get; } = [Mb6hcStandalone, Mb6hcCanMaster, Exp3hc, Exp1hcl];
+    public static IReadOnlyList<BoardType> All { get; } = [Mb6hcStandalone, Mb6hcCanMaster, Exp3hc, Exp1hcl, Tool1rr];
 
     /// <summary>The expansion board of a name, as the regression suite names them (EXP3HC)</summary>
     /// <exception cref="ArgumentException">The bench cannot emulate it</exception>

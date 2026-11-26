@@ -10,6 +10,7 @@ The bench is for seeing exactly what a stack does for a scenario, and for compar
 | MB6HC, with DSF | `DuetCANMaster_MB6HC` | SAME70Q20B | SBC SPI port (SPI1) bridged to DuetControlServer |
 | EXP3HC | `Duet3Firmware_EXP3HC` | SAME51N19A | Version 1.03; boots through `Duet3Bootloader-SAME5x`; any address its switches can set |
 | EXP1HCL | `Duet3Firmware_EXP1HCL` | SAME51G19A | Version 2.0; boots through the bootloader; at its default address, 123; open loop only |
+| TOOL1RR | `Duet3Firmware_TOOL1RR` | SAME51G19A | Boots through the bootloader; at its default address, 121 |
 
 Renode, its SVD files and the SD card tools are installed in the devcontainer (`.devcontainer/install-renode.sh`). The firmware images must have been built: `scripts/test.py emulation --build` builds them.
 
@@ -219,8 +220,9 @@ Anything a firmware accesses that has no model falls back to the SVD's reset val
 - **Stepper driver communication.** TMC drivers do not answer, so driver status and stall detection mean nothing. Step pulses are counted on the STEP pins.
 - **Closed loop.** The EXP1HCL's encoders (AS5047, quadrature through PDEC) are not modelled.
 - **The main board's pins.** The SAME70 PIO has no interrupts and its PWM and TC outputs are not traced, so standalone tests drive and observe pins on expansion boards.
-- **Tool boards.** The SAMC21 and RP2040 boards need models of their own.
-- **An EXP1HCL at another address.** Storing an address in a switchless board's user area, as M954 does, is not done yet.
+- **SAMC21 boards.** The TOOL1LC and EXP1XD need SAMC21 models of their own.
+- **I2C devices.** The TOOL1RR's accelerometer, LDC1612 and filament monitor do not answer.
+- **A switchless board at another address.** Storing an address in an EXP1HCL's or TOOL1RR's user area, as M954 does, is not done yet.
 - **A step trigger on another board.** An input can be triggered by the steps of a driver on its own board only.
 - **USB and the network.**
 

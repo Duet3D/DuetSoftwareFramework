@@ -26,7 +26,8 @@ PROJECT = ROOT / 'src' / 'EmulationTests' / 'EmulationTests.csproj'
 
 # The firmware the bench runs: every FirmwarePreset and BootloaderPreset in
 # src/DuetEmulation/Boards/BoardTypes.cs, which src/EmulationTests/Harness/BoardTypeTests.cs checks
-PRESETS = ['Duet3Firmware_MB6HC', 'DuetCANMaster_MB6HC', 'Duet3Firmware_EXP3HC', 'Duet3Firmware_EXP1HCL', 'Duet3Bootloader-SAME5x']
+PRESETS = ['Duet3Firmware_MB6HC', 'DuetCANMaster_MB6HC', 'Duet3Firmware_EXP3HC', 'Duet3Firmware_EXP1HCL', 'Duet3Firmware_TOOL1RR',
+           'Duet3Bootloader-SAME5x']
 
 STACKS = {'rrf': 'Rrf', 'dsf': 'Dsf'}
 
