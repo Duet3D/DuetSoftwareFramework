@@ -57,6 +57,11 @@ namespace Duet::Sbc
 	LinkService::~LinkService()
 	{
 		Stop();
+		// The events nobody will consume any more are no longer pending
+		while (m_inbound.Peek().has_value() && m_inbound.Consume())
+		{
+			Activity::EventConsumed();
+		}
 		if (m_inboundEventFd >= 0)
 		{
 			::close(m_inboundEventFd);

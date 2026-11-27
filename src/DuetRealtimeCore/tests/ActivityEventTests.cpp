@@ -108,6 +108,29 @@ namespace
 		CHECK(Activity::Pending() == before, "nothing is left pending once every event is consumed and the poster stops");
 	}
 
+	// A link destroyed with events in its inbound ring, as a bench's is when it ends, leaves none of them
+	// pending: nobody will consume them, and a later bench in the process would wait on them for ever
+	void EventsLeftWhenTheLinkGoesAreNotPending()
+	{
+		const int64_t before = Activity::Pending();
+		{
+			const std::unique_ptr<LinkService> link = CreateUnconnected();
+			MoveCompletedEvent event{};
+			event.header.type = static_cast<uint16_t>(InboundEventType::MoveCompleted);
+			for (uint32_t i = 1; i <= 3; ++i)
+			{
+				event.moveId = i;
+				link->PostEventFromOtherThread(InboundEventType::MoveCompleted, AsBytes(event));
+			}
+			if (link->Inbound().Peek().has_value() && link->Inbound().Consume())
+			{
+				Activity::EventConsumed();
+			}
+			CHECK(Activity::Pending() == before + 2, "the events not consumed are pending");
+		}
+		CHECK(Activity::Pending() == before, "none is pending once the link has gone");
+	}
+
 } // namespace
 
 int main()
@@ -115,5 +138,6 @@ int main()
 	// Before anything native is created, as a bench must
 	Activity::Enable();
 	AnEventConsumedAsSoonAsItIsPostedNeverHidesThePoster();
+	EventsLeftWhenTheLinkGoesAreNotPending();
 	return TestSupport::Summarise("activity event");
 }
