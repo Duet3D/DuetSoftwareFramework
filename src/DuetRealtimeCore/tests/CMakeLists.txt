@@ -7,6 +7,8 @@ function(duet_realtime_core_add_test name)
     add_executable(${name} ${ARGN})
     target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME ${name} COMMAND ${name})
+    # Each runs in seconds; a test that hangs, such as on a lock a thread never releases, fails instead
+    set_tests_properties(${name} PROPERTIES TIMEOUT 120)
 endfunction()
 
 duet_realtime_core_add_test(ring_buffer_tests RingBufferTests.cpp)

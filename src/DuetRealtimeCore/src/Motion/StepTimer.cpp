@@ -35,7 +35,11 @@ namespace
 	std::atomic<uint32_t> movementDelay{0};
 	std::atomic<bool> movementDelayIncreased{false};
 
-	// --- Fit state. Touched only by RecordMasterClockSample / Init, both on the interface thread.
+	// Set by Init, which runs on whichever thread initialises motion, for RecordMasterClockSample to
+	// start the fit again on the interface thread, which alone touches the fit state below
+	std::atomic<bool> fitResetRequested{false};
+
+	// --- Fit state. Touched only by RecordMasterClockSample, on the interface thread.
 
 	struct Sample
 	{
@@ -76,14 +80,34 @@ namespace
 		}
 	}
 
+	// Writers take turns: each claims the write by moving the sequence from even to odd itself, since
+	// Init publishes from whichever thread initialises motion while the interface thread publishes
+	// its fits. A plain store would let two writers interleave and leave the sequence odd for good,
+	// which every reader would then spin on.
 	void PublishModel(const ClockModel& model) noexcept
 	{
-		const uint32_t seq = modelSeq.load(std::memory_order_relaxed);
-		modelSeq.store(seq + 1, std::memory_order_relaxed); // odd: write in progress
+		uint32_t seq = modelSeq.load(std::memory_order_relaxed);
+		while ((seq & 1u) != 0 || !modelSeq.compare_exchange_weak(seq, seq + 1, std::memory_order_acquire, std::memory_order_relaxed))
+		{
+			if ((seq & 1u) != 0)
+			{
+				seq = modelSeq.load(std::memory_order_relaxed);
+			}
+		}
 		std::atomic_thread_fence(std::memory_order_release);
 		publishedModel = model;
 		std::atomic_thread_fence(std::memory_order_release);
 		modelSeq.store(seq + 2, std::memory_order_release); // even: readable again
+	}
+
+	void ResetFit() noexcept
+	{
+		numSamples = 0;
+		nextSample = 0;
+		unwrappedMaster = 0;
+		lastAcceptedNs = 0;
+		lastRawMaster = 0;
+		haveFirstSample = false;
 	}
 
 	int64_t TicksAt(const ClockModel& model, int64_t localNs) noexcept
@@ -117,12 +141,8 @@ namespace
 
 void StepTimer::Init() noexcept
 {
-	numSamples = 0;
-	nextSample = 0;
-	unwrappedMaster = 0;
-	lastAcceptedNs = 0;
-	lastRawMaster = 0;
-	haveFirstSample = false;
+	// The interface thread starts the fit again from its next sample
+	fitResetRequested.store(true, std::memory_order_release);
 
 	peakResidualNs.store(0, std::memory_order_relaxed);
 	numBackwardClamps.store(0, std::memory_order_relaxed);
@@ -190,6 +210,11 @@ StepTimer::Ticks StepTimer::CheckMovementDelayIncreased() noexcept
 
 void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) noexcept
 {
+	if (fitResetRequested.exchange(false, std::memory_order_acq_rel))
+	{
+		ResetFit();
+	}
+
 	// Unwrap the controller's 32-bit counter. Transfers are milliseconds apart and the counter
 	// wraps every ~95 minutes, so the difference between consecutive samples is always a small
 	// positive number and the wrap falls out of the unsigned subtraction.
@@ -277,9 +302,7 @@ void StepTimer::RecordMasterClockSample(uint32_t masterTicks, int64_t localNs) n
 		// The fit is implausible - a stalled transfer, or a controller reset that reset its clock.
 		// Drop the window and start again rather than steering the model somewhere wrong.
 		numRejectedSamples.fetch_add(1, std::memory_order_relaxed);
-		numSamples = 0;
-		nextSample = 0;
-		haveFirstSample = false;
+		ResetFit();
 		publishedSampleCount.store(0, std::memory_order_relaxed);
 		return;
 	}

@@ -15,7 +15,10 @@
 
 #include <Platform/LocalClock.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <thread>
 #include <vector>
 
 namespace
@@ -262,8 +265,63 @@ static void TestConversions()
 	CHECK(MillisToStepClocks(1000) == stepClockRate, "one second of step clocks");
 }
 
+// Init runs on whichever thread initialises motion, while the interface thread is already feeding
+// samples. The two publish models at once, and the reading must come through that rather than spin
+// on a half-written model for ever.
+static void TestInitWhileSampling()
+{
+	ResetClock();
+	// Several writers widen the window that two writes have to land in for the sequence to tear
+	std::atomic<bool> stop{false};
+	std::vector<std::thread> initialisers;
+	for (int i = 0; i < 4; ++i)
+	{
+		initialisers.emplace_back([&stop] {
+			while (!stop.load())
+			{
+				StepTimer::Init();
+			}
+		});
+	}
+	uint32_t ticks = 0;
+	for (unsigned int i = 0; i < 1000000; ++i)
+	{
+		ticks += 1000;
+		StepTimer::RecordMasterClockSample(ticks, fakeLocalNs);
+	}
+	stop.store(true);
+	for (std::thread& initialiser : initialisers)
+	{
+		initialiser.join();
+	}
+
+	std::atomic<bool> read{false};
+	std::thread reader([&read] {
+		(void)StepTimer::GetTimerTicks();
+		read.store(true);
+	});
+	for (int waited = 0; waited < 2000 && !read.load(); ++waited)
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	CHECK(read.load(), "the model can be read after Init and the samples raced");
+	if (!read.load())
+	{
+		// The reader is spinning for good; leaving it would hang the test rather than fail it
+		reader.detach();
+		return;
+	}
+	reader.join();
+
+	// The fit starts again from the next sample after Init
+	StepTimer::Init();
+	FeedSamples(10, transferIntervalNs, 0.0);
+	CHECK(StepTimer::GetClockStats().numSamples <= 10, "Init starts the fit again");
+}
+
 int main()
 {
+	TestInitWhileSampling();
 	TestMonotonicUnderJitter();
 	TestConvergesOnDriftingClock();
 	TestUsableBeforeSynced();
