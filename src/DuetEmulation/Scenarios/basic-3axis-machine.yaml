@@ -4,6 +4,9 @@ boards:
   1: EXP3HC
   123: EXP1HCL
   121: TOOL1RR
+beforeConfig:
+  - thermistor: {board: 1, port: temp0, celsius: 25}
+  - thermistor: {board: 1, port: temp1, celsius: 25}
 config: |
   ; General
   G90 ; absolute coordinates
