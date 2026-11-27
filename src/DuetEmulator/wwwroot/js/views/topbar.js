@@ -5,8 +5,41 @@ import { h, icon, replace } from '../dom.js';
 import { differenceCount, hasSession, on, stacks, state } from '../store.js';
 
 export function mountTopbar(bar) {
-  let confirmEnd = false;
-  let saved = null;
+  // A choice being confirmed: 'end' or 'restart', which stays until one of its buttons is pressed
+  let confirming = null;
+  let notice = null;
+  let busy = false;
+
+  const act = async (label, request) => {
+    confirming = null;
+    busy = true;
+    notice = label;
+    render();
+    try {
+      await request();
+      notice = null;
+    } catch (e) {
+      notice = e.message;
+    } finally {
+      busy = false;
+      render();
+    }
+  };
+
+  const save = () => act('Saving', async () => {
+    const saved = await api.post('/save');
+    notice = `Saved in ${Object.values(saved)[0].replace(/\/[^/]+\/[^/]+$/, '')}`;
+  }).then(() => setTimeout(() => { notice = null; render(); }, 2500));
+
+  const end = () => act('Ending the session', async () => {
+    await api.delete('/session');
+    location.hash = '#/';
+  });
+
+  const restart = replay => act('Restarting', async () => {
+    location.hash = '#/';
+    await api.post(`/session/restart${replay ? '?replay=true' : ''}`);
+  });
 
   const render = () => {
     const status = state.status;
@@ -26,41 +59,27 @@ export function mountTopbar(bar) {
     if (session) {
       const differences = differenceCount();
       const firstDifferent = state.steps.find(s => s.differences.length > 0);
-      children.push(h('div', { class: 'actions' },
-        stacks().length === 2
-          ? h('a', { class: `badge ${differences === 0 ? 'ok' : 'diff'}`, href: firstDifferent ? `#/step/${firstDifferent.number}` : '#/' },
-              differences === 0 ? 'No differences' : `${differences} difference${differences === 1 ? '' : 's'}`)
-          : null,
-        h('button', { class: 'button', type: 'button', onclick: save, dataset: saved ? { flash: saved } : undefined }, icon('save'), 'Save captures'),
-        h('a', { class: 'button', href: '#/export' }, 'Save as scenario'),
-        h('button', { class: `button ${confirmEnd ? 'danger' : 'primary'}`, type: 'button', onclick: end,
-                      onblur: () => { confirmEnd = false; render(); } },
-          confirmEnd ? 'End it: captures are saved' : 'End session')));
+      const steps = state.steps.length;
+      const actions = confirming === 'end'
+        ? [h('span', { class: 'muted', style: 'font-size: 13px' }, 'End the session? Its captures are saved.'),
+           h('button', { class: 'button primary', type: 'button', onclick: end }, 'End session'),
+           h('button', { class: 'button', type: 'button', onclick: () => { confirming = null; render(); } }, 'Keep it')]
+        : confirming === 'restart'
+          ? [h('span', { class: 'muted', style: 'font-size: 13px' }, 'Boot the boards afresh with the same config.g?'),
+             h('button', { class: 'button', type: 'button', onclick: () => restart(false) }, 'Restart'),
+             steps > 0 ? h('button', { class: 'button primary', type: 'button', onclick: () => restart(true) }, `Restart and replay ${steps} step${steps === 1 ? '' : 's'}`) : null,
+             h('button', { class: 'button', type: 'button', onclick: () => { confirming = null; render(); } }, 'Cancel')]
+          : [stacks().length === 2
+               ? h('a', { class: `badge ${differences === 0 ? 'ok' : 'diff'}`, href: firstDifferent ? `#/step/${firstDifferent.number}` : '#/' },
+                   differences === 0 ? 'No differences' : `${differences} difference${differences === 1 ? '' : 's'}`)
+               : null,
+             h('button', { class: 'button', type: 'button', onclick: save, disabled: busy }, icon('save'), 'Save captures'),
+             h('a', { class: 'button', href: '#/export' }, 'Save as scenario'),
+             h('button', { class: 'button', type: 'button', disabled: busy, onclick: () => { confirming = 'restart'; render(); } }, 'Restart'),
+             h('button', { class: 'button primary', type: 'button', disabled: busy, onclick: () => { confirming = 'end'; render(); } }, 'End session')];
+      children.push(h('div', { class: 'actions' }, notice ? h('span', { class: 'muted', role: 'status', style: 'font-size: 13px' }, notice) : null, actions));
     }
     replace(bar, children);
-  };
-
-  const save = async () => {
-    try {
-      await api.post('/save');
-      saved = 'Saved';
-    } catch (e) {
-      saved = e.message;
-    }
-    render();
-    setTimeout(() => { saved = null; render(); }, 1500);
-  };
-
-  const end = async () => {
-    if (!confirmEnd) {
-      confirmEnd = true;
-      render();
-      bar.querySelector('.button.danger')?.focus();
-      return;
-    }
-    confirmEnd = false;
-    await api.delete('/session');
-    location.hash = '#/';
   };
 
   for (const topic of ['status', 'steps', 'connection', 'session']) on(topic, render);

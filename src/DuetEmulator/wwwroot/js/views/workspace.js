@@ -1,8 +1,8 @@
 // The session's workspace: its boards, its steps with a box to send more, and the object model side by side
 
-import { countEvents, inputStates, seconds } from '../capture.js';
+import { PERIODIC_CAN_TYPES, countEvents, inputStates, seconds } from '../capture.js';
 import { copy, h, icon, replace, store, stored } from '../dom.js';
-import { sameIgnoring, summary, treeRows, valueAt } from '../model.js';
+import { summary, treeRows } from '../model.js';
 import { captureSteps, changedPaths, on, pendingStarts, run, stacks, state, stepEvents } from '../store.js';
 import { mountBoard } from './board.js';
 import { cliPrefix, quote, stepCommand, stepYaml } from './cli.js';
@@ -163,11 +163,24 @@ function stepRow(step, names, isOpen, pending, toggle) {
         return h('div', { class: 'difference' }, h('span', { class: 'aspect' }, aspect), h('span', { class: 'mono' }, rest.join(': ')));
       }),
       names.length === 2 && step.differences.length === 0 && step.state === 'done' ? h('span', { class: 'muted', style: 'font-size: 13px' }, 'The stacks did the same') : null,
+      names.length === 1 ? recorded(stepEvents(names[0], step.number)) : null,
       h('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px' },
         h('a', { class: 'button small', href: `#/step/${step.number}` }, 'Compare frame by frame', icon('next')),
         awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => run({ await: step.action.start }) }, 'Await it') : null,
         h('button', { class: 'button small', type: 'button', onclick: () => run(step.action) }, 'Run again'),
         h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML'))) : null);
+}
+
+// What one stack recorded in a step, for a session on one stack, where there are no differences to show
+function recorded(events) {
+  const frames = events.filter(e => e.kind === 'can' && !PERIODIC_CAN_TYPES.has(e.type));
+  const changes = events.filter(e => e.kind === 'om');
+  const line = (aspect, text) => h('div', { class: 'difference' }, h('span', { class: 'aspect', style: 'color: var(--muted)' }, aspect), h('span', { class: 'mono' }, text));
+  return [
+    frames.map(f => line('CAN', `${f.source}→${f.destination === 63 ? 'all' : f.destination} ${f.type}${f.response ? ' (response)' : ''} ${f.message ? JSON.stringify(f.message) : f.data}`)),
+    changes.map(c => line('OM', `${c.path}: ${JSON.stringify(c.old ?? null)} → ${JSON.stringify(c.new ?? null)}`)),
+    frames.length === 0 && changes.length === 0 ? h('span', { class: 'muted', style: 'font-size: 13px' }, 'No CAN frames or object model changes') : null
+  ];
 }
 
 function replyCell(step, stack, differs) {
@@ -283,6 +296,8 @@ function composer() {
   send.addEventListener('click', submit);
 
   const render = () => {
+    // The inputs are kept from one drawing to the next; the one being typed in keeps the focus
+    const focused = root.contains(document.activeElement) && [field, yaml, timeout, awaitPick].includes(document.activeElement) ? document.activeElement : null;
     const pending = pendingStarts();
     field.placeholder = { code: 'G-code, such as G28 or M409 K"move.axes"', start: 'A code to send without waiting, such as G1 X100 F600',
                           wait: 'How long, such as 500ms or 2s', note: 'A remark, which starts a step when captures are compared' }[mode] ?? '';
@@ -306,6 +321,7 @@ function composer() {
           mode === 'yaml' ? 'Ctrl+Enter sends' : 'Enter sends to every stack · ↑ recalls', ' · steps sent from the CLI appear here too'),
         hint));
     updateHint();
+    focused?.focus();
   };
   const off = on('steps', () => { if (mode === 'await') render(); });
   render();
@@ -316,7 +332,9 @@ function composer() {
 function mountModel(column) {
   let tab = 'tree';
   let root = stored('modelRoot', '');
+  let onlyDifferences = stored('modelOnlyDifferences', false);
   const expanded = new Set(stored('modelExpanded', []));
+  const collapsed = new Set(stored('modelCollapsed', []));
   let watched = stored('watched', []);
   const body = h('div', { class: 'card' });
   const tabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Object model' });
@@ -324,10 +342,16 @@ function mountModel(column) {
 
   const lastStep = () => [...state.steps].reverse().find(s => s.state !== 'running')?.number;
 
-  const toggle = key => {
-    if (expanded.has(key)) expanded.delete(key);
-    else expanded.add(key);
+  const toggle = row => {
+    if (row.open) {
+      expanded.delete(row.key);
+      collapsed.add(row.key);
+    } else {
+      collapsed.delete(row.key);
+      expanded.add(row.key);
+    }
     store('modelExpanded', [...expanded]);
+    store('modelCollapsed', [...collapsed]);
     render();
   };
 
@@ -337,7 +361,24 @@ function mountModel(column) {
     render();
   };
 
+  const rowElement = (r, names, isWatchedRoot) => h('div', { class: `tree-row ${r.differs ? 'differs' : ''} ${r.changed ? 'changed' : ''} ${r.ignored ? 'ignored' : ''}`,
+                                                             title: r.ignored ? 'Not compared: it describes the computer, or changes with time' : undefined },
+    h('span', { class: 'key', style: `padding-left: ${r.depth * 14}px` },
+      r.container
+        ? h('button', { type: 'button', 'aria-expanded': r.open, onclick: () => toggle(r) }, h('span', { class: 'toggle' }, icon(r.open ? 'down' : 'open')), r.name)
+        : h('button', { type: 'button', title: `Copy ${r.key}`, onclick: e => copy(r.key, e.currentTarget) }, r.name)),
+    names.map(s => {
+      const v = r.values[s];
+      return h('span', { class: `value ${v !== null && typeof v === 'object' ? 'container' : ''}` }, v === undefined ? (isWatchedRoot ? 'absent' : '') : summary(v));
+    }),
+    h('span', { class: 'marks' }, r.differs ? '≠' : r.changed ? '•' : '',
+      isWatchedRoot
+        ? h('button', { class: 'watch', type: 'button', 'aria-pressed': true, 'aria-label': `Stop watching ${r.key}`, onclick: () => watch(r.key) }, icon('close'))
+        : h('button', { class: 'watch', type: 'button', 'aria-pressed': watched.includes(r.key), 'aria-label': `Watch ${r.key}`, onclick: () => watch(r.key) }, icon('eye'))));
+
   const render = () => {
+    // Drawing again keeps where the tree was scrolled to
+    const scrolled = body.querySelector('.model-body')?.scrollTop ?? 0;
     const names = Object.keys(state.models);
     replace(tabs, [['tree', 'Object model'], ['watched', `Watched (${watched.length})`]].map(([value, label]) =>
       h('button', { type: 'button', role: 'tab', 'aria-selected': tab === value, onclick: () => { tab = value; render(); } }, label)));
@@ -346,49 +387,46 @@ function mountModel(column) {
       return;
     }
     const number = lastStep();
-    const changed = number === undefined ? new Set() : changedPaths(number);
+    const options = { expanded, collapsed, changed: number === undefined ? new Set() : changedPaths(number), ignored: state.status.ignoredPaths ?? [], onlyDifferences };
     const head = h('div', { class: 'tree-head' }, h('span', {}, 'Key'), names.map(s => h('span', { class: `stack stack-${s}` }, s)), h('span', {}));
+    const controls = h('div', { style: 'padding: 10px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px' },
+      tab === 'tree' ? h('input', { class: 'input mono', type: 'text', value: root, placeholder: 'A key, such as move.axes[0]; empty for all', 'aria-label': 'Object model key',
+                                    onchange: e => { root = e.target.value.trim(); store('modelRoot', root); if (root) { expanded.add(root); collapsed.delete(root); } render(); } }) : null,
+      h('div', { class: 'legend', style: 'align-items: center' },
+        names.length > 1 ? h('label', { class: 'option', style: 'padding: 2px 10px' },
+          h('input', { type: 'checkbox', checked: onlyDifferences, onchange: e => { onlyDifferences = e.target.checked; store('modelOnlyDifferences', onlyDifferences); render(); } }),
+          'Only differences') : null,
+        h('span', {}, '• changed in the last step'), names.length > 1 ? h('span', { style: 'color: var(--diff)' }, '≠ stacks differ') : null,
+        h('span', { class: 'faint' }, 'grey: not compared')));
+
+    let content;
     if (tab === 'watched') {
-      replace(body, h('div', { style: `--stacks: ${names.length}` }, head,
-        watched.length === 0 ? h('div', { class: 'empty-state' }, 'Watch a key with its eye in the object model, to keep it in view') : null,
-        watched.map(key => {
-          const values = names.map(s => valueAt(state.models[s], key));
-          const differs = names.length > 1 && !values.every(v => sameIgnoring(v, values[0], key, state.status.ignoredPaths ?? []));
-          return h('div', { class: `tree-row ${differs ? 'differs' : ''} ${changed.has(key) ? 'changed' : ''}` },
-            h('span', { class: 'key' }, h('button', { type: 'button', title: 'Copy the key', onclick: e => copy(key, e.currentTarget) }, key)),
-            values.map(v => h('span', { class: `value ${v !== null && typeof v === 'object' ? 'container' : ''}` }, v === undefined ? 'absent' : summary(v))),
-            h('button', { class: 'watch', type: 'button', 'aria-pressed': true, 'aria-label': `Stop watching ${key}`, onclick: () => watch(key) }, icon('close')));
-        })));
-      return;
+      content = watched.length === 0
+        ? h('div', { class: 'empty-state' }, 'Watch a key with its eye in the object model, to keep it in view')
+        : watched.map(key => {
+          let rows;
+          try {
+            rows = treeRows(state.models, { ...options, root: key, onlyDifferences: false });
+          } catch (e) {
+            return h('div', { class: 'tree-row' }, h('span', { class: 'key' }, key), h('span', {}, e.message));
+          }
+          const shown = onlyDifferences ? rows.filter((r, i) => i === 0 || r.differs) : rows;
+          return shown.map((r, i) => rowElement(r, names, i === 0));
+        });
+    } else {
+      let rows = [];
+      let problem = null;
+      try {
+        rows = treeRows(state.models, { ...options, root });
+      } catch (e) {
+        problem = e.message;
+      }
+      content = [problem ? h('div', { class: 'empty-state' }, problem) : null,
+                 rows.length === 0 && !problem ? h('div', { class: 'empty-state' }, onlyDifferences ? 'The stacks\' object models are the same' : 'Nothing here') : null,
+                 rows.map(r => rowElement(r, names, false))];
     }
-    let rows;
-    let problem = null;
-    try {
-      rows = treeRows(state.models, { root, expanded, changed, ignored: state.status.ignoredPaths ?? [] });
-    } catch (e) {
-      rows = [];
-      problem = e.message;
-    }
-    replace(body,
-      h('div', { style: 'padding: 10px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px' },
-        h('input', { class: 'input mono', type: 'text', value: root, placeholder: 'A key, such as move.axes[0]; empty for all', 'aria-label': 'Object model key',
-                     onchange: e => { root = e.target.value.trim(); store('modelRoot', root); if (root) expanded.add(root); render(); } }),
-        h('div', { class: 'legend' }, h('span', {}, '• changed in the last step'), names.length > 1 ? h('span', { style: 'color: var(--diff)' }, '≠ stacks differ') : null,
-          h('span', { class: 'faint' }, 'grey: not compared'))),
-      h('div', { class: 'model-body', style: `--stacks: ${names.length}` }, head,
-        problem ? h('div', { class: 'empty-state' }, problem) : null,
-        rows.map(r => h('div', { class: `tree-row ${r.differs ? 'differs' : ''} ${r.changed ? 'changed' : ''} ${r.ignored ? 'ignored' : ''}`,
-                                 title: r.ignored ? 'Not compared: it describes the computer, or changes with time' : undefined },
-          h('span', { class: 'key', style: `padding-left: ${r.depth * 14}px` },
-            r.container
-              ? h('button', { type: 'button', 'aria-expanded': r.open, onclick: () => toggle(r.key) }, h('span', { class: 'toggle' }, icon(r.open ? 'down' : 'open')), r.name)
-              : h('button', { type: 'button', title: `Copy ${r.key}`, onclick: e => copy(r.key, e.currentTarget) }, r.name)),
-          names.map(s => {
-            const v = r.values[s];
-            return h('span', { class: `value ${v !== null && typeof v === 'object' ? 'container' : ''}` }, v === undefined ? '' : summary(v));
-          }),
-          h('span', { class: 'marks' }, r.differs ? '≠' : r.changed ? '•' : '',
-            h('button', { class: 'watch', type: 'button', 'aria-pressed': watched.includes(r.key), 'aria-label': `Watch ${r.key}`, onclick: () => watch(r.key) }, icon('eye')))))));
+    replace(body, controls, h('div', { class: 'model-body', style: `--stacks: ${names.length}` }, head, content));
+    body.querySelector('.model-body').scrollTop = scrolled;
   };
 
   const offs = ['models', 'steps', 'session'].map(topic => on(topic, render));

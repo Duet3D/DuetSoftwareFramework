@@ -65,3 +65,13 @@ test('containers are summarised by their size', () => {
   assert.equal(summary('X'), '"X"');
   assert.equal(summary(undefined), '');
 });
+
+test('with only differences, the keys that agree are left out and those that differ open', () => {
+  const rows = treeRows({ rrf, dsf }, { onlyDifferences: true, ignored: ['network'] });
+  assert.deepEqual(rows.map(r => r.key), ['move', 'move.axes', 'move.axes[0]', 'move.axes[0].machinePosition']);
+});
+
+test('a key closed by hand stays closed, even where the stacks differ', () => {
+  const rows = treeRows({ rrf, dsf }, { onlyDifferences: true, ignored: ['network'], collapsed: new Set(['move.axes']) });
+  assert.deepEqual(rows.map(r => [r.key, r.open]), [['move', true], ['move.axes', false]]);
+});

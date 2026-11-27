@@ -16,7 +16,7 @@ export async function loadRun(id, query) {
 
 export function mountRun(page, id) {
   replace(page, h('div', { class: 'empty-state' }, h('span', { class: 'spinner', style: 'display: inline-block' }), ' Reading the run'));
-  const options = { hidePeriodic: true, ignoreFields: true, tolerance: '', ...stored('compareOptions', {}) };
+  const options = { ignoreFields: true, tolerance: '', ...stored('compareOptions', {}) };
   loadRun(id, optionsQuery(options)).then(run => render(page, id, run)).catch(e =>
     replace(page, h('div', { class: 'compare' }, h('a', { class: 'button link', href: '#/' }, icon('back'), 'Start'), h('div', { class: 'notice err', role: 'alert' }, e.message))));
   return { unmount: () => {} };

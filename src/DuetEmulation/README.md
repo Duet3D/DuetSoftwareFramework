@@ -105,9 +105,11 @@ Once the boards are up, the workspace shows:
 
 - **Boards**: each board's drivers' step counts and the inputs and outputs in use, on each stack. A board's **Inputs and outputs** drawer drives its inputs (a level, a level once a driver has made so many more steps, a thermistor's temperature or an analogue fraction, a pulse train or a tacho that follows its fan) and shows every output. Each control shows the scenario step it sends.
 - **Steps**: every step run so far, from the page or from the CLI, with each stack's reply and how much it recorded, and how many differences it has. A step opens to its differences, to **Compare frame by frame**, to run it again or to copy it as YAML. The box under them sends a code, a code not waited for, an await, a wait, a note or any step as YAML; ↑ recalls earlier codes.
-- **Object model**: each stack's object model side by side, as last recorded. A key the last step changed is marked •, one where the stacks differ ≠, and the paths the comparison leaves out are grey. Any key can be watched, to keep it in view.
+- **Object model**: each stack's object model side by side, as last recorded. A key the last step changed is marked •, one where the stacks differ ≠, and the paths the comparison leaves out are grey. **Only differences** shows just the keys where the stacks differ, opened down to the values. Any key can be watched, to keep it in view, and opened like the rest.
 
-**Compare frame by frame** shows one step on both stacks: the replies, the CAN frames and pin changes lined up as the comparison lines them up (a frame one stack did not send is marked, and any frame opens to its decoded fields), the object model paths the step changed with their values before and after, and everything each stack recorded. Its options change what is compared, as `scripts/emulate.py diff` does.
+**Compare frame by frame** shows one step on both stacks: the replies, the CAN frames and pin changes lined up as the comparison lines them up (a frame one stack did not send is marked, and any frame opens to its decoded fields), the object model paths the step changed with their values before and after, and everything each stack recorded. On a session of one stack it lists that stack's frames, object model changes and pins. A chip for each CAN message type in the step shows or hides it; the periodic ones (TimeSync and the status and fan reports) start hidden. Its other options change what is compared, as `scripts/emulate.py diff` does.
+
+**Restart** boots the session's boards afresh with the same `config.g` and files, and can replay the steps it had run, which is the quick way to see a change to the firmware or to DSF on the same steps (DSF runs in the server, so a change to it needs the server restarted). **End session** saves the captures and returns to the start page.
 
 **Save as scenario** writes the session as a scenario that replays it: its boards, `config.g` and files, and the steps ticked. Queries and failed steps start unticked, and a code can be moved to the end of `config.g` instead of being a step. It saves to a path in the repository (asking before it replaces a file) or downloads the file.
 
@@ -126,6 +128,7 @@ scripts/emulate.py capture --text                # everything recorded so far
 scripts/emulate.py differences                   # how the stacks differ so far
 scripts/emulate.py save                          # save the captures and their differences
 scripts/emulate.py export homing.yaml --skip 4   # save the session as a scenario, without step 4
+scripts/emulate.py restart --replay              # boot the boards afresh and run the steps again
 scripts/emulate.py stop
 ```
 
@@ -140,6 +143,7 @@ The API is under `/api`. It takes JSON or YAML and answers JSON; a refusal is `{
 | `GET /api/session` | What the server is doing (`none`, `booting`, `ready`, `running`, `failed`) and its session |
 | `POST /api/session` | Start a session from a scenario, which may be empty, ending the one there is; its steps run once booted |
 | `DELETE /api/session` | End it, saving the captures |
+| `POST /api/session/restart?replay=true` | Boot its boards afresh with the same `config.g` and files; with `replay`, run its steps again |
 | `GET /api/events` | Follow the session as server-sent events: `hello` with everything so far, then `status`, `step`, `capture` (the events from an index on) and `boards` |
 | `GET /api/steps` | The steps run so far |
 | `POST /api/steps` | Run a step, or a list of steps, on every stack, answering with what each did |

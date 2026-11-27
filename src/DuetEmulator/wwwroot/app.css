@@ -154,7 +154,7 @@ a { color: var(--rrf); }
 .columns { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .column-boards { flex: 1 1 260px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; }
 .column-steps { flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.column-model { flex: 1 1 340px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.column-model { flex: 1 1 400px; max-width: 100%; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; min-height: 28px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
 .card > .card-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); }
@@ -174,7 +174,7 @@ a { color: var(--rrf); }
 .pair.same > span { color: var(--ink); }
 
 /* Steps list */
-.steps-table { min-width: 760px; }
+.steps-table { min-width: 600px; }
 .steps-head, .step-row {
   display: grid; grid-template-columns: 34px minmax(0, 1.15fr) repeat(var(--stacks, 2), minmax(0, 1fr)) 110px; gap: 12px; padding: 9px 14px;
 }
@@ -217,13 +217,14 @@ a { color: var(--rrf); }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
 .tabs > button { border: 0; background: transparent; padding: 6px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; }
 .tabs > button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
-.tree-head, .tree-row { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(var(--stacks, 2), minmax(0, 1fr)) 26px; gap: 8px; padding: 3px 10px; }
-.tree-head { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+.tree-head, .tree-row { display: grid; grid-template-columns: minmax(170px, 1.5fr) repeat(var(--stacks, 2), minmax(90px, 1fr)) 30px; gap: 8px; padding: 3px 10px; min-width: 440px; }
+.tree-head { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; padding-top: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line-soft);
+  position: sticky; top: 0; z-index: 1; background: var(--surface); }
 .tree-head .stack { color: var(--stack); }
 .tree-row { border-bottom: 1px solid var(--line-soft); font-family: var(--mono); font-size: 12px; align-items: baseline; }
 .tree-row.differs { background: var(--diff-row); }
-.tree-row .key { display: flex; align-items: center; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
-.tree-row .key button { border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; font: inherit; text-align: left; overflow-wrap: anywhere; }
+.tree-row .key { display: flex; align-items: center; gap: 3px; min-width: 0; white-space: nowrap; }
+.tree-row .key button { border: 0; background: transparent; padding: 0; cursor: pointer; color: inherit; font: inherit; text-align: left; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
 .tree-row .toggle { width: 14px; height: 14px; color: var(--faint); flex: none; }
 .tree-row .value { overflow-wrap: anywhere; }
 .tree-row .value.container { color: var(--faint); }
@@ -294,6 +295,11 @@ h2 { font-size: 15px; }
 .model-rows .row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 30px; gap: 10px; padding: 7px 14px; border-bottom: 1px solid var(--line-soft); font-family: var(--mono); font-size: 12px; align-items: baseline; }
 .model-rows .row.head { font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); }
 .model-rows .row.head .stack { color: var(--stack); }
+.model-rows .row.single { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
+.single-head, .single-row { display: grid; grid-template-columns: 96px 90px minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; padding: 7px 14px; align-items: center; }
+.single-head { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line-soft); }
+.single-row { cursor: pointer; font-family: var(--mono); font-size: 12px; }
+.single-row .time { color: var(--muted); }
 .model-rows .row.differs { background: var(--diff-row); box-shadow: inset 3px 0 0 var(--diff); }
 .model-rows .row.differs .value { color: var(--diff); font-weight: 600; }
 .model-rows .row > span { overflow-wrap: anywhere; }

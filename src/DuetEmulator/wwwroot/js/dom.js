@@ -2,12 +2,18 @@
 
 /**
  * An element: h('button', { class: 'primary', onclick: send }, 'Send'). Properties starting with "on"
- * are listeners, "class" and "style" set those attributes, a boolean sets or removes an attribute,
+ * are listeners, "class" and "style" set those attributes, a boolean sets or removes an attribute
+ * (except an aria- one, which is written "true" or "false"),
  * "value" and "checked" set the element's state, and children are elements, text or arrays of them
  */
 export function h(tag, props = {}, ...children) {
   const element = document.createElement(tag);
   for (const [name, value] of Object.entries(props ?? {})) {
+    if (name.startsWith('aria-') && typeof value === 'boolean') {
+      // aria-expanded="false" and the like say something, where a boolean attribute's absence does
+      element.setAttribute(name, String(value));
+      continue;
+    }
     if (value === undefined || value === null || value === false) continue;
     if (name.startsWith('on') && typeof value === 'function') {
       element.addEventListener(name.slice(2), value);

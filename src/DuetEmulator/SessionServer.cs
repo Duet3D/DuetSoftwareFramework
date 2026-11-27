@@ -35,6 +35,7 @@ namespace DuetEmulator;
 /// <item><term>GET /api/session</term><description>What the server is doing, and its session</description></item>
 /// <item><term>POST /api/session</term><description>Start a session from a scenario, ending the one there is; its steps run once booted</description></item>
 /// <item><term>DELETE /api/session</term><description>End the session, saving its captures</description></item>
+/// <item><term>POST /api/session/restart?replay=true</term><description>Boot the session's boards afresh; with replay, run its steps again</description></item>
 /// <item><term>GET /api/events</term><description>Follow the session: <c>hello</c> with everything so far, then <c>status</c>, <c>step</c>, <c>capture</c> and <c>boards</c></description></item>
 /// <item><term>GET /api/steps</term><description>The steps run so far</description></item>
 /// <item><term>POST /api/steps</term><description>Run a step, or a list of them, on every stack, answering with what each did</description></item>
@@ -109,6 +110,7 @@ public sealed class SessionServer : IAsyncDisposable
         app.MapPost("/api/session", async (HttpRequest request, CancellationToken token) =>
             Json(await _hub.StartAsync(Scenario.Parse(await BodyAsync(request), "session"), token)));
         app.MapDelete("/api/session", async () => Json(await _hub.EndAsync()));
+        app.MapPost("/api/session/restart", async (bool? replay, CancellationToken token) => Json(await _hub.RestartAsync(replay == true, token)));
         app.MapGet("/api/events", FollowAsync);
 
         app.MapGet("/api/steps", () => Json(new JsonObject { ["steps"] = new JsonArray([.. _hub.Session.Steps.Select(s => ApiJson.SessionStep(s))]) }));

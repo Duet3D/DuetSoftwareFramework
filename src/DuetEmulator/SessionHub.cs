@@ -132,6 +132,27 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Start the session again from what it started from (its boards, config.g, files and stacks), so
+    /// that the boards boot afresh; with <paramref name="replay"/>, the steps it had run run again
+    /// </summary>
+    public async Task<JsonObject> RestartAsync(bool replay, CancellationToken cancellationToken)
+    {
+        Session session = Session;
+        Scenario scenario = new()
+        {
+            Name = session.Scenario.Name,
+            Description = session.Scenario.Description,
+            Stacks = [.. session.Scenario.Stacks],
+            Boards = new(session.Scenario.Boards),
+            Config = session.Scenario.Config,
+            Files = new(session.Scenario.Files),
+            CaptureBoot = session.Scenario.CaptureBoot,
+            Steps = replay ? [.. session.Steps.Select(s => s.Step)] : []
+        };
+        return await StartAsync(scenario, cancellationToken);
+    }
+
     /// <summary>Run steps on the session, every client following them</summary>
     public async Task<IReadOnlyList<SessionStep>> RunAsync(IEnumerable<ScenarioStep> steps, CancellationToken cancellationToken)
     {

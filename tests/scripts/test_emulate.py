@@ -118,6 +118,8 @@ class SessionCommandsTest(TestCase):
         cases: list[tuple[list[str], tuple[str, str]]] = [
             (['status'], ('GET', '/api/session')),
             (['stop'], ('DELETE', '/api/session')),
+            (['restart'], ('POST', '/api/session/restart')),
+            (['restart', '--replay'], ('POST', '/api/session/restart?replay=true')),
             (['om', 'move.axes'], ('GET', '/api/om?key=move.axes')),
             (['om', 'boards[1]'], ('GET', '/api/om?key=boards%5B1%5D')),
             (['capture'], ('GET', '/api/capture')),

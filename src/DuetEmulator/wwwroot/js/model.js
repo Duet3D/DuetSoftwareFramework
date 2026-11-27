@@ -90,27 +90,31 @@ export function touches(key, changed) {
 /**
  * The rows of a tree of several stacks' models side by side, from a key down: each row a key, its
  * depth, the value on each stack, whether it can open, whether the stacks differ under it (leaving out
- * the keys the comparison ignores) and whether the last step changed it. Only the keys in <expanded>
- * show their children
+ * the keys the comparison ignores) and whether the last step changed it. A key opens when it is in
+ * <expanded>, or with <onlyDifferences> when the stacks differ under it, unless it is in <collapsed>;
+ * with <onlyDifferences> the keys under which the stacks agree are left out
  */
-export function treeRows(models, { root = '', expanded = new Set(), changed = new Set(), ignored = [] } = {}) {
+export function treeRows(models, { root = '', expanded = new Set(), collapsed = new Set(), changed = new Set(), ignored = [], onlyDifferences = false } = {}) {
   const stacks = Object.keys(models);
   const rows = [];
   const visit = (key, name, depth) => {
     const values = stacks.map(stack => key === '' ? models[stack] : valueAt(models[stack], key));
     const container = values.some(v => v !== null && typeof v === 'object');
+    const differs = stacks.length > 1 && !values.every(v => sameIgnoring(v, values[0], key, ignored));
+    if (onlyDifferences && !differs) return;
+    const open = container && (expanded.has(key) || (onlyDifferences && differs)) && !collapsed.has(key);
     rows.push({
       key,
       name,
       depth,
       values: Object.fromEntries(stacks.map((stack, i) => [stack, values[i]])),
       container,
-      open: container && expanded.has(key),
+      open,
       ignored: matches(key, ignored),
-      differs: stacks.length > 1 && !values.every(v => sameIgnoring(v, values[0], key, ignored)),
+      differs,
       changed: touches(key, changed)
     });
-    if (container && expanded.has(key)) {
+    if (open) {
       for (const child of childNames(values)) visit(childKey(key, child), typeof child === 'number' ? `[${child}]` : child, depth + 1);
     }
   };

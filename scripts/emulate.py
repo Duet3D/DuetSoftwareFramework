@@ -27,6 +27,7 @@ A session boots the boards once and runs steps one at a time, on both stacks sid
     scripts/emulate.py differences                              how the stacks differ so far
     scripts/emulate.py save                                     save the captures
     scripts/emulate.py export homing.yaml --skip 4              save the session as a scenario, without step 4
+    scripts/emulate.py restart --replay                         boot the boards afresh and run the steps again
     scripts/emulate.py stop                                     end the session
 
 The tool builds and runs src/DuetEmulator; the firmware images must have been built
@@ -113,6 +114,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     start.add_argument('--config', action='append', default=[], metavar='LINE', help='a line of config.g; may be repeated')
     start.add_argument('--name', help='what the session is called, which names its directory (default session)')
     commands.add_parser('stop', help='end the session')
+    restart = commands.add_parser('restart', help='boot the session\'s boards afresh, with its config.g and files')
+    restart.add_argument('--replay', action='store_true', help='run the session\'s steps again once booted')
     commands.add_parser('status', help='the session\'s stacks, boards and times')
 
     send = commands.add_parser('send', help='send codes, each waited for')
@@ -170,6 +173,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             show(emulator.request(port, 'POST', '/api/session', start_text(p, args)), args.json)
         elif command == 'stop':
             show(emulator.request(port, 'DELETE', '/api/session'), True)
+        elif command == 'restart':
+            show(emulator.request(port, 'POST', '/api/session/restart' + ('?replay=true' if args.replay else ''), ''), args.json)
         elif command == 'status':
             show(emulator.request(port, 'GET', '/api/session'), True)
         elif command == 'send':
