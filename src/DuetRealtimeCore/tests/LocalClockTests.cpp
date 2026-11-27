@@ -8,8 +8,10 @@
 #include <TestSupport.h>
 
 #include <poll.h>
+#include <unistd.h>
 
 #include <atomic>
+#include <cstdio>
 #include <thread>
 
 using namespace Duet::Sbc;
@@ -167,6 +169,51 @@ namespace
 		CHECK(Activity::Pending() == before, "a thread that has stopped is not pending");
 	}
 
+	// A thread that starts to wait as another signals what it waits on is either counted as woken or
+	// finds the wake-up already there, so once the wake-up can be seen the thread is pending
+	void AThreadThatStartsWaitingAsItIsSignalledIsPending()
+	{
+		const int64_t before = Activity::Pending();
+		Waker waker;
+		std::atomic<bool> waiting{true};
+		std::thread signaller(
+			[&]
+			{
+				while (waiting)
+				{
+					waker.Signal();
+				}
+			});
+
+		constexpr int numWaits = 200000;
+		int hidden = 0;
+		std::thread worker(
+			[&]
+			{
+				const Activity::Running running;
+				pollfd pfd{waker.Fd(), POLLIN, 0};
+				for (int i = 0; i < numWaits; ++i)
+				{
+					{
+						const Activity::WaitingOn wait({&pfd, 1});
+						if (PollsReadable(waker.Fd()) && Activity::Pending() < before + 1)
+						{
+							++hidden;
+						}
+					}
+					(void)waker.Drain();
+				}
+			});
+		worker.join();
+		waiting = false;
+		signaller.join();
+		(void)waker.Drain();
+
+		std::printf("  a woken thread was counted as waiting %d time(s) in %d waits\n", hidden, numWaits);
+		CHECK(hidden == 0, "a thread woken as it starts to wait is pending");
+		CHECK(Activity::Pending() == before, "a thread that has stopped is not pending");
+	}
+
 } // namespace
 
 int main()
@@ -177,5 +224,6 @@ int main()
 	NothingIsCountedUntilABenchEnablesIt();
 	AWakeUpCountsOnlyWhileAThreadWaitsOnIt();
 	AThreadIsPendingWhileItRunsAndNotWhileItWaits();
+	AThreadThatStartsWaitingAsItIsSignalledIsPending();
 	return TestSupport::Summarise("local clock");
 }

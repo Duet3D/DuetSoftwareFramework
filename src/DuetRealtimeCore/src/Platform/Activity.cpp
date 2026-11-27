@@ -1,6 +1,7 @@
 #include "Activity.h"
 
 #include <pthread.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>
@@ -26,7 +27,7 @@ namespace Duet::Sbc::Activity
 		std::atomic<int64_t> pendingCount{0};
 		std::atomic<int64_t> parkedElsewhereCount{0};
 
-		// The threads waiting, which Signalled looks through
+		// The threads waiting, which Signal looks through
 		std::mutex waitersMutex;
 		std::vector<WaitingOn*> waiters;
 
@@ -52,6 +53,12 @@ namespace Duet::Sbc::Activity
 		{
 			std::array<char, 32> name{};
 			return ::pthread_getname_np(::pthread_self(), name.data(), name.size()) == 0 ? std::string(name.data()) : std::string("?");
+		}
+
+		void WriteWakeUp(int fd) noexcept
+		{
+			const uint64_t one = 1;
+			(void)::write(fd, &one, sizeof(one));
 		}
 
 		bool AnyReadable(std::span<const pollfd> fds) noexcept
@@ -129,12 +136,14 @@ namespace Duet::Sbc::Activity
 		return description;
 	}
 
-	void Signalled(int fd) noexcept
+	void Signal(int fd) noexcept
 	{
 		if (!IsEnabled())
 		{
+			WriteWakeUp(fd);
 			return;
 		}
+		// Written under the lock WaitingOn registers under, so that a thread starting to wait sees either the count or the wake-up
 		const std::lock_guard lock(waitersMutex);
 		for (WaitingOn* waiter : waiters)
 		{
@@ -145,6 +154,7 @@ namespace Duet::Sbc::Activity
 				pendingCount.fetch_add(1, std::memory_order_seq_cst);
 			}
 		}
+		WriteWakeUp(fd);
 	}
 
 	void EventPosted() noexcept

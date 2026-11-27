@@ -348,9 +348,7 @@ namespace Duet::Sbc::Emulator
 			return;
 		}
 		state.edges.push_back({level, state.sequenceNumber});
-		Activity::Signalled(state.eventFd);
-		const uint64_t one = 1;
-		(void)::write(state.eventFd, &one, sizeof(one));
+		Activity::Signal(state.eventFd);
 	}
 
 	void EmulatorLink::Fail(const char* reason) noexcept

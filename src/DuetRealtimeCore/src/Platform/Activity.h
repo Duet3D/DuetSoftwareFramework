@@ -49,9 +49,10 @@ namespace Duet::Sbc::Activity
 	void ThreadStarted() noexcept;
 	void ThreadStopped() noexcept;
 
-	// A wake-up is about to be written to `fd`. Call it before the write, so that the thread it wakes
-	// is counted before it can be woken.
-	void Signalled(int fd) noexcept;
+	// Write a wake-up to the eventfd `fd`, counting the thread waiting on it. The count and the write
+	// are one step to a thread starting to wait on `fd`, which is either counted as woken or finds the
+	// wake-up and does not wait.
+	void Signal(int fd) noexcept;
 
 	// An inbound event has been posted for the managed side, or consumed by it
 	void EventPosted() noexcept;
@@ -82,7 +83,7 @@ namespace Duet::Sbc::Activity
 		WaitingOn(WaitingOn&&) = delete;
 		WaitingOn& operator=(WaitingOn&&) = delete;
 
-		// Whether it is waiting on `fd`; for Signalled
+		// Whether it is waiting on `fd`; for Signal
 		[[nodiscard]] bool Watches(int fd) const noexcept;
 
 	  private:
@@ -92,7 +93,7 @@ namespace Duet::Sbc::Activity
 		bool m_running = false;
 		int64_t m_woken = 0;
 
-		friend void Signalled(int fd) noexcept;
+		friend void Signal(int fd) noexcept;
 	};
 
 } // namespace Duet::Sbc::Activity

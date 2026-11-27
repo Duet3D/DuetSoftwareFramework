@@ -119,9 +119,7 @@ namespace Duet::Sbc
 
 	void Waker::Signal() noexcept
 	{
-		Activity::Signalled(m_fd);
-		const uint64_t one = 1;
-		(void)::write(m_fd, &one, sizeof(one));
+		Activity::Signal(m_fd);
 	}
 
 	bool Waker::Drain() noexcept
