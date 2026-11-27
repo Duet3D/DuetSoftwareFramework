@@ -225,11 +225,8 @@ public class UpdateService : BackgroundService
         {
             try
             {
-#if false
-                // Starting the next OM update. Waiting clients can be notified after this one,
-                // but clients requesting an update while the OM is being updated should wait for the next one to complete first
-                updateInterface.WaitForConditionA = !updateInterface.WaitForConditionA;
-#endif
+                // Clients that ask for a full update from here on have to wait for the one after this, because part of this one may be read before they ask
+                await _model.FullUpdateStartingAsync(stoppingToken);
 
                 // Verbose and obsolete fields are read once on start-up and from then on only while a
                 // subscriber asks for them. Sequence numbers do not change just because a client changed its

@@ -61,6 +61,11 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// </summary>
     private readonly AsyncConditionVariable _fullUpdateEvent;
 
+    /// <summary>
+    /// Number of full updates that have been started and the number of the last one that was completed, both guarded by the update lock
+    /// </summary>
+    private long _fullUpdatesStarted, _lastCompletedFullUpdate;
+
     // Private fields
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger<ObjectModel> _logger;
@@ -576,11 +581,16 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// <summary>
     /// Wait for the model to be fully updated from RepRapFirmware
     /// </summary>
+    /// <remarks>An update that is already in progress may have read its data before the call, so this waits for the next one to complete</remarks>
     public void WaitForFullUpdate()
     {
         using (_updateLock.Lock())
         {
-            _fullUpdateEvent.Wait();
+            long requiredUpdate = _fullUpdatesStarted + 1;
+            while (_lastCompletedFullUpdate < requiredUpdate)
+            {
+                _fullUpdateEvent.Wait();
+            }
         }
     }
 
@@ -589,11 +599,29 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     /// </summary>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Asynchronous task</returns>
+    /// <remarks>An update that is already in progress may have read its data before the call, so this waits for the next one to complete</remarks>
     public async Task WaitForFullUpdateAsync(CancellationToken cancellationToken = default)
     {
         using (await _updateLock.LockAsync(cancellationToken))
         {
-            await _fullUpdateEvent.WaitAsync(cancellationToken);
+            long requiredUpdate = _fullUpdatesStarted + 1;
+            while (_lastCompletedFullUpdate < requiredUpdate)
+            {
+                await _fullUpdateEvent.WaitAsync(cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called when the next full model update is about to be requested from RepRapFirmware
+    /// </summary>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Asynchronous task</returns>
+    internal async Task FullUpdateStartingAsync(CancellationToken cancellationToken = default)
+    {
+        using (await _updateLock.LockAsync(cancellationToken))
+        {
+            _fullUpdatesStarted++;
         }
     }
 
@@ -604,6 +632,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     {
         using (_updateLock.Lock())
         {
+            _lastCompletedFullUpdate = _fullUpdatesStarted;
             _fullUpdateEvent.NotifyAll();
         }
     }
@@ -617,6 +646,7 @@ public partial class ObjectModel : DuetAPI.ObjectModel.ObjectModel, IDiagnostics
     {
         using (await _updateLock.LockAsync(cancellationToken))
         {
+            _lastCompletedFullUpdate = _fullUpdatesStarted;
             _fullUpdateEvent.NotifyAll();
         }
     }
