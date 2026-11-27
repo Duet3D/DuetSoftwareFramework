@@ -171,6 +171,7 @@ public static class CanFrameDecoder
         string s => JsonValue.Create(s),
         float f => float.IsFinite(f) ? JsonValue.Create(f) : JsonValue.Create(f.ToString(System.Globalization.CultureInfo.InvariantCulture)),
         double d => double.IsFinite(d) ? JsonValue.Create(d) : JsonValue.Create(d.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+        Half h => ToJson((float)h, depth),
         Enum e => JsonValue.Create(e.ToString()),
         ulong u => JsonValue.Create(u),
         sbyte or byte or short or ushort or int or uint or long => JsonValue.Create(Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture)),

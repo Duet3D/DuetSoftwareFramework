@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json.Nodes;
+using DuetControlServer.Link.Protocol.CanMessages;
 using DuetControlServer.Link.Protocol.Shared;
 using DuetEmulation.Can;
 using NUnit.Framework;
@@ -53,6 +54,19 @@ public class CanFrameDecoderTests
             Assert.That(message["NumHandles"]!.GetValue<long>(), Is.EqualTo(1));
             Assert.That(message["Results"]!.AsArray(), Is.Empty);
         });
+    }
+
+    [Test]
+    public void AHalfPrecisionValueIsDecodedAsANumber()
+    {
+        CanMessageBoardStatusV1 report = new();
+        report.ShortValues[0].Current = (Half)24.0;
+        byte[] data = new byte[System.Runtime.CompilerServices.Unsafe.SizeOf<CanMessageBoardStatusV1>()];
+        CanMessageSerializer.Serialize(report, data);
+
+        JsonObject message = CanFrameDecoder.Decode(Frame(CanMessageBoardStatusV1.MessageType, Convert.ToHexString(data)))!;
+
+        Assert.That(message["ShortValues"]![0]!["Current"]!.GetValue<float>(), Is.EqualTo(24.0f));
     }
 
     [Test]
