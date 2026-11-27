@@ -303,7 +303,7 @@ public class MCodeHandler(
                         }
                     }
 
-                    // Let RepRapFirmware process this request so it can invoke resume.g or release the feed hold. When M24 completes, the file is resumed
+                    // Let RepRapFirmware process this request so it can invoke resume.g or release the feed hold. When M24 completes, the file is resumed unless only a hold was released
                     break;
                 }
                 throw new OperationCanceledException();
@@ -1342,14 +1342,34 @@ public class MCodeHandler(
 
         switch (code.MajorNumber)
         {
+            // Resume print
+            case 24:
+                bool jobPaused;
+                using (await jobProcessor.LockAsync(cancellationToken))
+                {
+                    jobPaused = jobProcessor.IsPaused;
+                }
+
+                if (jobPaused)
+                {
+                    // M24 only releases a feed hold while one is active, so RRF decides if the paused job has been resumed as well
+                    await model.WaitForFullUpdateAsync(cancellationToken);
+                    using (await model.AccessReadOnlyAsync(cancellationToken))
+                    {
+                        if (model.State.Status is MachineStatus.Held or MachineStatus.Resuming or MachineStatus.Pausing or MachineStatus.Paused)
+                        {
+                            break;
+                        }
+                    }
+                }
+                goto case 0;
+
             // Stop or Unconditional stop
             // Sleep or Conditional stop
-            // Resume print
             // Select file and start SD print
             // Simulate file
             case 0:
             case 1:
-            case 24:
             case 32:
             case 37:
                 using (await jobProcessor.LockAsync(cancellationToken))
