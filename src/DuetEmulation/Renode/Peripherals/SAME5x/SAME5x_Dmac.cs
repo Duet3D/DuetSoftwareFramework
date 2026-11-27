@@ -114,8 +114,12 @@ namespace Antmicro.Renode.Peripherals.DMA
                     return CrcIs32 ? ~crc : crc;
                 case CrcStatus:
                     return 0;         // never busy
+                // The lowest channel with an enabled interrupt pending, and its flags, which DMAC_4_Handler loops on
                 case IntPend:
-                    return 0;
+                    {
+                        var channel = LowestPendingChannel();
+                        return channel < 0 ? 0u : (uint)channel | (uint)(channels[channel].IntFlag & channels[channel].IntEnable & IntPendFlags) << IntPendFlagsShift;
+                    }
                 case IntStatus:
                     {
                         uint status = 0;
@@ -165,6 +169,17 @@ namespace Antmicro.Renode.Peripherals.DMA
                     return;
                 case CrcStatus:
                     return;
+                // Writing a flag clears it on the channel the ID field names
+                case IntPend:
+                    {
+                        var channel = (int)(value & IntPendIdMask);
+                        if(channel < channels.Length)
+                        {
+                            channels[channel].IntFlag &= (byte)~((value >> IntPendFlagsShift) & IntPendFlags);
+                            UpdateInterrupts();
+                        }
+                        return;
+                    }
                 case SwTrigCtrl:
                     for(var i = 0; i < channels.Length && i < 32; i++)
                     {
@@ -410,6 +425,18 @@ namespace Antmicro.Renode.Peripherals.DMA
             sysbus.WriteDoubleWord(address + 12, (uint)channel.NextDescriptor);
         }
 
+        private int LowestPendingChannel()
+        {
+            for(var i = 0; i < channels.Length && i < 32; i++)
+            {
+                if((channels[i].IntFlag & channels[i].IntEnable) != 0)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         private void UpdateInterrupts()
         {
             var lines = new bool[NumIrqs];
@@ -482,6 +509,9 @@ namespace Antmicro.Renode.Peripherals.DMA
         private const byte IntTerr = 0x1;
         private const byte IntTcmpl = 0x2;
         private const byte IntSusp = 0x4;
+        private const uint IntPendIdMask = 0x1F;
+        private const int IntPendFlagsShift = 8;          // TERR, TCMPL and SUSP, in CHINTFLAG's order
+        private const uint IntPendFlags = IntTerr | IntTcmpl | IntSusp;
         private const ushort BtCtrlValid = 0x1;
         private const ushort BtCtrlSrcInc = 1 << 10;
         private const ushort BtCtrlDstInc = 1 << 11;
