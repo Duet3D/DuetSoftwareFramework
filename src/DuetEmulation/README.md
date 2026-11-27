@@ -87,7 +87,7 @@ The object model leaves out what changes with time rather than with the machine 
 - CAN frames and pin changes are compared as one sequence each over the whole capture, aligned so that one missing frame is one difference, and a frame one stack sends a moment later than the other, in the next step, is still the same frame;
 - timing is ignored unless `--time-tolerance` is given.
 
-By default the comparison leaves out the periodic CAN messages (TimeSync, the status and fan reports), the fields each stack fills in its own way (`RequestId`, `WhenToExecute`, `When`) and the main board's description (`boards[0]`); `--ignore-path`, `--ignore-can-type` and `--no-pins` change that.
+By default the comparison leaves out the periodic CAN messages (TimeSync and the boards' status, driver, fan, heater and temperature reports), the fields each stack fills in its own way (`RequestId`, `WhenToExecute`, `When`) and the main board's description (`boards[0]`); `--ignore-path`, `--ignore-can-type` and `--no-pins` change that.
 
 ## Sessions
 
@@ -107,7 +107,7 @@ Once the boards are up, the workspace shows:
 - **Steps**: every step run so far, from the page or from the CLI, with each stack's reply and how much it recorded, and how many differences it has. A step opens to its differences, to **Compare frame by frame**, to run it again or to copy it as YAML. The box under them sends a code, a code not waited for, an await, a wait, a note or any step as YAML; ↑ recalls earlier codes.
 - **Object model**: each stack's object model side by side, as last recorded. A key the last step changed is marked •, one where the stacks differ ≠, and the paths the comparison leaves out are grey. **Only differences** shows just the keys where the stacks differ, opened down to the values. Any key can be watched, to keep it in view, and opened like the rest.
 
-**Compare frame by frame** shows one step on both stacks: the replies, the CAN frames and pin changes lined up as the comparison lines them up (a frame one stack did not send is marked, and any frame opens to its decoded fields), the object model paths the step changed with their values before and after, and everything each stack recorded. On a session of one stack it lists that stack's frames, object model changes and pins. A chip for each CAN message type in the step shows or hides it; the periodic ones (TimeSync and the status and fan reports) start hidden. Its other options change what is compared, as `scripts/emulate.py diff` does.
+**Compare frame by frame** shows one step on both stacks: the replies, the CAN frames and pin changes lined up as the comparison lines them up (a frame one stack did not send is marked, and any frame opens to its decoded fields), the object model paths the step changed with their values before and after, and everything each stack recorded. On a session of one stack it lists that stack's frames, object model changes and pins. A chip for each CAN message type in the step shows or hides it; the periodic ones (TimeSync and the boards' status, driver, fan, heater and temperature reports) start hidden. Its other options change what is compared, as `scripts/emulate.py diff` does.
 
 **Restart** boots the session's boards afresh with the same `config.g` and files, and can replay the steps it had run, which is the quick way to see a change to the firmware or to DSF on the same steps (DSF runs in the server, so a change to it needs the server restarted). **End session** saves the captures and returns to the start page.
 

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using DuetControlServer.Link.Protocol.Shared;
 
 namespace DuetEmulation.Captures;
 
@@ -12,10 +13,18 @@ namespace DuetEmulation.Captures;
 public sealed record ComparisonOptions
 {
     /// <summary>
-    /// CAN message types left out: by default the periodic ones, whose number depends on how long a
-    /// step takes rather than on what it does
+    /// The CAN message types sent periodically, whose number depends on how long a step takes rather
+    /// than on what it does: the main board's time sync and the expansion boards' reports
     /// </summary>
-    public IReadOnlyList<string> IgnoredCanTypes { get; init; } = ["TimeSync", "StatusReport", "BoardStatusReport", "BoardStatusReportV1", "DriversStatusReport", "FansReport"];
+    public static readonly IReadOnlyList<string> PeriodicCanTypes =
+    [
+        nameof(CanMessageType.TimeSync), nameof(CanMessageType.BoardStatusReportV0), nameof(CanMessageType.BoardStatusReportV1),
+        nameof(CanMessageType.DriversStatusReport), nameof(CanMessageType.FansReport), nameof(CanMessageType.HeatersStatusReport),
+        nameof(CanMessageType.SensorTemperaturesReport)
+    ];
+
+    /// <summary>CAN message types left out: by default the periodic ones</summary>
+    public IReadOnlyList<string> IgnoredCanTypes { get; init; } = PeriodicCanTypes;
 
     /// <summary>
     /// Fields of decoded CAN messages left out, at any depth: by default the request id, which each stack

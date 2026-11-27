@@ -43,8 +43,19 @@ export function countEvents(events, ignoredCanTypes = PERIODIC_CAN_TYPES) {
   return counts;
 }
 
-/** The CAN message types sent periodically, which the comparison leaves out by default */
-export const PERIODIC_CAN_TYPES = new Set(['TimeSync', 'StatusReport', 'BoardStatusReport', 'BoardStatusReportV1', 'DriversStatusReport', 'FansReport']);
+/**
+ * The CAN message types sent periodically, which the comparison leaves out by default. The server's
+ * list (ComparisonOptions.PeriodicCanTypes) replaces these once the page has heard from it
+ */
+export const PERIODIC_CAN_TYPES = new Set(['TimeSync', 'BoardStatusReportV0', 'BoardStatusReportV1', 'DriversStatusReport', 'FansReport',
+                                           'HeatersStatusReport', 'SensorTemperaturesReport']);
+
+/** Take the server's list of periodic CAN message types */
+export function setPeriodicCanTypes(types) {
+  if (!Array.isArray(types) || types.length === 0) return;
+  PERIODIC_CAN_TYPES.clear();
+  for (const type of types) PERIODIC_CAN_TYPES.add(type);
+}
 
 /** A JSON value as one line of text */
 export function json(value) {

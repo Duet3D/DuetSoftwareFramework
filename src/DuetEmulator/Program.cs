@@ -34,7 +34,7 @@ Option<string[]> ignorePathOption = new("--ignore-path")
 };
 Option<string[]> ignoreCanTypeOption = new("--ignore-can-type")
 {
-    Description = "Leave out a CAN message type; replaces the defaults, which are the periodic ones (TimeSync and the status and fan reports)",
+    Description = "Leave out a CAN message type; replaces the defaults, which are the periodic ones (TimeSync and the boards' status, driver, fan, heater and temperature reports)",
     AllowMultipleArgumentsPerToken = true
 };
 Option<bool> noPinsOption = new("--no-pins")

@@ -6,11 +6,19 @@ import { debounce, h, icon, replace, stored, store } from '../dom.js';
 import { on, stacks, state } from '../store.js';
 import { loadRun } from './run.js';
 
+/**
+ * The CAN message types hidden: the periodic ones but those chosen to be shown, and the others chosen
+ * to be hidden, so that a type the server adds to the periodic ones starts hidden too
+ */
+export function hiddenTypes(options) {
+  const shown = new Set(options.shownPeriodic ?? []);
+  return new Set([...[...PERIODIC_CAN_TYPES].filter(type => !shown.has(type)), ...(options.hiddenOthers ?? [])]);
+}
+
 /** The comparison options as the API's query: what the page's toggles leave in */
 export function optionsQuery(options) {
   const query = new URLSearchParams();
-  const hidden = options.hiddenTypes ?? [...PERIODIC_CAN_TYPES];
-  if ([...PERIODIC_CAN_TYPES].some(type => !hidden.includes(type))) {
+  if ((options.shownPeriodic ?? []).some(type => PERIODIC_CAN_TYPES.has(type))) {
     // A periodic type is shown, so the server lines them up too; those still hidden are hidden here
     query.set('periodic', '1');
   }
@@ -20,7 +28,7 @@ export function optionsQuery(options) {
 }
 
 export function mountStep(page, { source, number, id }) {
-  const options = { ignoreFields: true, onlyDifferences: false, tolerance: '', hiddenTypes: [...PERIODIC_CAN_TYPES], ...stored('compareOptions', {}) };
+  const options = { ignoreFields: true, onlyDifferences: false, tolerance: '', shownPeriodic: [], hiddenOthers: [], ...stored('compareOptions', {}) };
   const open = new Set();
   let data = null;
   let error = null;
@@ -83,7 +91,7 @@ function compare(data, number, options, open, render, reload) {
   const aligned = alignment?.steps[captureStep - 1];
   const action = aligned?.action ?? split[names[0]][captureStep - 1]?.action ?? '';
   const differences = alignment ? alignment.differences.filter(d => d.step === captureStep) : [];
-  const hidden = new Set(options.hiddenTypes);
+  const hidden = hiddenTypes(options);
   const isIn = e => e.firstStep === captureStep || e.secondStep === captureStep;
   const shown = e => isIn(e) && !(options.onlyDifferences && e.matched);
   const canShown = e => shown(e) && !hidden.has((e.first ?? e.second).type);
@@ -104,15 +112,27 @@ function compare(data, number, options, open, render, reload) {
     [...types].sort((a, b) => a[0].localeCompare(b[0])).map(([type, count]) => h('button', {
       class: 'chip', type: 'button', 'aria-pressed': !hidden.has(type), title: hidden.has(type) ? `Show ${type}` : `Hide ${type}`,
       onclick: () => {
-        options.hiddenTypes = hidden.has(type) ? options.hiddenTypes.filter(t => t !== type) : [...options.hiddenTypes, type];
-        store('compareOptions', options);
-        render();
+        const periodic = PERIODIC_CAN_TYPES.has(type);
+        const list = periodic ? 'shownPeriodic' : 'hiddenOthers';
+        options[list] = options[list].includes(type) ? options[list].filter(t => t !== type) : [...options[list], type];
+        // The server lines the periodic frames up only when asked for them, so a periodic type shown or hidden reads the alignment again
+        if (periodic && alignment) {
+          reload();
+        } else {
+          store('compareOptions', options);
+          render();
+        }
       }
     }, `${type} ${count}`)),
     h('button', { class: 'button link', type: 'button', style: 'font-size: 12px', onclick: () => {
-      options.hiddenTypes = [...PERIODIC_CAN_TYPES];
-      store('compareOptions', options);
-      render();
+      options.shownPeriodic = [];
+      options.hiddenOthers = [];
+      if (alignment) {
+        reload();
+      } else {
+        store('compareOptions', options);
+        render();
+      }
     } }, 'Hide only the periodic ones'));
 
   const option = (key, label) => h('label', { class: 'option' },
@@ -133,8 +153,8 @@ function compare(data, number, options, open, render, reload) {
       h('h1', {}, number === 0 ? 'start: boot and config.g' : action),
       alignment ? h('span', { class: `badge ${differences.length === 0 ? 'ok' : 'diff'}` }, differences.length === 0 ? 'the same' : `${differences.length} ≠`) : null,
       h('div', { class: 'nav' },
-        h('a', { class: 'button', href: data.href(number - 1), 'aria-disabled': number <= 0, style: number <= 0 ? 'pointer-events: none; opacity: 0.5' : '' }, icon('back'), `Step ${number - 1}`),
-        h('a', { class: 'button', href: data.href(number + 1), 'aria-disabled': number >= last, style: number >= last ? 'pointer-events: none; opacity: 0.5' : '' }, `Step ${number + 1}`, icon('next')))),
+        number > 0 ? h('a', { class: 'button', href: data.href(number - 1) }, icon('back'), `Step ${number - 1}`) : null,
+        number < last ? h('a', { class: 'button', href: data.href(number + 1) }, `Step ${number + 1}`, icon('next')) : null)),
     h('div', { class: 'side-cards' }, names.map(stack => sideCard(stack, events[stack], stack === names[0] ? aligned?.firstReply : aligned?.secondReply))),
     typeChips,
     alignment ? h('div', { class: 'options' },

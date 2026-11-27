@@ -76,6 +76,7 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
             ["detail"] = _detail,
             ["session"] = session is null ? null : ApiJson.Scenario(session.Scenario),
             ["ignoredPaths"] = new JsonArray([.. Recorder.DefaultIgnoredPaths.Concat(new ComparisonOptions().IgnoredPaths).Select(p => (JsonNode)p)]),
+            ["periodicCanTypes"] = new JsonArray([.. ComparisonOptions.PeriodicCanTypes.Select(t => (JsonNode)t)]),
             ["directory"] = session?.Directory,
             ["stacks"] = session is null ? new JsonArray() : new JsonArray([.. session.Stacks.Select(s => (JsonNode)new JsonObject
             {

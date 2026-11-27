@@ -1,7 +1,7 @@
 // The session as the page knows it, kept up to date from the server's events
 
 import { api, follow } from './api.js';
-import { applyCaptureChange, splitSteps } from './capture.js';
+import { applyCaptureChange, setPeriodicCanTypes, splitSteps } from './capture.js';
 
 const listeners = new Map();
 let stream = null;
@@ -144,6 +144,7 @@ export function connect() {
     hello(hello) {
       const changed = sessionKey(hello.status) !== sessionKey(state.status);
       state.status = hello.status;
+      setPeriodicCanTypes(hello.status.periodicCanTypes);
       state.steps = hello.steps;
       state.captures = hello.captures;
       state.boardStates = hello.boards;

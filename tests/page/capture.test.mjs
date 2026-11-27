@@ -61,3 +61,14 @@ test('a capture message past the end says events were missed, and changes nothin
   assert.equal(applyCaptureChange(list, 3, [4]), false);
   assert.deepEqual(list, [1, 2]);
 });
+
+test('the server\'s periodic CAN types replace the page\'s own', async () => {
+  const { PERIODIC_CAN_TYPES, setPeriodicCanTypes } = await import('../../src/DuetEmulator/wwwroot/js/capture.js');
+  const before = [...PERIODIC_CAN_TYPES];
+  assert.ok(PERIODIC_CAN_TYPES.has('HeatersStatusReport') && PERIODIC_CAN_TYPES.has('SensorTemperaturesReport'));
+  setPeriodicCanTypes(['TimeSync']);
+  assert.deepEqual([...PERIODIC_CAN_TYPES], ['TimeSync']);
+  setPeriodicCanTypes([]);
+  assert.deepEqual([...PERIODIC_CAN_TYPES], ['TimeSync'], 'an empty list changes nothing');
+  setPeriodicCanTypes(before);
+});
