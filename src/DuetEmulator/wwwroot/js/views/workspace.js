@@ -2,8 +2,8 @@
 
 import { api } from '../api.js';
 import { PERIODIC_CAN_TYPES, countEvents, inputStates, seconds } from '../capture.js';
-import { copy, h, icon, replace, store, stored } from '../dom.js';
-import { summary, treeRows } from '../model.js';
+import { copy, debounce, h, icon, replace, store, stored } from '../dom.js';
+import { modelQuery, summary, treeRows } from '../model.js';
 import { captureSteps, changedPaths, on, pendingStarts, run, stacks, state, stepEvents } from '../store.js';
 import { mountBoard } from './board.js';
 import { cliPrefix, quote, stepCommand, stepYaml } from './cli.js';
@@ -383,11 +383,13 @@ function composer() {
 // The object model on each stack side by side, and the keys being watched
 function mountModel(column) {
   let tab = 'tree';
-  let root = stored('modelRoot', '');
   let onlyDifferences = stored('modelOnlyDifferences', false);
   const expanded = new Set(stored('modelExpanded', []));
   const collapsed = new Set(stored('modelCollapsed', []));
   let watched = stored('watched', []);
+  // Kept from one drawing to the next, so that typing in it goes on as the tree redraws
+  const findField = h('input', { class: 'input mono', type: 'search', value: stored('modelFind', ''), placeholder: 'A key, or a name or value to search for, such as move.axes[0], heater or 285',
+                                 'aria-label': 'Find in the object model', oninput: debounce(() => { store('modelFind', findField.value); render(); }, 150) });
   const body = h('div', { class: 'card' });
   const tabs = h('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Object model' });
   column.append(tabs, body);
@@ -429,8 +431,9 @@ function mountModel(column) {
         : h('button', { class: 'watch', type: 'button', 'aria-pressed': watched.includes(r.key), 'aria-label': `Watch ${r.key}`, onclick: () => watch(r.key) }, icon('eye'))));
 
   const render = () => {
-    // Drawing again keeps where the tree was scrolled to
+    // Drawing again keeps where the tree was scrolled to, and the search being typed
     const scrolled = body.querySelector('.model-body')?.scrollTop ?? 0;
+    const finding = document.activeElement === findField;
     const names = Object.keys(state.models);
     replace(tabs, [['tree', 'Object model'], ['watched', `Watched (${watched.length})`]].map(([value, label]) =>
       h('button', { type: 'button', role: 'tab', 'aria-selected': tab === value, onclick: () => { tab = value; render(); } }, label)));
@@ -442,8 +445,7 @@ function mountModel(column) {
     const options = { expanded, collapsed, changed: number === undefined ? new Set() : changedPaths(number), ignored: state.status.ignoredPaths ?? [], onlyDifferences };
     const head = h('div', { class: 'tree-head' }, h('span', {}, 'Key'), names.map(s => h('span', { class: `stack stack-${s}` }, s)), h('span', {}));
     const controls = h('div', { style: 'padding: 10px; border-bottom: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 8px' },
-      tab === 'tree' ? h('input', { class: 'input mono', type: 'text', value: root, placeholder: 'A key, such as move.axes[0]; empty for all', 'aria-label': 'Object model key',
-                                    onchange: e => { root = e.target.value.trim(); store('modelRoot', root); if (root) { expanded.add(root); collapsed.delete(root); } render(); } }) : null,
+      tab === 'tree' ? findField : null,
       h('div', { class: 'legend', style: 'align-items: center' },
         names.length > 1 ? h('label', { class: 'option', style: 'padding: 2px 10px' },
           h('input', { type: 'checkbox', checked: onlyDifferences, onchange: e => { onlyDifferences = e.target.checked; store('modelOnlyDifferences', onlyDifferences); render(); } }),
@@ -468,17 +470,21 @@ function mountModel(column) {
     } else {
       let rows = [];
       let problem = null;
+      // A key found opens, unless it was closed by hand
+      const { root, search } = modelQuery(state.models, findField.value);
       try {
-        rows = treeRows(state.models, { ...options, root });
+        rows = treeRows(state.models, { ...options, root, search, expanded: root ? new Set([...expanded, root]) : expanded });
       } catch (e) {
         problem = e.message;
       }
       content = [problem ? h('div', { class: 'empty-state' }, problem) : null,
-                 rows.length === 0 && !problem ? h('div', { class: 'empty-state' }, onlyDifferences ? 'The stacks\' object models are the same' : 'Nothing here') : null,
+                 rows.length === 0 && !problem ? h('div', { class: 'empty-state' }, search ? `Nothing has "${search}" in its name or value`
+                   : onlyDifferences ? 'The stacks\' object models are the same' : 'Nothing here') : null,
                  rows.map(r => rowElement(r, names, false))];
     }
     replace(body, controls, h('div', { class: 'model-body', style: `--stacks: ${names.length}` }, head, content));
     body.querySelector('.model-body').scrollTop = scrolled;
+    if (finding) findField.focus();
   };
 
   const offs = ['models', 'steps', 'session'].map(topic => on(topic, render));

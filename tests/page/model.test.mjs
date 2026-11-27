@@ -1,7 +1,7 @@
 // The emulation bench's page: the object model tree with two stacks side by side
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { childKey, matches, parseKey, same, sameIgnoring, summary, touches, treeRows, valueAt } from '../../src/DuetEmulator/wwwroot/js/model.js';
+import { childKey, found, matches, modelQuery, parseKey, same, sameIgnoring, summary, touches, treeRows, valueAt } from '../../src/DuetEmulator/wwwroot/js/model.js';
 
 const rrf = { move: { axes: [{ letter: 'X', machinePosition: 0, homed: true }], kinematics: { name: 'cartesian' } }, network: { name: 'rrf' } };
 const dsf = { move: { axes: [{ letter: 'X', machinePosition: -10, homed: true }], kinematics: { name: 'cartesian' } }, network: { name: 'dsf' } };
@@ -74,4 +74,31 @@ test('with only differences, the keys that agree are left out and those that dif
 test('a key closed by hand stays closed, even where the stacks differ', () => {
   const rows = treeRows({ rrf, dsf }, { onlyDifferences: true, ignored: ['network'], collapsed: new Set(['move.axes']) });
   assert.deepEqual(rows.map(r => [r.key, r.open]), [['move', true], ['move.axes', false]]);
+});
+
+test('a search finds values as well as names, and opens the way to them', () => {
+  const rows = treeRows({ rrf, dsf }, { search: 'cartes' });
+  assert.deepEqual(rows.map(r => [r.key, r.open]), [['move', true], ['move.kinematics', true], ['move.kinematics.name', false]]);
+  assert.deepEqual(treeRows({ rrf, dsf }, { search: '-10' }).map(r => r.key),
+                   ['move', 'move.axes', 'move.axes[0]', 'move.axes[0].machinePosition'], 'a value on one stack is enough');
+  assert.deepEqual(treeRows({ rrf, dsf }, { search: 'KINEMATICS' }).map(r => [r.key, r.open]), [['move', true], ['move.kinematics', false]],
+                   'a key found by its own name is shown closed');
+  assert.deepEqual(treeRows({ rrf, dsf }, { search: 'nothing like it' }), []);
+});
+
+test('a search reads strings without their quotes, and a closed key stays closed', () => {
+  assert.equal(found('X', 'letter', 'x'), true);
+  assert.equal(found('X', 'letter', '"x"'), false);
+  assert.equal(found({ a: { b: 285 } }, 'heat', '28'), true);
+  const rows = treeRows({ rrf, dsf }, { search: 'cartes', collapsed: new Set(['move']) });
+  assert.deepEqual(rows.map(r => [r.key, r.open]), [['move', false]]);
+});
+
+test('the one box shows a key that is in a model and searches for anything else', () => {
+  assert.deepEqual(modelQuery({ rrf, dsf }, ' move.axes[0] '), { root: 'move.axes[0]', search: '' });
+  assert.deepEqual(modelQuery({ rrf, dsf }, 'network.name'), { root: 'network.name', search: '' }, 'a key in either model');
+  assert.deepEqual(modelQuery({ rrf, dsf }, 'move.axes[3]'), { root: '', search: 'move.axes[3]' }, 'a key in neither is searched for');
+  assert.deepEqual(modelQuery({ rrf, dsf }, 'cartes'), { root: '', search: 'cartes' });
+  assert.deepEqual(modelQuery({ rrf, dsf }, '[x'), { root: '', search: '[x' }, 'text that is not written as a key');
+  assert.deepEqual(modelQuery({ rrf, dsf }, '  '), { root: '', search: '' });
 });
