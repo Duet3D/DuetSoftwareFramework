@@ -94,7 +94,9 @@ A session boots the boards once and runs steps one at a time, on both stacks sid
 
 ```bash
 scripts/emulate.py serve &                       # the session server, on localhost:8770
-scripts/emulate.py start session.yaml            # boot a scenario's boards and config.g; its steps run at once
+scripts/emulate.py start --board 1=EXP3HC --board 121=TOOL1RR --config 'M584 X1.0'
+                                                 # boot these boards with these lines of config.g
+scripts/emulate.py start session.yaml            # or a scenario's boards and config.g; its steps run at once
 scripts/emulate.py send 'M584 X1.0' 'G1 X10'     # codes, each waited for
 scripts/emulate.py drive 1 io0.in high           # also release, analog, thermistor
 scripts/emulate.py wait 500ms
@@ -106,12 +108,12 @@ scripts/emulate.py save                          # save the captures and their d
 scripts/emulate.py stop
 ```
 
-`--json` prints the server's answers as they are. The server's HTTP API takes JSON or YAML and answers JSON:
+A session needs no scenario file: `start` on its own boots both stacks with no expansion boards and an empty `config.g`, and `--board ADDRESS=TYPE` and `--config LINE` (each repeatable), `--stack` and `--name` describe the rest. A scenario file is for what a session needs files or setup steps for. `--json` prints the server's answers as they are. The server's HTTP API takes JSON or YAML and answers JSON:
 
 | Request | |
 | --- | --- |
 | `GET /` | The session: its stacks, boards, emulated times and event counts |
-| `POST /session` | Start a session from a scenario; its steps run at once |
+| `POST /session` | Start a session from a scenario, which may be empty; its steps run at once |
 | `DELETE /session` | End it, saving the captures |
 | `POST /steps` | Run a step, or a list of steps, on every stack |
 | `GET /om?key=...` | The object model at a key on every stack |

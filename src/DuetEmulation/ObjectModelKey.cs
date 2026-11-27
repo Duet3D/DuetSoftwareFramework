@@ -11,7 +11,10 @@ namespace DuetEmulation;
 /// </summary>
 public static partial class ObjectModelKey
 {
-    /// <summary>The part of <paramref name="model"/> a key names, or null if the model has nothing there</summary>
+    /// <summary>
+    /// The part of <paramref name="model"/> a key names, or null if the model has nothing there; a part
+    /// within the model is copied, so that it can go into another document
+    /// </summary>
     /// <exception cref="FormatException">The key is not a sequence of names with optional indices</exception>
     public static JsonNode? Select(JsonNode? model, string key)
     {
@@ -38,7 +41,7 @@ public static partial class ObjectModelKey
                 return null;
             }
         }
-        return node;
+        return node.DeepClone();
     }
 
     [GeneratedRegex(@"^(?<name>[A-Za-z_][A-Za-z0-9_]*)(\[(?<index>\d+)\])*$")]

@@ -112,3 +112,21 @@ def scenario_text(path: str) -> str:
         import sys
         return sys.stdin.read()
     return Path(path).read_text()
+
+
+def session_scenario(boards: list[str], stack: str | None, config: list[str], name: str | None) -> dict[str, object]:
+    """A scenario with no steps, from boards given as 'ADDRESS=TYPE', config.g's lines and the stack to run on."""
+    by_address: dict[str, str] = {}
+    for board in boards:
+        address, _, board_type = board.partition('=')
+        if not address.strip().isdigit() or not board_type.strip():
+            raise ValueError(f'"{board}" is not a board: give ADDRESS=TYPE, such as 1=EXP3HC')
+        if address.strip() in by_address:
+            raise ValueError(f'two boards at address {address.strip()}')
+        by_address[str(int(address))] = board_type.strip()
+    scenario: dict[str, object] = {'name': name or 'session', 'boards': by_address}
+    if stack:
+        scenario['stacks'] = [stack]
+    if config:
+        scenario['config'] = ''.join(line + '\n' for line in config)
+    return scenario

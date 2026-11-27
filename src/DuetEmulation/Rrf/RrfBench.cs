@@ -119,7 +119,7 @@ public sealed class RrfBench : Bench
         }
         try
         {
-            return JsonNode.Parse(reply[start..])?["result"];
+            return ObjectModelKey.Select(JsonNode.Parse(reply[start..]), "result");
         }
         catch (JsonException e)
         {

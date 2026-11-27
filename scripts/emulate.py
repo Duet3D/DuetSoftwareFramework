@@ -15,6 +15,8 @@ A session boots the boards once and runs steps one at a time, on both stacks sid
 
     scripts/emulate.py serve &                                  start the session server (port 8770)
     scripts/emulate.py start session.yaml                       boot a scenario's boards and config.g
+    scripts/emulate.py start --board 1=EXP3HC --config 'M584 X1.0'
+                                                                or name the boards and config.g lines here
     scripts/emulate.py send 'M584 X1.0' 'G1 X10 F600'           send codes; each answers on every stack
     scripts/emulate.py drive 1 io0.in high                      drive an input
     scripts/emulate.py thermistor 1 temp0 60                    make a thermistor read 60C
@@ -101,8 +103,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     serve = commands.add_parser('serve', help='serve sessions on localhost')
     serve.add_argument('-o', '--out', metavar='DIR', help='where sessions\' files go (default: build/emulation/sessions)')
 
-    start = commands.add_parser('start', help='start a session from a scenario file (- for standard input)')
-    start.add_argument('scenario')
+    start = commands.add_parser('start', help='start a session from a scenario file, or from the boards and config.g lines given here')
+    start.add_argument('scenario', nargs='?', help='a scenario file (- for standard input); its steps run at once')
+    start.add_argument('--board', action='append', default=[], metavar='ADDRESS=TYPE',
+                       help='an expansion board, such as 1=EXP3HC or 121=TOOL1RR; may be repeated')
+    start.add_argument('--stack', choices=('rrf', 'dsf'), help='only on this stack (default both)')
+    start.add_argument('--config', action='append', default=[], metavar='LINE', help='a line of config.g; may be repeated')
+    start.add_argument('--name', help='what the session is called, which names its directory (default session)')
     commands.add_parser('stop', help='end the session')
     commands.add_parser('status', help='the session\'s stacks, boards and times')
 
@@ -151,7 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     port: int = args.port
     try:
         if command == 'start':
-            show(emulator.request(port, 'POST', '/session', emulator.scenario_text(args.scenario)), args.json)
+            show(emulator.request(port, 'POST', '/session', start_text(p, args)), args.json)
         elif command == 'stop':
             show(emulator.request(port, 'DELETE', '/session'), True)
         elif command == 'status':
@@ -193,6 +200,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(e, file=sys.stderr)
         return 1
     return 0
+
+
+def start_text(p: argparse.ArgumentParser, args: argparse.Namespace) -> str:
+    """The scenario a session starts from: the file named, or one made of the options given."""
+    options: list[str] = [o for o, given in (('--board', args.board), ('--stack', args.stack), ('--config', args.config), ('--name', args.name)) if given]
+    if args.scenario is not None:
+        if options:
+            p.error(f'start: give a scenario file or {", ".join(options)}, not both')
+        return emulator.scenario_text(args.scenario)
+    try:
+        return json.dumps(emulator.session_scenario(args.board, args.stack, args.config, args.name))
+    except ValueError as e:
+        p.error(f'start: {e}')
 
 
 if __name__ == '__main__':

@@ -79,6 +79,37 @@ class SessionCommandsTest(TestCase):
                 self.assertEqual((method, path), ('POST', '/steps'))
                 self.assertEqual(json.loads(text or ''), body)
 
+    def test_a_session_starts_from_the_boards_and_config_given(self) -> None:
+        cases: list[tuple[list[str], dict[str, Any]]] = [
+            (['start'], {'name': 'session', 'boards': {}}),
+            (['start', '--board', '1=EXP3HC', '--board', '121=TOOL1RR', '--config', 'M584 X1.0', '--config', 'M92 X80'],
+             {'name': 'session', 'boards': {'1': 'EXP3HC', '121': 'TOOL1RR'}, 'config': 'M584 X1.0\nM92 X80\n'}),
+            (['start', '--stack', 'rrf', '--name', 'probing'], {'name': 'probing', 'boards': {}, 'stacks': ['rrf']}),
+        ]
+        for argv, scenario in cases:
+            with self.subTest(argv=argv):
+                status, _, sent = self.requests(*argv, answer={})
+                self.assertEqual(status, 0)
+                self.assertEqual([(m, p) for m, p, _ in sent], [('POST', '/session')])
+                self.assertEqual(json.loads(sent[0][2] or ''), scenario)
+
+    def test_a_session_starts_from_a_scenario_file(self) -> None:
+        with patch.object(emulator, 'scenario_text', return_value='boards: {1: EXP3HC}') as read:
+            _, _, sent = self.requests('start', 'session.yaml', answer={})
+        read.assert_called_once_with('session.yaml')
+        self.assertEqual(sent, [('POST', '/session', 'boards: {1: EXP3HC}')])
+
+    def test_a_start_that_cannot_be_understood_sends_nothing(self) -> None:
+        cases = [
+            ['start', 'session.yaml', '--board', '1=EXP3HC'],
+            ['start', '--board', 'EXP3HC'],
+            ['start', '--board', 'x=EXP3HC'],
+            ['start', '--board', '1=EXP3HC', '--board', '1=TOOL1RR'],
+        ]
+        for argv in cases:
+            with self.subTest(argv=argv), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                self.requests(*argv)
+
     def test_a_step_given_as_yaml_is_passed_on_as_it_is(self) -> None:
         _, _, sent = self.requests('step', '{code: G28, timeout: 30s}')
         self.assertEqual(sent, [('POST', '/steps', '{code: G28, timeout: 30s}')])
