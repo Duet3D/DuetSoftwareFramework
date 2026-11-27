@@ -286,10 +286,12 @@ namespace Duet::Sbc
 		// The caller has already filled in the type; this just performs the scattered write
 		(void)type;
 		const ByteSpan fragments[2] = {header, tail};
-		if (m_inbound.WriteScattered(fragments))
+		// Counted until the managed dispatcher consumes it (DuetRT_ConsumeEvent), from before the write
+		// so that the dispatcher cannot consume it first
+		Activity::EventPosted();
+		if (!m_inbound.WriteScattered(fragments))
 		{
-			// Counted until the managed dispatcher consumes it (DuetRT_ConsumeEvent)
-			Activity::EventPosted();
+			Activity::EventConsumed();
 		}
 
 		// Wake a parked consumer. Skipped entirely while the dispatcher is keeping up, so the real-time

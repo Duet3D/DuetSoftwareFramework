@@ -32,6 +32,10 @@ target_link_libraries(socket_transport_tests PRIVATE duet_realtime_core)
 duet_realtime_core_add_test(local_clock_tests LocalClockTests.cpp)
 target_link_libraries(local_clock_tests PRIVATE duet_motion)
 
+# The inbound events the activity count holds from LinkService posting them until they are consumed
+duet_realtime_core_add_test(activity_event_tests ActivityEventTests.cpp)
+target_link_libraries(activity_event_tests PRIVATE duet_realtime_core)
+
 duet_realtime_core_add_test(step_timer_tests StepTimerTests.cpp)
 target_link_libraries(step_timer_tests PRIVATE duet_motion)
 
