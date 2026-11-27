@@ -94,6 +94,8 @@ export function output(state) {
 // The steps run so far, with the box that sends more
 function mountSteps(column) {
   const open = new Set();
+  // Why a step's button was refused, by step number, until the step is next run from it
+  const refusals = new Map();
   let filter = 'all';
   const table = h('div', { class: 'card scroll-x' });
   const filters = h('div', { class: 'chips', role: 'group', 'aria-label': 'Which steps' });
@@ -105,6 +107,15 @@ function mountSteps(column) {
 
   const renderFilters = () => replace(filters, [['all', 'All'], ['different', 'With differences'], ['codes', 'Codes only']].map(([value, label]) =>
     h('button', { class: 'chip', type: 'button', 'aria-pressed': filter === value, onclick: () => { filter = value; render(); } }, label)));
+
+  const runFrom = (number, body) => {
+    refusals.delete(number);
+    render();
+    run(body).catch(e => {
+      refusals.set(number, e.message);
+      render();
+    });
+  };
 
   const render = () => {
     renderFilters();
@@ -124,7 +135,7 @@ function mountSteps(column) {
         if (open.has(step.number)) open.delete(step.number);
         else open.add(step.number);
         render();
-      })),
+      }, body => runFrom(step.number, body), refusals.get(step.number))),
       state.steps.length === 0 ? h('div', { class: 'empty-state' }, 'No steps yet: send a code below, or drive an input from a board\'s panel') : null));
   };
 
@@ -142,7 +153,7 @@ function kindOf(action) {
   return ['', 'Note'];
 }
 
-function stepRow(step, names, isOpen, pending, toggle) {
+function stepRow(step, names, isOpen, pending, toggle, runAgain, refusal) {
   const [kindClass, kindLabel] = kindOf(step.action);
   const replyDiffers = step.differences.some(d => d.startsWith('reply:'));
   const finished = names.map(s => step.stacks[s]?.finished).filter(t => t != null);
@@ -166,9 +177,10 @@ function stepRow(step, names, isOpen, pending, toggle) {
       names.length === 1 ? recorded(stepEvents(names[0], step.number)) : null,
       h('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px' },
         h('a', { class: 'button small', href: `#/step/${step.number}` }, 'Compare frame by frame', icon('next')),
-        awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => run({ await: step.action.start }) }, 'Await it') : null,
-        h('button', { class: 'button small', type: 'button', onclick: () => run(step.action) }, 'Run again'),
-        h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML'))) : null);
+        awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => runAgain({ await: step.action.start }) }, 'Await it') : null,
+        h('button', { class: 'button small', type: 'button', onclick: () => runAgain(step.action) }, 'Run again'),
+        h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML')),
+      refusal ? h('div', { class: 'error', role: 'alert' }, refusal) : null) : null);
 }
 
 // What one stack recorded in a step, for a session on one stack, where there are no differences to show

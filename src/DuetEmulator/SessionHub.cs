@@ -47,6 +47,7 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
     private readonly Dictionary<string, IReadOnlyList<BoardState>> _boards = [];
     private readonly Dictionary<string, string> _models = [];
     private Session? _session;
+    private int _sessionId;
     private SessionPhase _phase = SessionPhase.None;
     private string? _detail;
     private int _running;
@@ -75,6 +76,8 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
             ["phase"] = ApiJson.Node(_phase),
             ["detail"] = _detail,
             ["session"] = session is null ? null : ApiJson.Scenario(session.Scenario),
+            // Tells sessions apart, which their names and directories need not
+            ["id"] = session is null ? null : _sessionId,
             ["ignoredPaths"] = new JsonArray([.. Recorder.DefaultIgnoredPaths.Concat(new ComparisonOptions().IgnoredPaths).Select(p => (JsonNode)p)]),
             ["periodicCanTypes"] = new JsonArray([.. ComparisonOptions.PeriodicCanTypes.Select(t => (JsonNode)t)]),
             ["directory"] = session?.Directory,
@@ -116,6 +119,7 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
             lock (_feed)
             {
                 _session = session;
+                _sessionId++;
                 _phase = SessionPhase.Ready;
                 _detail = null;
                 PublishLocked(Hello());

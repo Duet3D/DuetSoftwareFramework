@@ -2,24 +2,36 @@
 
 import { api } from '../api.js';
 import { splitSteps } from '../capture.js';
-import { h, icon, replace, stored } from '../dom.js';
+import { h, icon, latestRequest, replace, stored } from '../dom.js';
 import { optionsQuery } from './step.js';
 
 const cache = new Map();
 
-/** A saved run with its captures, lined up as the options say; kept while the page is open */
+/** A saved run with its captures, lined up as the options say; kept until forgetRuns */
 export async function loadRun(id, query) {
   const key = `${id}?${query}`;
   if (!cache.has(key)) cache.set(key, api.get(`/runs/${id}?${query}`).catch(e => { cache.delete(key); throw e; }));
   return cache.get(key);
 }
 
+/** Read the runs afresh when next opened: a later session saved under the same name replaces a run's files */
+export function forgetRuns() {
+  cache.clear();
+}
+
 export function mountRun(page, id) {
   replace(page, h('div', { class: 'empty-state' }, h('span', { class: 'spinner', style: 'display: inline-block' }), ' Reading the run'));
   const options = { ignoreFields: true, tolerance: '', ...stored('compareOptions', {}) };
-  loadRun(id, optionsQuery(options)).then(run => render(page, id, run)).catch(e =>
-    replace(page, h('div', { class: 'compare' }, h('a', { class: 'button link', href: '#/' }, icon('back'), 'Start'), h('div', { class: 'notice err', role: 'alert' }, e.message))));
-  return { unmount: () => {} };
+  const requests = latestRequest();
+  const request = requests.start();
+  loadRun(id, optionsQuery(options)).then(run => {
+    if (requests.isCurrent(request)) render(page, id, run);
+  }).catch(e => {
+    if (requests.isCurrent(request)) {
+      replace(page, h('div', { class: 'compare' }, h('a', { class: 'button link', href: '#/' }, icon('back'), 'Start'), h('div', { class: 'notice err', role: 'alert' }, e.message)));
+    }
+  });
+  return { unmount: () => requests.cancel() };
 }
 
 function render(page, id, run) {

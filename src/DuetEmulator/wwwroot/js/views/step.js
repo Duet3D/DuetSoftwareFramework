@@ -2,7 +2,7 @@
 
 import { api } from '../api.js';
 import { PERIODIC_CAN_TYPES, countEvents, describe, destination, json, splitSteps } from '../capture.js';
-import { debounce, h, icon, replace, stored, store } from '../dom.js';
+import { debounce, h, icon, latestRequest, replace, stored, store } from '../dom.js';
 import { on, stacks, state } from '../store.js';
 import { loadRun } from './run.js';
 
@@ -33,13 +33,18 @@ export function mountStep(page, { source, number, id }) {
   let data = null;
   let error = null;
   let offs = [];
+  // A reply that a newer request or leaving the view has superseded is not drawn
+  const requests = latestRequest();
 
   const load = async () => {
+    const request = requests.start();
+    let next = null;
+    let failure = null;
     try {
       if (source === 'run') {
         const run = await loadRun(id, optionsQuery(options));
         const names = Object.keys(run.captures);
-        data = {
+        next = {
           names,
           captures: Object.fromEntries(names.map(s => [s, run.captures[s].events])),
           alignment: run.alignment ?? null,
@@ -49,7 +54,7 @@ export function mountStep(page, { source, number, id }) {
         };
       } else {
         const names = stacks();
-        data = {
+        next = {
           names,
           captures: state.captures,
           alignment: names.length === 2 ? await api.get(`/alignment?${optionsQuery(options)}`) : null,
@@ -58,10 +63,12 @@ export function mountStep(page, { source, number, id }) {
           href: n => `#/step/${n}`
         };
       }
-      error = null;
     } catch (e) {
-      error = e.message;
+      failure = e.message;
     }
+    if (!requests.isCurrent(request)) return;
+    data = next ?? data;
+    error = failure;
     render();
   };
 
@@ -72,13 +79,19 @@ export function mountStep(page, { source, number, id }) {
     replace(page, compare(data, number, options, open, render, () => { store('compareOptions', options); load(); }));
   };
 
+  const reload = debounce(load, 200);
   if (source === 'session') {
-    const reload = debounce(load, 200);
     offs = [on('steps', reload), on('capture', reload)];
   }
   render();
   load();
-  return { unmount: () => offs.forEach(off => off()) };
+  return {
+    unmount: () => {
+      offs.forEach(off => off());
+      reload.cancel();
+      requests.cancel();
+    }
+  };
 }
 
 // The comparison of capture step <number> + 1: the session numbers its steps from 1, after the start

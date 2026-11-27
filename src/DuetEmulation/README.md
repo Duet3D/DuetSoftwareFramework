@@ -142,7 +142,7 @@ Only this machine's pages and scripts may use it, so that a page on another site
 
 | Request | |
 | --- | --- |
-| `GET /api/session` | What the server is doing (`none`, `booting`, `ready`, `running`, `failed`) and its session |
+| `GET /api/session` | What the server is doing (`none`, `booting`, `ready`, `running`, `failed`) and its session, with an `id` that a later session, even one of the same name, does not share |
 | `POST /api/session` | Start a session from a scenario, which may be empty, ending the one there is; its steps run once booted |
 | `DELETE /api/session` | End it, saving the captures |
 | `POST /api/session/restart?replay=true` | Boot its boards afresh with the same `config.g` and files; with `replay`, run its steps again |

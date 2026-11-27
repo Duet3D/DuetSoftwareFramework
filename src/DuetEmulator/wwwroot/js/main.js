@@ -6,7 +6,7 @@ import { mountTopbar } from './views/topbar.js';
 import { mountStart } from './views/start.js';
 import { mountWorkspace } from './views/workspace.js';
 import { mountStep } from './views/step.js';
-import { mountRun } from './views/run.js';
+import { forgetRuns, mountRun } from './views/run.js';
 
 const app = document.getElementById('app');
 const topbar = h('header', { class: 'topbar' });
@@ -36,12 +36,14 @@ function route() {
 function show() {
   const target = route();
   // The workspace stays mounted while its drawer or dialog changes, so that what is typed in it stays
-  const key = target.view === 'workspace' ? `workspace:${state.status.directory}` : JSON.stringify(target);
+  const key = target.view === 'workspace' ? `workspace:${state.status.id}` : JSON.stringify(target);
   if (key === current.key && current.update) {
     current.update(target);
     return;
   }
   current.unmount?.();
+  // A run is kept while it and its steps are looked at, and read again once left
+  if (target.view !== 'run' && target.view !== 'run-step') forgetRuns();
   page.replaceChildren();
   page.dataset.view = target.view;
   const mounted = {

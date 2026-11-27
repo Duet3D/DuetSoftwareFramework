@@ -7,6 +7,23 @@ import { stepCommand, stepYaml } from './cli.js';
 import { output } from './workspace.js';
 
 export function mountBoard(host, address) {
+  let drawer = mountDrawer(host, address);
+  // The boards are read after the session arrives, so a drawer opened from the address may come before its board
+  const off = on('boards', () => {
+    if (drawer.missing && state.boards.some(b => b.address === address)) {
+      drawer.unmount();
+      drawer = mountDrawer(host, address);
+    }
+  });
+  return {
+    unmount: () => {
+      off();
+      drawer.unmount();
+    }
+  };
+}
+
+function mountDrawer(host, address) {
   const board = state.boards.find(b => b.address === address);
   const close = () => { location.hash = '#/'; };
   const scrim = h('div', { class: 'scrim', onclick: close });
@@ -18,7 +35,7 @@ export function mountBoard(host, address) {
   if (!board) {
     replace(drawer, h('div', { class: 'drawer-head' }, h('div', {}, h('h2', { id: 'drawer-title' }, `No board at ${address}`),
       h('button', { class: 'button icon-only', type: 'button', 'aria-label': 'Close', onclick: close, style: 'margin-left: auto' }, icon('close')))));
-    return { unmount: () => { scrim.remove(); drawer.remove(); document.removeEventListener('keydown', onKey); } };
+    return { missing: true, unmount: () => { scrim.remove(); drawer.remove(); document.removeEventListener('keydown', onKey); } };
   }
 
   // The parts that change as the boards do, refreshed without rebuilding the controls

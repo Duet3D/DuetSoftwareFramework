@@ -10,14 +10,14 @@ export function mountTopbar(bar) {
   let notice = null;
   let busy = false;
 
+  // Runs a request, showing the label meanwhile, then what the request returns or why it failed
   const act = async (label, request) => {
     confirming = null;
     busy = true;
     notice = label;
     render();
     try {
-      await request();
-      notice = null;
+      notice = (await request()) ?? null;
     } catch (e) {
       notice = e.message;
     } finally {
@@ -28,8 +28,15 @@ export function mountTopbar(bar) {
 
   const save = () => act('Saving', async () => {
     const saved = await api.post('/save');
-    notice = `Saved in ${Object.values(saved)[0].replace(/\/[^/]+\/[^/]+$/, '')}`;
-  }).then(() => setTimeout(() => { notice = null; render(); }, 2500));
+    const text = `Saved in ${Object.values(saved)[0].replace(/\/[^/]+\/[^/]+$/, '')}`;
+    setTimeout(() => {
+      if (notice === text) {
+        notice = null;
+        render();
+      }
+    }, 2500);
+    return text;
+  });
 
   const end = () => act('Ending the session', async () => {
     await api.delete('/session');

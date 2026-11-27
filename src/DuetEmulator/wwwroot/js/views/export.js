@@ -1,7 +1,7 @@
 // Saving the session as a scenario: the steps to keep, codes to move to config.g, and where it goes
 
 import { api, ApiError } from '../api.js';
-import { debounce, h, icon, replace } from '../dom.js';
+import { debounce, h, icon, latestRequest, replace } from '../dom.js';
 import { state } from '../store.js';
 import { cliPrefix, quote } from './cli.js';
 
@@ -25,7 +25,6 @@ export function mountExport(host) {
     path: `src/DuetEmulation/Scenarios/${fileName(session.name)}`,
     pathEdited: false
   };
-  let yaml = '';
   let message = null;
   let exists = false;
 
@@ -45,15 +44,21 @@ export function mountExport(host) {
     toConfig: [...form.toConfig]
   });
 
+  // The scenario as the form now says, asked for each time so that what is saved matches it
+  const exported = async () => (await api.post('/scenario', request())).yaml;
+
   const preview = h('pre', {}, '');
   const command = h('code', {});
+  const previews = latestRequest();
   const refresh = debounce(async () => {
+    const token = previews.start();
+    let text;
     try {
-      yaml = (await api.post('/scenario', request())).yaml;
-      preview.textContent = yaml;
+      text = await exported();
     } catch (e) {
-      preview.textContent = e.message;
+      text = e.message;
     }
+    if (previews.isCurrent(token)) preview.textContent = text;
   }, 150);
 
   const updateCommand = () => {
@@ -77,6 +82,14 @@ export function mountExport(host) {
   const save = async (overwrite = false) => {
     message = null;
     if (form.destination === 'download') {
+      let yaml;
+      try {
+        yaml = await exported();
+      } catch (e) {
+        message = { ok: false, text: e.message };
+        render();
+        return;
+      }
       const link = h('a', { href: URL.createObjectURL(new Blob([yaml], { type: 'application/yaml' })), download: fileName(form.name) });
       link.click();
       URL.revokeObjectURL(link.href);
@@ -170,9 +183,16 @@ export function mountExport(host) {
           h('div', { class: 'bar-head' },
             h('span', { class: 'mono', style: 'color: #fff' }, form.destination === 'repository' ? form.path.split('/').pop() : fileName(form.name)),
             h('span', {}, 'as it will be saved'),
-            h('button', { class: 'button small', type: 'button', style: 'margin-left: auto', onclick: e => navigator.clipboard.writeText(yaml).then(() => {
-              e.target.textContent = 'Copied';
-            }) }, 'Copy')),
+            h('button', { class: 'button small', type: 'button', style: 'margin-left: auto', onclick: async e => {
+              const button = e.currentTarget;
+              try {
+                await navigator.clipboard.writeText(await exported());
+                button.textContent = 'Copied';
+              } catch (error) {
+                message = { ok: false, text: error.message };
+                render();
+              }
+            } }, 'Copy')),
           preview)),
       h('div', { class: 'dialog-foot' },
         command,
@@ -189,6 +209,8 @@ export function mountExport(host) {
 
   return {
     unmount() {
+      refresh.cancel();
+      previews.cancel();
       document.removeEventListener('keydown', onKey);
       scrim.remove();
       wrap.remove();

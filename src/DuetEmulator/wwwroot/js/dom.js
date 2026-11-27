@@ -58,9 +58,25 @@ export function icon(name) {
 /** Call a function after it has stopped being asked for for a while */
 export function debounce(fn, ms) {
   let timer = null;
-  return (...args) => {
+  const debounced = (...args) => {
     clearTimeout(timer);
     timer = setTimeout(() => fn(...args), ms);
+  };
+  /** Forget a call still waiting, as a view that has gone must */
+  debounced.cancel = () => clearTimeout(timer);
+  return debounced;
+}
+
+/**
+ * Tells the newest of overlapping requests from those it superseded: start() before a request, then use
+ * its reply only while isCurrent() says so. cancel() supersedes them all, for a view that has gone
+ */
+export function latestRequest() {
+  let current = 0;
+  return {
+    start: () => ++current,
+    isCurrent: token => token === current,
+    cancel: () => { current++; }
   };
 }
 

@@ -87,7 +87,7 @@ export function differenceCount() {
 }
 
 function sessionKey(status) {
-  return status.session ? `${status.directory}` : null;
+  return status.session ? status.id : null;
 }
 
 async function loadBoards() {
@@ -97,9 +97,8 @@ async function loadBoards() {
     return;
   }
   try {
-    const answer = await api.get('/boards');
-    state.boards = answer.boards;
-    state.boardStates = answer.states;
+    // What the boards have done comes with the hello and each boards event, which may be newer than this reply
+    state.boards = (await api.get('/boards')).boards;
     emit('boards');
   } catch {
     // The session ended meanwhile; the next hello says so
