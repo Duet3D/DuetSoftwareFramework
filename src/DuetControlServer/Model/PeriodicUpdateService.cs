@@ -157,8 +157,8 @@ public partial class PeriodicUpdateService(
                 {
                     // The readings are taken on every tick; the walk over the interfaces and the
                     // volumes is taken on its own slower one, because it spawns a subprocess per
-                    // interface and asks every mount for its size. sinceWalk is not running until
-                    // the first walk, so the first tick takes both
+                    // interface and asks every mount for its size. lastWalk is null until the first
+                    // walk, so the first tick takes both
                     bool walkDue = lastWalk is not long walked || timeProvider.GetElapsedTime(walked).TotalMilliseconds >= settings.Value.HostUpdateInterval;
                     if (walkDue)
                     {
