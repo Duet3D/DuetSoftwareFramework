@@ -8,10 +8,10 @@ using NUnit.Framework;
 namespace EmulationTests.Scenarios;
 
 /// <summary>
-/// Each bench is deterministic: the same boards given the same codes send the same CAN frames at the
-/// same emulated times, give the same replies and end in the same state, every time. Tests and captures
-/// rely on that to mean the same thing on every run, so check it with an expansion board and a move,
-/// which is where it could go wrong
+/// Each bench is deterministic: the same boards given the same codes send the same CAN frames and drive
+/// their pins the same way at the same emulated times, give the same replies and end in the same state,
+/// every time. Tests and captures rely on that to mean the same thing on every run, so check it with an
+/// expansion board and a move, which is where it could go wrong
 /// </summary>
 [TestFixture(Stack.Rrf, Category = nameof(Stack.Rrf))]
 [TestFixture(Stack.Dsf, Category = nameof(Stack.Dsf))]
@@ -21,7 +21,7 @@ public class DeterminismTests(Stack stack)
     [Test]
     public async Task TwoRunsAreIdentical()
     {
-        List<(string Can, string Replies, string Move)> runs = [];
+        List<(string Can, string Pins, string Replies, string Move)> runs = [];
         for (int run = 0; run < 2; run++)
         {
             string directory = Path.Combine(Runs.Directory(this), $"run{run}");
@@ -32,11 +32,12 @@ public class DeterminismTests(Stack stack)
             {
                 replies.Add((await bench.SendCodeAsync(code)).ToString());
             }
-            runs.Add((await File.ReadAllTextAsync(bench.Can.Path), string.Join('\n', replies),
+            runs.Add((await File.ReadAllTextAsync(bench.Can.Path), await File.ReadAllTextAsync(bench.System.Io.Path), string.Join('\n', replies),
                       (await bench.GetObjectModelAsync("move.axes"))!.ToJsonString()));
         }
 
         Assert.That(runs[1].Can, Is.EqualTo(runs[0].Can));
+        Assert.That(runs[1].Pins, Is.EqualTo(runs[0].Pins));
         Assert.That(runs[1].Replies, Is.EqualTo(runs[0].Replies));
         Assert.That(runs[1].Move, Is.EqualTo(runs[0].Move));
     }
