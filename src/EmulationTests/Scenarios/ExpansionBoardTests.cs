@@ -60,6 +60,16 @@ public class ExpansionBoardTests(Stack stack)
     }
 
     [Test]
+    public async Task TheWholeObjectModelCanBeRead()
+    {
+        JsonObject model = (await _bench.GetObjectModelAsync())!.AsObject();
+
+        Assert.That(model.Select(k => k.Key), Is.SupersetOf(new[] { "boards", "fans", "heat", "move", "sensors", "state", "tools" }));
+        Assert.That(model["boards"]![1]!["shortName"]!.GetValue<string>(), Is.EqualTo("EXP3HC"));
+        Assert.That(model["move"]!["axes"]!.AsArray().Select(a => a!["letter"]!.GetValue<string>()), Does.Contain("X"));
+    }
+
+    [Test]
     public void TheBoardAnnouncedItselfAndWasAcknowledged()
     {
         IReadOnlyList<CanFrame> frames = _bench.Can.All;

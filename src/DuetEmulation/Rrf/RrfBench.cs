@@ -101,11 +101,30 @@ public sealed class RrfBench : Bench
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// RepRapFirmware's output buffers cannot hold the whole model in one reply, so the whole model is read
+    /// a top-level key at a time
+    /// </remarks>
     public override async Task<JsonNode?> GetObjectModelAsync(string key = "", CancellationToken cancellationToken = default)
     {
-        // d99: every level; v: verbose (every field); n: include nulls
-        return await QueryAsync(key, "d99vn", cancellationToken);
+        if (key.Length != 0)
+        {
+            return await QueryAsync(key, FullFlags, cancellationToken);
+        }
+        JsonObject model = [];
+        foreach (string topLevelKey in await TopLevelKeysAsync(cancellationToken))
+        {
+            model[topLevelKey] = await QueryAsync(topLevelKey, FullFlags, cancellationToken);
+        }
+        return model;
     }
+
+    // d99: every level; v: verbose (every field); n: include nulls
+    private const string FullFlags = "d99vn";
+
+    // The object model's top-level keys
+    private async Task<List<string>> TopLevelKeysAsync(CancellationToken cancellationToken) =>
+        [.. ((await QueryAsync("", "", cancellationToken))?.AsObject() ?? []).Select(k => k.Key)];
 
     // M409 with a key and flags
     private async Task<JsonNode?> QueryAsync(string key, string flags, CancellationToken cancellationToken)
@@ -117,14 +136,21 @@ public sealed class RrfBench : Bench
         {
             throw new InvalidOperationException($"{command} returned \"{reply}\"");
         }
+        JsonNode? answer;
         try
         {
-            return ObjectModelKey.Select(JsonNode.Parse(reply[start..]), "result");
+            answer = JsonNode.Parse(reply[start..]);
         }
         catch (JsonException e)
         {
             throw new InvalidOperationException($"{command} returned invalid JSON: {reply}", e);
         }
+        if (answer?["err"] is JsonNode err)
+        {
+            // The key's value does not fit in the output buffers
+            throw new InvalidOperationException($"{command} returned error {err.ToJsonString()}: RepRapFirmware cannot report that much of the object model at once");
+        }
+        return ObjectModelKey.Select(answer, "result");
     }
 
     /// <summary>
@@ -136,8 +162,7 @@ public sealed class RrfBench : Bench
     {
         if (_snapshot.Count == 0)
         {
-            JsonObject keys = (await QueryAsync("", "", cancellationToken))?.AsObject() ?? [];
-            foreach (string key in keys.Select(k => k.Key))
+            foreach (string key in await TopLevelKeysAsync(cancellationToken))
             {
                 _snapshot[key] = null;
             }
@@ -150,7 +175,7 @@ public sealed class RrfBench : Bench
             bool stale = _snapshot[key] is null || (seq is long now && (!_seqs.TryGetValue(key, out long then) || now != then));
             if (stale)
             {
-                _snapshot[key] = await QueryAsync(key, "d99vn", cancellationToken);
+                _snapshot[key] = await QueryAsync(key, FullFlags, cancellationToken);
                 if (seq is long read)
                 {
                     _seqs[key] = read;
