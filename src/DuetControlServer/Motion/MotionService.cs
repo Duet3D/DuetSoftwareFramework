@@ -193,10 +193,11 @@ internal sealed class MotionService(
         {
             await PublishMotionOnceAsync(stoppingToken);
 
-            // A move ending while others follow it is not the end of the motion, which is reported at once
+            // A move ending while others follow it is not the end of the motion, which is reported at once.
+            // due also completes when stopping, as waitCts follows stoppingToken
             using CancellationTokenSource waitCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             Task due = Task.Delay(LivePositionInterval, timeProvider, waitCts.Token);
-            while (await Task.WhenAny(tracker.MoveEnded.WaitAsync(waitCts.Token), due) != due && planner.IsMoving)
+            while (!due.IsCompleted && await Task.WhenAny(tracker.MoveEnded.WaitAsync(waitCts.Token), due) != due && planner.IsMoving)
             {
             }
             // Withdraws the wait that lost, so that it does not take the next move's end
