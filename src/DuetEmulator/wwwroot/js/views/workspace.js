@@ -131,7 +131,7 @@ function mountSteps(column) {
       h('span', { class: 'step-number' }, '0'),
       h('div', { class: 'step-what' }, h('div', {}, h('span', { class: 'kind' }, 'Start'), h('span', { class: 'text' }, 'boot'))),
       names.map(s => h('span', { class: 'reply none' }, '—')),
-      h('div', { class: 'step-counts' }, counts(names, s => captureSteps(s)[0]?.events ?? []))));
+      h('div', { class: 'step-counts' }, counts(names, s => captureSteps(s)[0]?.events ?? []), compareLink(0))));
     replace(table, h('div', { class: 'steps-table', style: `--stacks: ${Math.max(1, names.length)}` },
       h('div', { class: 'steps-head' }, h('span', {}, '#'), h('span', {}, 'Step'),
         names.map(s => h('span', { class: `stack stack-${s}` }, h('span', { class: 'dot' }), `${s} reply`)), h('span', { style: 'text-align: right' }, 'Recorded')),
@@ -200,7 +200,8 @@ function stepRow(step, names, isOpen, pending, toggle, runAgain, refusal) {
         h('span', { class: 'when' }, [...finished.map(t => seconds(t)), ...(step.kind === 'beforeConfig' ? ['before config.g'] : [])].join(' · '))),
       names.map(s => replyCell(step, s, replyDiffers)),
       h('div', { class: 'step-counts' }, counts(names, s => stepEvents(s, step.number)),
-        step.differences.length > 0 ? h('span', { class: 'badge diff' }, `${step.differences.length} ≠`) : null)),
+        step.differences.length > 0 ? h('span', { class: 'badge diff' }, `${step.differences.length} ≠`) : null,
+        compareLink(step.number))),
     isOpen ? h('div', { class: 'step-detail' },
       step.differences.map(d => {
         const [aspect, ...rest] = d.split(': ');
@@ -209,12 +210,17 @@ function stepRow(step, names, isOpen, pending, toggle, runAgain, refusal) {
       names.length === 2 && step.differences.length === 0 && step.state === 'done' ? h('span', { class: 'muted', style: 'font-size: 13px' }, 'The stacks did the same') : null,
       names.length === 1 ? recorded(stepEvents(names[0], step.number)) : null,
       // config.g runs once, when it is let go, and is no step a scenario lists
-      h('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px' },
-        h('a', { class: 'button small', href: `#/step/${step.number}` }, 'Compare frame by frame', icon('next')),
-        step.action.config ? null : [awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => runAgain({ await: step.action.start }) }, 'Await it') : null,
+      step.action.config ? null : h('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px' },
+        awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => runAgain({ await: step.action.start }) }, 'Await it') : null,
         h('button', { class: 'button small', type: 'button', onclick: () => runAgain(step.action) }, 'Run again'),
-        h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML')]),
+        h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML')),
       refusal ? h('div', { class: 'error', role: 'alert' }, refusal) : null) : null);
+}
+
+// The step's CAN frames, pins and object model in full, a click away from its row
+function compareLink(number) {
+  return h('a', { class: 'compare-link', href: `#/step/${number}`, title: 'Compare frame by frame', onclick: e => e.stopPropagation(),
+                  onkeydown: e => e.stopPropagation() }, 'Compare', icon('next'));
 }
 
 // What one stack recorded in a step, for a session on one stack, where there are no differences to show
