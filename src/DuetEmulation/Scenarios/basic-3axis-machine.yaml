@@ -2,11 +2,12 @@
 name: basic-3axis-machine
 boards:
   1: EXP3HC
+  123: EXP1HCL
+  121: TOOL1RR
 config: |
   ; General
   G90 ; absolute coordinates
   M83 ; relative extruder moves
-  M550 P"Duet 3" ; set hostname
 
   ; Smart Drivers
   M569 P1.0 S1 D2 ; driver 1.0 goes forwards (X axis)
