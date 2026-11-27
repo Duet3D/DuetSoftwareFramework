@@ -362,28 +362,38 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         // Forget the edge triggers that have not fired
         public void ClearEdgeTriggers() => edgeTriggers.Clear();
 
-        // Drive `pin` as a square wave at `frequency` Hz, starting high; 0 stops it and releases the pin
+        // Drive `pin` as a square wave at `frequency` Hz, starting high; 0 stops it and releases the pin. A
+        // wave already running keeps its level and changes only its rate, so a new speed adds no edge.
         public void Pulses(int pin, double frequency)
         {
-            StopPulses(pin);
             if(frequency <= 0)
             {
+                StopPulses(pin);
                 Release(pin);
                 DuetIoTrace.RecordInput(machine, PinName(pin), "released");
                 return;
             }
             var halfPeriod = (ulong)Math.Max(1, Math.Round(500000.0 / frequency));
-            var level = true;
-            var timer = new LimitTimer(machine.ClockSource, 1000000, this, $"pulses{pin}", halfPeriod, Direction.Ascending, false, WorkMode.Periodic, true, true);
-            timer.LimitReached += () =>
+            if(!pulseWaves.TryGetValue(pin, out var wave))
             {
-                level = !level;
-                Drive(pin, level);
-            };
-            pulseTimers[pin] = timer;
-            Drive(pin, true);
+                wave = new PulseWave();
+                wave.Timer = new LimitTimer(machine.ClockSource, 1000000, this, $"pulses{pin}", halfPeriod, Direction.Ascending, false, WorkMode.Periodic, true, true);
+                wave.Timer.LimitReached += () =>
+                {
+                    wave.Level = !wave.Level;
+                    Drive(pin, wave.Level);
+                };
+                pulseWaves[pin] = wave;
+            }
+            wave.Timer.Limit = halfPeriod;
+            if(!wave.Timer.Enabled)
+            {
+                wave.Timer.Value = 0;
+                wave.Level = true;
+                Drive(pin, true);
+            }
             DuetIoTrace.RecordInput(machine, PinName(pin), string.Format(System.Globalization.CultureInfo.InvariantCulture, "pulses {0:0.###}Hz", frequency));
-            timer.Enabled = true;
+            wave.Timer.Enabled = true;
         }
 
         public void Pulses(string pin, double frequency) => Pulses(PinNumber(pin), frequency);
@@ -419,12 +429,12 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
             Pulses(tacho.Pin, frequency);
         }
 
+        // Kept for the next wave on the pin, since the clock source keeps every timer made on it
         private void StopPulses(int pin)
         {
-            if(pulseTimers.TryGetValue(pin, out var timer))
+            if(pulseWaves.TryGetValue(pin, out var wave))
             {
-                timer.Enabled = false;
-                pulseTimers.Remove(pin);
+                wave.Timer.Enabled = false;
             }
         }
 
@@ -656,7 +666,13 @@ namespace Antmicro.Renode.Peripherals.GPIOPort
         private readonly Dictionary<int, PwmMap> pwmMaps = new Dictionary<int, PwmMap>();
         private readonly HashSet<IDuetPwmSource> subscribedSources = new HashSet<IDuetPwmSource>();
         private readonly List<EdgeTrigger> edgeTriggers = new List<EdgeTrigger>();
-        private readonly Dictionary<int, LimitTimer> pulseTimers = new Dictionary<int, LimitTimer>();
+        private readonly Dictionary<int, PulseWave> pulseWaves = new Dictionary<int, PulseWave>();
+
+        private class PulseWave
+        {
+            public LimitTimer Timer;
+            public bool Level;
+        }
         private readonly Dictionary<int, Tacho> tachoFollowers = new Dictionary<int, Tacho>();
 
         private sealed class EdgeTrigger
