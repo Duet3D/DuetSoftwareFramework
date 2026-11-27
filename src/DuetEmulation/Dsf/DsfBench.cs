@@ -26,9 +26,6 @@ public sealed class DsfBench : Bench
     /// <summary>The line config.g starts with: DuetControlServer drives CAN only once it is enabled</summary>
     public const string ConfigPreamble = "M953\n";
 
-    // The global variable config.g ends by creating, which says it has run to the end
-    private const string ConfigDoneVariable = "emulationConfigDone";
-
     // Real time between moves of DuetControlServer's clock while it shuts down, when the emulation no longer runs
     private static readonly TimeSpan ShutdownTick = TimeSpan.FromMilliseconds(10);
 
@@ -49,14 +46,14 @@ public sealed class DsfBench : Bench
 
     /// <summary>
     /// Create the boards, start the emulation and DuetControlServer with <paramref name="config"/> as
-    /// config.g after the line that enables CAN, and boot them
+    /// config.g after the line that enables CAN and the hold, and boot them to the hold
     /// </summary>
     /// <param name="expansionBoards">The expansion boards, by CAN address</param>
     /// <param name="config">The rest of config.g</param>
     /// <param name="workDirectory">Where the run's files go</param>
     /// <param name="files">Further files for the SD card, by path on the card</param>
     /// <param name="cancellationToken">Cancels starting</param>
-    public static async Task<DsfBench> StartAsync(IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
+    internal static async Task<DsfBench> CreateAsync(IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
                                                   IReadOnlyDictionary<string, string>? files = null, CancellationToken cancellationToken = default)
     {
         if (Interlocked.CompareExchange(ref s_running, 1, 0) != 0)
@@ -110,11 +107,8 @@ public sealed class DsfBench : Bench
         {
             await system.ExecuteAsync(system.Main, $"{bench._lockstep.SbcBridge} ListenForSbc {Emulator.MonitorSyntax.Quote(socketPath)}", cancellationToken);
 
-            Dictionary<string, string> sdCard = new() { ["sys/config.g"] = $"{ConfigPreamble}{config}\nglobal {ConfigDoneVariable} = 1\n" };
-            foreach ((string path, string contents) in files ?? new Dictionary<string, string>())
-            {
-                sdCard[path] = contents;
-            }
+            Dictionary<string, string> sdCard = SdCardFiles(files);
+            sdCard["sys/config.g"] = ConfigFile(ConfigPreamble, config);
 
             // Starting DuetControlServer connects to the controller, which takes emulated time, so the
             // lockstep runs while it starts. It starts on the thread pool, where the lockstep sees it
@@ -137,11 +131,12 @@ public sealed class DsfBench : Bench
     }
 
     /// <inheritdoc/>
-    protected override async Task StartStackAsync(TimeSpan timeout, CancellationToken cancellationToken)
-    {
-        await WaitUntilAsync(async () => await ReadModelAsync(m => m.Global.ContainsKey(ConfigDoneVariable), cancellationToken),
-                             timeout, "DuetControlServer to connect and run config.g", cancellationToken);
-    }
+    /// <remarks>DuetControlServer has started, and a code sent before it has connected waits until it has</remarks>
+    protected override Task StartStackAsync(TimeSpan timeout, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <inheritdoc/>
+    protected override Task<bool> IsStartingAsync(CancellationToken cancellationToken) =>
+        ReadModelAsync(m => m.State.Status == DuetAPI.ObjectModel.MachineStatus.Starting, cancellationToken);
 
     /// <inheritdoc/>
     public override Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default) =>

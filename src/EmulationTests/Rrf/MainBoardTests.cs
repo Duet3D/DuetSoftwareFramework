@@ -23,7 +23,7 @@ public class MainBoardTests
 
     [OneTimeSetUp]
     public async Task StartAsync() =>
-        _bench = await RrfBench.StartAsync(new Dictionary<int, BoardType>(), string.Empty, Runs.Directory(this));
+        _bench = (RrfBench)await Bench.StartAsync(Stack.Rrf, new Dictionary<int, BoardType>(), string.Empty, Runs.Directory(this));
 
     [OneTimeTearDown]
     public async Task StopAsync() => await _bench.DisposeAsync();

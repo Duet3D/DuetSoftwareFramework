@@ -1,7 +1,7 @@
 // Captures as the page reads them: events split into steps, and each event described in a line
 
 /** The kinds of event that start a step: the same as CaptureComparison.StepAction on the server */
-export const STEP_KINDS = new Set(['code', 'await', 'wait', 'input', 'note']);
+export const STEP_KINDS = new Set(['code', 'await', 'wait', 'config', 'input', 'note']);
 
 /** What an event does to start a step, or null if it does not start one */
 export function stepAction(event) {
@@ -9,6 +9,7 @@ export function stepAction(event) {
     case 'code': return event.code;
     case 'await': return `await ${event.code}`;
     case 'wait': return `wait ${event.duration}`;
+    case 'config': return 'config.g';
     case 'input': return `input ${event.board}.${event.port} ${event.value}`;
     case 'note': return `# ${event.text}`;
     default: return null;
@@ -74,6 +75,7 @@ export function describe(event) {
     case 'reply': return `< ${event.severity === 'success' ? '' : `${event.severity}: `}${event.text === '' ? '(empty)' : event.text}`;
     case 'await': return `await ${event.code}`;
     case 'wait': return `wait ${event.duration}`;
+    case 'config': return 'run config.g';
     case 'can': return `CAN ${event.source}->${destination(event.destination)} ${event.type}${event.response ? ' (response)' : ''} ${event.message ? JSON.stringify(event.message) : event.data}`;
     case 'om': return `OM ${event.path}: ${json(event.old ?? null)} -> ${json(event.new ?? null)}`;
     case 'om-snapshot': return `OM snapshot of ${Object.keys(event.model ?? {}).length} keys`;

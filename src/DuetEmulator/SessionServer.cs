@@ -114,10 +114,18 @@ public sealed class SessionServer : IAsyncDisposable
     private void MapApi(WebApplication app)
     {
         app.MapGet("/api/session", () => Json(_hub.Status()));
-        app.MapPost("/api/session", async (HttpRequest request, CancellationToken token) =>
-            Json(await _hub.StartAsync(Scenario.Parse(await BodyAsync(request), "session"), token)));
+        app.MapPost("/api/session", async (HttpRequest request, bool? hold, CancellationToken token) =>
+            Json(await _hub.StartAsync(Scenario.Parse(await BodyAsync(request), "session"), hold == true, token)));
         app.MapDelete("/api/session", async () => Json(await _hub.EndAsync()));
         app.MapPost("/api/session/restart", async (bool? replay, CancellationToken token) => Json(await _hub.RestartAsync(replay == true, token)));
+        app.MapPost("/api/config", async (CancellationToken token) =>
+        {
+            Session session = _hub.Session;
+            return Json(new JsonObject
+            {
+                ["steps"] = new JsonArray([.. (await _hub.RunConfigAsync(token)).Select(s => ApiJson.SessionStep(s, session))])
+            });
+        });
         app.MapGet("/api/events", FollowAsync);
 
         app.MapGet("/api/steps", () => Json(new JsonObject { ["steps"] = new JsonArray([.. _hub.Session.Steps.Select(s => ApiJson.SessionStep(s))]) }));
@@ -255,8 +263,10 @@ public sealed class SessionServer : IAsyncDisposable
         {
             JsonObject read = ApiJson.Scenario(scenario);
             json["stepCount"] = scenario.Steps.Count;
+            json["beforeConfigCount"] = scenario.BeforeConfig.Count;
             if (!steps)
             {
+                read.Remove("beforeConfig");
                 read.Remove("steps");
                 read.Remove("config");
                 read.Remove("files");

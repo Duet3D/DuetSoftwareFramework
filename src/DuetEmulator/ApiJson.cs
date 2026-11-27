@@ -40,6 +40,8 @@ internal static class ApiJson
         ["boards"] = new JsonObject(scenario.Boards.OrderBy(b => b.Key).Select(b => KeyValuePair.Create(b.Key.ToString(), (JsonNode?)b.Value))),
         ["config"] = scenario.Config,
         ["files"] = new JsonObject(scenario.Files.Select(f => KeyValuePair.Create(f.Key, (JsonNode?)f.Value))),
+        ["captureBoot"] = scenario.CaptureBoot,
+        ["beforeConfig"] = new JsonArray([.. scenario.BeforeConfig.Select(Step)]),
         ["steps"] = new JsonArray([.. scenario.Steps.Select(Step)])
     };
 
@@ -69,9 +71,11 @@ internal static class ApiJson
         {
             ["number"] = step.Number,
             ["captureStep"] = step.CaptureStep,
-            ["step"] = step.Step.Describe(),
-            ["yaml"] = step.Step.ToYaml(),
-            ["action"] = Step(step.Step),
+            ["kind"] = Node(step.Kind),
+            ["step"] = step.Describe(),
+            ["yaml"] = step.Step?.ToYaml(),
+            // config.g has no step of a scenario, so its action is its own
+            ["action"] = step.Step is null ? new JsonObject { ["config"] = true } : Step(step.Step),
             ["state"] = Node(step.State),
             ["stacks"] = stacks,
             ["differences"] = new JsonArray([.. step.Differences.Select(d => (JsonNode)$"{d.Aspect}: {d.Description}")])

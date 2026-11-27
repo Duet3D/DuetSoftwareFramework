@@ -12,7 +12,8 @@ const DEFAULT_FORM = {
   config: 'M564 H0 S0\n',
   files: [],
   scenario: null,
-  runSteps: true
+  runSteps: true,
+  hold: false
 };
 
 export function mountStart(page) {
@@ -37,15 +38,17 @@ export function mountStart(page) {
       config: form.config
     };
     if (form.files.length > 0) body.files = Object.fromEntries(form.files.map(f => [f.path, f.contents]));
+    if (form.scenario?.beforeConfig?.length > 0) body.beforeConfig = form.scenario.beforeConfig;
     if (form.scenario && form.runSteps && form.scenario.steps.length > 0) body.steps = form.scenario.steps;
     return body;
   };
 
   const command = () => {
+    const hold = form.hold ? ' --hold' : '';
     if (form.scenario && form.runSteps && form.scenario.steps.length > 0) {
-      return `${cliPrefix()} start ${form.scenario.path}`;
+      return `${cliPrefix()} start ${form.scenario.path}${hold}`;
     }
-    const parts = [`${cliPrefix()} start`];
+    const parts = [`${cliPrefix()} start${hold}`];
     if (form.name.trim() && form.name.trim() !== 'session') parts.push(`--name ${quote(form.name.trim())}`);
     if (form.stacks.length === 1) parts.push(`--stack ${form.stacks[0]}`);
     for (const board of form.boards) parts.push(`--board ${board.address}=${board.type}`);
@@ -58,7 +61,7 @@ export function mountStart(page) {
     starting = true;
     render();
     try {
-      await api.post('/session', scenarioBody());
+      await api.post(form.hold ? '/session?hold=true' : '/session', scenarioBody());
       location.hash = '#/';
     } catch (e) {
       error = e.message;
@@ -78,7 +81,7 @@ export function mountStart(page) {
         boards: Object.entries(scenario.boards).map(([address, type]) => ({ address: Number(address), type })),
         config: scenario.config,
         files: Object.entries(scenario.files).map(([path, contents]) => ({ path, contents })),
-        scenario: { path: file.path, steps: scenario.steps, description: scenario.description }
+        scenario: { path: file.path, steps: scenario.steps, beforeConfig: scenario.beforeConfig ?? [], description: scenario.description }
       });
       remember();
       render();
@@ -173,6 +176,11 @@ export function mountStart(page) {
       form.scenario && form.scenario.steps.length > 0 ? h('label', { class: 'option', style: 'align-self: flex-start' },
         h('input', { type: 'checkbox', checked: form.runSteps, onchange: e => { form.runSteps = e.target.checked; updateCli(); } }),
         `Run its ${form.scenario.steps.length} steps once the boards are up`) : null,
+      form.scenario?.beforeConfig?.length > 0 ? h('span', { class: 'muted', style: 'font-size: 13px' },
+        `Its ${form.scenario.beforeConfig.length} step${form.scenario.beforeConfig.length === 1 ? '' : 's'} before config.g run${form.scenario.beforeConfig.length === 1 ? 's' : ''} first`) : null,
+      h('label', { class: 'option', style: 'align-self: flex-start' },
+        h('input', { type: 'checkbox', checked: form.hold, onchange: e => { form.hold = e.target.checked; remember(); updateCli(); } }),
+        'Stop before config.g, so that inputs such as thermistors can be set first'),
       h('div', { style: 'border-top: 1px solid var(--line-soft); padding-top: 18px; display: flex; flex-direction: column; gap: 12px' },
         h('div', { class: 'cli' }, h('span', { class: 'label' }, 'The same from a terminal'), h('code', { id: 'start-cli' }, command())),
         h('div', { style: 'display: flex; align-items: center; gap: 14px; flex-wrap: wrap' },

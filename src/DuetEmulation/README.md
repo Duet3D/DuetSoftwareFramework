@@ -16,14 +16,16 @@ Renode, its SVD files and the SD card tools are installed in the devcontainer (`
 
 ## Scenarios and captures
 
-A scenario is a YAML file: the boards, `config.g`, and the steps to run.
+A scenario is a YAML file: the boards, any steps to run before `config.g`, `config.g`, and the steps to run after it.
 
 ```yaml
 name: an endstop stops a homing move
 stacks: [rrf, dsf]            # the default
 boards:
   1: EXP3HC                   # board type by CAN address
-config: |                     # config.g, after the stack's own first line
+beforeConfig:                 # steps run once the boards are up, before config.g
+  - thermistor: { board: 1, port: temp0, celsius: 25 }
+config: |                     # config.g, after the stack's own first lines
   M584 X1.0
   M92 X80
   M574 X1 S1 P"1.io0.in"
@@ -53,6 +55,8 @@ steps:
 | `pulses: { board, port, frequency }` | Drive an input as a square wave; 0 stops it |
 | `tacho: { board, port, fan, maxRpm, pulsesPerRev, inverted }` | Pulse a tacho input as the fan on output `fan` turns: its duty times `maxRpm` (6000), `pulsesPerRev` (2) pulses a revolution |
 
+Every config.g starts by waiting, in `0:/emulation/hold.g`, until the bench lets it carry on. While it waits, the bench reads the unconfigured machine's object model and runs the `beforeConfig` steps; then it lets `config.g` run, as a step of its own. Any kind of step can come before `config.g`, but its purpose is to set what the boards' inputs read before `config.g` reads them, such as the thermistors of heaters it creates.
+
 Ports are named as the board's firmware names them (`io0.in`, `out3`, `out3.tach`, `temp0`); the bench reads them from the firmware's pin table. `Scenarios/Examples` has scenarios to start from (a move, endstop homing, a fan's tacho), which `ExampleScenarioTests` runs on both stacks.
 
 ```bash
@@ -68,7 +72,8 @@ A run's files go in `build/emulation/scenarios/<name>/<stack>`: the capture (`ca
 
 | `kind` | |
 | --- | --- |
-| `om-snapshot` | The whole object model when the capture started |
+| `om-snapshot` | The whole object model when the capture started, before `config.g` |
+| `config` | `config.g` carrying on from its hold: what follows until the next step is what `config.g` did |
 | `code`, `reply` | A code sent, and its reply and severity once it finished |
 | `await`, `wait` | The script waiting for a code it started, or letting emulated time pass |
 | `can` | A CAN frame: source, destination, type, response, raw `data`, and the `message` decoded with DSF's generated CAN types (a generic message by parameter letter), less any fields and array entries past the end of the frame |
@@ -80,7 +85,7 @@ A run's files go in `build/emulation/scenarios/<name>/<stack>`: the capture (`ca
 
 The object model leaves out what changes with time rather than with the machine (`state.time`, `state.upTime`, `state.msUpTime`), what describes the computer rather than the machine (`sbc`, `network`, `volumes`), and `inputs[].lineNumber`, which RepRapFirmware advances with the bench's own M409 queries. Standalone, the bench reads the object model the way Duet Web Control does: each key in full when its sequence number changes, and the live values every time. DSF's codes are sent on Aux2, the channel the standalone console is, so the two stacks' `inputs[]` describe the same channel.
 
-**Comparing** pairs the two captures' steps in order (a step starts at each code sent or awaited, wait, input or note, so each step of a scenario is one step of its capture; what comes before the first is `start`):
+**Comparing** pairs the two captures' steps in order (a step starts at each code sent or awaited, wait, input, note and at `config.g`, so each step of a scenario is one step of its capture; what comes before the first is `start`, the boot):
 
 - replies must match, step by step;
 - the object model is compared by state: at the end of each step, every path either stack changed in it must have the same value in both, numbers within 0.1%;
@@ -99,19 +104,19 @@ scripts/emulate.py serve &                       # the session server; its page 
 
 ### The page
 
-Open `http://127.0.0.1:8770/` (VS Code forwards the port out of the devcontainer). With no session it offers a form for one (the stacks, the expansion boards, `config.g` and files on the SD card), the scenario files under `Scenarios` to start from, and the saved runs under `build/emulation` to look at without booting anything.
+Open `http://127.0.0.1:8770/` (VS Code forwards the port out of the devcontainer). With no session it offers a form for one (the stacks, the expansion boards, `config.g` and files on the SD card), the scenario files under `Scenarios` to start from, and the saved runs under `build/emulation` to look at without booting anything. **Stop before config.g** leaves `config.g` waiting once the boards are up: the steps sent meanwhile, such as a thermistor's temperature from a board's drawer, run before it, until **Run config.g**.
 
 Once the boards are up, the workspace shows:
 
 - **Boards**: each board's drivers' step counts and the inputs and outputs in use, on each stack. A board's **Inputs and outputs** drawer drives its inputs (a level, a level once a driver has made so many more steps, a thermistor's temperature or an analogue fraction, a pulse train or a tacho that follows its fan) and shows every output. Each control shows the scenario step it sends.
-- **Steps**: every step run so far, from the page or from the CLI, with each stack's reply and how much it recorded, and how many differences it has. A step opens to its differences, to **Compare frame by frame**, to run it again or to copy it as YAML. The box under them sends a code, a code not waited for, an await, a wait, a note or any step as YAML; ↑ recalls earlier codes.
+- **Steps**: every step run so far, from the page or from the CLI, with each stack's reply and how much it recorded, and how many differences it has; the boot is step 0 and `config.g` a step of its own, after any steps run before it. A step opens to its differences, to **Compare frame by frame**, to run it again or to copy it as YAML. The box under them sends a code, a code not waited for, an await, a wait, a note or any step as YAML; ↑ recalls earlier codes.
 - **Object model**: each stack's object model side by side, as last recorded. A key the last step changed is marked •, one where the stacks differ ≠, and the paths the comparison leaves out are grey. **Only differences** shows just the keys where the stacks differ, opened down to the values. Any key can be watched, to keep it in view, and opened like the rest.
 
 **Compare frame by frame** shows one step on both stacks: the replies, the CAN frames and pin changes lined up as the comparison lines them up (a frame one stack did not send is marked, and any frame opens to its decoded fields), the object model paths the step changed with their values before and after, and everything each stack recorded. On a session of one stack it lists that stack's frames, object model changes and pins. A chip for each CAN message type in the step shows or hides it; the periodic ones (TimeSync and the boards' status, driver, fan, heater and temperature reports) start hidden. Its other options change what is compared, as `scripts/emulate.py diff` does.
 
-**Restart** boots the session's boards afresh with the same `config.g` and files, and can replay the steps it had run, which is the quick way to see a change to the firmware or to DSF on the same steps (DSF runs in the server, so a change to it needs the server restarted). **End session** saves the captures and returns to the start page.
+**Restart** boots the session's boards afresh with the same `config.g` and files, runs the steps it had run before `config.g` (or stops before `config.g` again, if it had not run yet), and can replay the steps it had run after it, which is the quick way to see a change to the firmware or to DSF on the same steps (DSF runs in the server, so a change to it needs the server restarted). **End session** saves the captures and returns to the start page.
 
-**Save as scenario** writes the session as a scenario that replays it: its boards, `config.g` and files, and the steps ticked. Queries and failed steps start unticked, and a code can be moved to the end of `config.g` instead of being a step. It saves to a path in the repository (asking before it replaces a file) or downloads the file.
+**Save as scenario** writes the session as a scenario that replays it: its boards, `config.g` and files, and the steps ticked, those run before `config.g` as `beforeConfig`. Queries and failed steps start unticked, and a code can be moved to the end of `config.g` instead of being a step. It saves to a path in the repository (asking before it replaces a file) or downloads the file.
 
 ### The CLI
 
@@ -119,6 +124,8 @@ Once the boards are up, the workspace shows:
 scripts/emulate.py start --board 1=EXP3HC --board 121=TOOL1RR --config 'M584 X1.0'
                                                  # boot these boards with these lines of config.g
 scripts/emulate.py start session.yaml            # or a scenario's boards and config.g; its steps run once booted
+scripts/emulate.py start session.yaml --hold     # stop before config.g: the steps sent next run before it
+scripts/emulate.py config                        # then run config.g, and the scenario's steps after it
 scripts/emulate.py send 'M584 X1.0' 'G1 X10'     # codes, each waited for
 scripts/emulate.py drive 1 io0.in high           # also release, analog, thermistor
 scripts/emulate.py wait 500ms
@@ -143,9 +150,10 @@ Only this machine's pages and scripts may use it, so that a page on another site
 | Request | |
 | --- | --- |
 | `GET /api/session` | What the server is doing (`none`, `booting`, `ready`, `running`, `failed`) and its session, with an `id` that a later session, even one of the same name, does not share |
-| `POST /api/session` | Start a session from a scenario, which may be empty, ending the one there is; its steps run once booted |
+| `POST /api/session?hold=true` | Start a session from a scenario, which may be empty, ending the one there is: its `beforeConfig` steps, `config.g` and its steps run once booted; with `hold`, `config.g` and the steps after it wait for `POST /api/config` |
+| `POST /api/config` | Let `config.g` run on a session held before it, then the steps of the scenario it started from |
 | `DELETE /api/session` | End it, saving the captures |
-| `POST /api/session/restart?replay=true` | Boot its boards afresh with the same `config.g` and files; with `replay`, run its steps again |
+| `POST /api/session/restart?replay=true` | Boot its boards afresh with the same `config.g`, files and steps before `config.g`; with `replay`, run its steps after `config.g` again |
 | `GET /api/events` | Follow the session as server-sent events: `hello` with everything so far, then `status`, `step`, `capture` (the events from an index on) and `boards` |
 | `GET /api/steps` | The steps run so far |
 | `POST /api/steps` | Run a step, or a list of steps, on every stack, answering with what each did |
@@ -209,7 +217,7 @@ public class MyTests(Stack stack)
 }
 ```
 
-Booting takes tens of seconds of host time, so a fixture boots once and its tests share it. Each stack adds its own first line of `config.g` (`M575` to open the standalone console, `M953` to enable CAN under DSF). Under DSF every driver is on an expansion board, so a configuration that is to run on both stacks puts its axes there.
+Booting takes tens of seconds of host time, so a fixture boots once and its tests share it. Each stack adds its own first line of `config.g` (`M575` to open the standalone console, `M953` to enable CAN under DSF), then the line that holds it until the bench lets it run; `Bench.StartAsync` boots the boards to there and runs `config.g`, unless `holdConfig` leaves that to `RunConfigAsync`. Under DSF every driver is on an expansion board, so a configuration that is to run on both stacks puts its axes there.
 
 | `Bench` | |
 | --- | --- |

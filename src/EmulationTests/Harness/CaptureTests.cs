@@ -189,6 +189,20 @@ public class CaptureTests
     }
 
     [Test]
+    public void ConfigIsAStepWhoseModelChangesAreCompared()
+    {
+        MachineCapture first = Capture("rrf", new InputDriven(1, 1, "temp0", "thermistor 25C"), new ConfigStarted(2),
+                                       new ObjectModelChanged(3, "move.axes[0].drivers[0]", "0.0", "1.0"), new CodeSent(4, "M115"));
+        MachineCapture second = Capture("dsf", new InputDriven(1, 1, "temp0", "thermistor 25C"), new ConfigStarted(2),
+                                        new ObjectModelChanged(3, "move.axes[0].drivers[0]", "0.0", "1.1"), new CodeSent(4, "M115"));
+
+        CaptureAlignment alignment = CaptureComparison.Align(first, second);
+
+        Assert.That(alignment.Steps.Select(s => s.Action), Is.EqualTo(new[] { "start", "input 1.temp0 thermistor 25C", "config.g", "M115" }));
+        Assert.That(alignment.Differences.Select(d => (d.Step, d.Aspect)), Is.EqualTo(new[] { (3, "om") }), "what config.g did is config.g's step");
+    }
+
+    [Test]
     public void TheAlignmentPairsTheSameFramesAndShowsTheMissingOnes()
     {
         CanFrameSent enable = new(1.001, 0, 1, "SetDriverStates", false, "00", new JsonObject { ["DriversToUpdate"] = 1 });

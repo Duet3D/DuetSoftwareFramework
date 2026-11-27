@@ -15,8 +15,8 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace DuetEmulation.Scenarios;
 
 /// <summary>
-/// A script for the bench, read from a YAML file: the boards, config.g, and the steps to run, each a
-/// code to send, an input to drive or time to let pass. The same scenario runs on each stack, and the
+/// A script for the bench, read from a YAML file: the boards, any steps to run before config.g, config.g,
+/// and the steps to run after it, each a code to send, an input to drive or time to let pass. The same scenario runs on each stack, and the
 /// captures it makes can be compared
 /// </summary>
 /// <example>
@@ -58,8 +58,28 @@ public sealed partial class Scenario
     /// <summary>Whether the capture starts when the boards are created rather than once they have booted</summary>
     public bool CaptureBoot { get; set; }
 
-    /// <summary>The steps</summary>
+    /// <summary>
+    /// Steps run once the boards have booted but before config.g, such as setting the thermistors that
+    /// config.g's heaters will read
+    /// </summary>
+    public List<ScenarioStep> BeforeConfig { get; set; } = [];
+
+    /// <summary>The steps, run once config.g has</summary>
     public List<ScenarioStep> Steps { get; set; } = [];
+
+    /// <summary>A copy, whose lists and dictionaries can change without changing this one's</summary>
+    public Scenario Copy() => new()
+    {
+        Name = Name,
+        Description = Description,
+        Stacks = [.. Stacks],
+        Boards = new(Boards),
+        Config = Config,
+        Files = new(Files),
+        CaptureBoot = CaptureBoot,
+        BeforeConfig = [.. BeforeConfig],
+        Steps = [.. Steps]
+    };
 
     /// <summary>The expansion boards as board types</summary>
     /// <exception cref="ArgumentException">A board type has no emulation</exception>
@@ -96,17 +116,8 @@ public sealed partial class Scenario
             scenario.Name = Path.GetFileNameWithoutExtension(source);
         }
         scenario.Description = LeadingComment(yaml);
-        for (int i = 0; i < scenario.Steps.Count; i++)
-        {
-            try
-            {
-                scenario.Steps[i].Validate();
-            }
-            catch (FormatException e)
-            {
-                throw new FormatException($"{source}: step {i + 1}: {e.Message}", e);
-            }
-        }
+        Validate(scenario.BeforeConfig, $"{source}: beforeConfig step");
+        Validate(scenario.Steps, $"{source}: step");
         try
         {
             _ = scenario.BoardTypes();
@@ -134,6 +145,13 @@ public sealed partial class Scenario
         {
             throw new FormatException($"{e.Message}{(e.InnerException is null ? string.Empty : ": " + e.InnerException.Message)}", e);
         }
+        Validate(steps, "step");
+        return steps;
+    }
+
+    // Check each step, naming the first that is not valid by its number from 1
+    private static void Validate(List<ScenarioStep> steps, string what)
+    {
         for (int i = 0; i < steps.Count; i++)
         {
             try
@@ -142,10 +160,9 @@ public sealed partial class Scenario
             }
             catch (FormatException e)
             {
-                throw new FormatException($"step {i + 1}: {e.Message}", e);
+                throw new FormatException($"{what} {i + 1}: {e.Message}", e);
             }
         }
-        return steps;
     }
 
     // The comment lines a file starts with, as one paragraph each run of them; null if it starts with none
@@ -202,6 +219,7 @@ public sealed partial class Scenario
             Config = Config.Length == 0 ? null : Config.EndsWith('\n') ? Config : Config + "\n",
             Files = Files.Count == 0 ? null : new SortedDictionary<string, string>(Files, StringComparer.Ordinal),
             CaptureBoot = CaptureBoot ? true : null,
+            BeforeConfig = BeforeConfig.Count == 0 ? null : BeforeConfig,
             Steps = Steps.Count == 0 ? null : Steps
         };
         yaml.Append(Serializer.Serialize(document));
@@ -219,6 +237,7 @@ public sealed partial class Scenario
         public string? Config { get; set; }
         public SortedDictionary<string, string>? Files { get; set; }
         public bool? CaptureBoot { get; set; }
+        public List<ScenarioStep>? BeforeConfig { get; set; }
         public List<ScenarioStep>? Steps { get; set; }
     }
 

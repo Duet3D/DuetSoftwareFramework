@@ -52,6 +52,9 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
     private string? _detail;
     private int _running;
 
+    // The steps of the scenario a held session started from, which run once config.g has
+    private IReadOnlyList<ScenarioStep> _afterConfig = [];
+
     /// <summary>The session</summary>
     /// <exception cref="InvalidOperationException">There is none</exception>
     public Session Session => _session ?? throw new InvalidOperationException("No session: start one first");
@@ -75,7 +78,7 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
         {
             ["phase"] = ApiJson.Node(_phase),
             ["detail"] = _detail,
-            ["session"] = session is null ? null : ApiJson.Scenario(session.Scenario),
+            ["session"] = session is null ? null : SessionJson(session),
             // Tells sessions apart, which their names and directories need not
             ["id"] = session is null ? null : _sessionId,
             ["ignoredPaths"] = new JsonArray([.. Recorder.DefaultIgnoredPaths.Concat(new ComparisonOptions().IgnoredPaths).Select(p => (JsonNode)p)]),
@@ -90,10 +93,19 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
         };
     }
 
+    private static JsonObject SessionJson(Session session)
+    {
+        JsonObject json = ApiJson.Scenario(session.Scenario);
+        json["configHeld"] = session.ConfigHeld;
+        return json;
+    }
+
     /// <summary>
-    /// Start a session from a scenario, ending the one there is; booting is followed by every client
+    /// Start a session from a scenario, ending the one there is; booting is followed by every client. The
+    /// scenario's steps before config.g run, then config.g and the steps after it unless <paramref name="hold"/>,
+    /// which leaves config.g held for <see cref="RunConfigAsync"/>
     /// </summary>
-    public async Task<JsonObject> StartAsync(Scenario scenario, CancellationToken cancellationToken)
+    public async Task<JsonObject> StartAsync(Scenario scenario, bool hold, CancellationToken cancellationToken)
     {
         await _lifecycle.WaitAsync(cancellationToken);
         try
@@ -124,10 +136,16 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
                 _detail = null;
                 PublishLocked(Hello());
             }
-            JsonObject result = Status();
-            if (scenario.Steps.Count > 0)
+            List<SessionStep> steps = [.. await RunAsync(scenario.BeforeConfig, cancellationToken)];
+            _afterConfig = scenario.Steps;
+            if (!hold && steps.All(s => s.State == StepState.Done))
             {
-                result["steps"] = new JsonArray([.. (await RunAsync(scenario.Steps, cancellationToken)).Select(s => ApiJson.SessionStep(s, session))]);
+                steps.AddRange(await RunConfigAsync(cancellationToken));
+            }
+            JsonObject result = Status();
+            if (steps.Count > 0)
+            {
+                result["steps"] = new JsonArray([.. steps.Select(s => ApiJson.SessionStep(s, session))]);
             }
             return result;
         }
@@ -144,29 +162,44 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
     public async Task<JsonObject> RestartAsync(bool replay, CancellationToken cancellationToken)
     {
         Session session = Session;
-        Scenario scenario = new()
+        Scenario scenario = session.Scenario;
+        scenario.Steps = replay ? [.. session.Steps.Where(s => s.Kind == StepKind.Step).Select(s => s.Step!)] : [];
+        return await StartAsync(scenario, session.ConfigHeld, cancellationToken);
+    }
+
+    /// <summary>
+    /// Let config.g run on the session, every client following it, then the steps of the scenario the session
+    /// started from that come after it
+    /// </summary>
+    /// <returns>config.g and the steps run after it</returns>
+    public async Task<IReadOnlyList<SessionStep>> RunConfigAsync(CancellationToken cancellationToken)
+    {
+        Session session = Session;
+        List<SessionStep> steps = [await RunAsync(token => session.RunConfigAsync(token), cancellationToken)];
+        IReadOnlyList<ScenarioStep> after = Interlocked.Exchange(ref _afterConfig, []);
+        if (steps[0].State == StepState.Done && after.Count > 0)
         {
-            Name = session.Scenario.Name,
-            Description = session.Scenario.Description,
-            Stacks = [.. session.Scenario.Stacks],
-            Boards = new(session.Scenario.Boards),
-            Config = session.Scenario.Config,
-            Files = new(session.Scenario.Files),
-            CaptureBoot = session.Scenario.CaptureBoot,
-            Steps = replay ? [.. session.Steps.Select(s => s.Step)] : []
-        };
-        return await StartAsync(scenario, cancellationToken);
+            steps.AddRange(await RunAsync(after, cancellationToken));
+        }
+        return steps;
     }
 
     /// <summary>Run steps on the session, every client following them</summary>
-    public async Task<IReadOnlyList<SessionStep>> RunAsync(IEnumerable<ScenarioStep> steps, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<SessionStep>> RunAsync(IEnumerable<ScenarioStep> steps, CancellationToken cancellationToken)
+    {
+        List<ScenarioStep> list = [.. steps];
+        return list.Count == 0 ? Task.FromResult<IReadOnlyList<SessionStep>>([]) : RunAsync(token => Session.RunAsync(list, token), cancellationToken);
+    }
+
+    // Run something on the session in the running phase
+    private async Task<T> RunAsync<T>(Func<CancellationToken, Task<T>> run, CancellationToken cancellationToken)
     {
         Session session = Session;
         Interlocked.Increment(ref _running);
         SetPhase(SessionPhase.Running, null);
         try
         {
-            return await session.RunAsync(steps, cancellationToken);
+            return await run(cancellationToken);
         }
         finally
         {
@@ -198,6 +231,7 @@ internal sealed class SessionHub(string outputRoot) : IAsyncDisposable
         {
             return new JsonObject { ["ended"] = null };
         }
+        _afterConfig = [];
         lock (_feed)
         {
             _session = null;

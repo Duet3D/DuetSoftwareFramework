@@ -82,6 +82,8 @@ def describe_event(event: dict[str, Any]) -> str:
         text = f'await {event["code"]}'
     elif kind == 'wait':
         text = f'wait {event["duration"]}'
+    elif kind == 'config':
+        text = 'run config.g'
     else:
         text = json.dumps(event)
     return f'{float(event.get("t", 0)):12.6f} {text}'
@@ -91,7 +93,8 @@ def describe_steps(answer: dict[str, Any]) -> str:
     """The answer to running steps as text: each step's reply and events on each stack, then their differences."""
     lines: list[str] = []
     for step in cast(list[dict[str, Any]], answer.get('steps', [])):
-        lines.append(f'== {step["number"]}: {step["step"]}' + ('' if step.get('state') != 'failed' else ' (failed)'))
+        before = ' (before config.g)' if step.get('kind') == 'beforeConfig' else ''
+        lines.append(f'== {step["number"]}: {step["step"]}{before}' + ('' if step.get('state') != 'failed' else ' (failed)'))
         for stack, result in cast(dict[str, dict[str, Any]], step.get('stacks', {})).items():
             finished = result.get('finished')
             lines.append(f'-- {stack} (t={float(finished if finished is not None else result.get("started", 0)):.6f})')

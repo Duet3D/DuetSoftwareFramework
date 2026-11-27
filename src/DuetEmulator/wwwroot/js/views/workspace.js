@@ -1,5 +1,6 @@
 // The session's workspace: its boards, its steps with a box to send more, and the object model side by side
 
+import { api } from '../api.js';
 import { PERIODIC_CAN_TYPES, countEvents, inputStates, seconds } from '../capture.js';
 import { copy, h, icon, replace, store, stored } from '../dom.js';
 import { summary, treeRows } from '../model.js';
@@ -100,9 +101,13 @@ function mountSteps(column) {
   const table = h('div', { class: 'card scroll-x' });
   const filters = h('div', { class: 'chips', role: 'group', 'aria-label': 'Which steps' });
   const box = composer();
+  const held = h('div', { class: 'notice warn held', role: 'status' });
+  let configRunning = false;
+  let configError = null;
   column.append(
     h('div', { class: 'section-head' }, h('h2', { class: 'label' }, 'Steps'), filters),
     table,
+    held,
     box.element);
 
   const renderFilters = () => replace(filters, [['all', 'All'], ['different', 'With differences'], ['codes', 'Codes only']].map(([value, label]) =>
@@ -124,7 +129,7 @@ function mountSteps(column) {
     const steps = state.steps.filter(step => filter === 'all' || (filter === 'different' ? step.differences.length > 0 : step.action.code !== undefined));
     const start = names.length === 0 ? null : h('div', { class: 'step' }, h('div', { class: 'step-row', style: 'cursor: default' },
       h('span', { class: 'step-number' }, '0'),
-      h('div', { class: 'step-what' }, h('div', {}, h('span', { class: 'kind' }, 'Start'), h('span', { class: 'text' }, 'boot and config.g'))),
+      h('div', { class: 'step-what' }, h('div', {}, h('span', { class: 'kind' }, 'Start'), h('span', { class: 'text' }, 'boot'))),
       names.map(s => h('span', { class: 'reply none' }, '—')),
       h('div', { class: 'step-counts' }, counts(names, s => captureSteps(s)[0]?.events ?? []))));
     replace(table, h('div', { class: 'steps-table', style: `--stacks: ${Math.max(1, names.length)}` },
@@ -137,9 +142,36 @@ function mountSteps(column) {
         render();
       }, body => runFrom(step.number, body), refusals.get(step.number))),
       state.steps.length === 0 ? h('div', { class: 'empty-state' }, 'No steps yet: send a code below, or drive an input from a board\'s panel') : null));
+    renderHeld();
   };
 
-  const offs = [...['steps', 'capture', 'session'].map(topic => on(topic, render)), box.off];
+  // While config.g is held, what is sent runs before it, until it is let run
+  const renderHeld = () => {
+    if (!state.status.session?.configHeld) {
+      replace(held);
+      held.hidden = true;
+      return;
+    }
+    held.hidden = false;
+    replace(held,
+      h('span', {}, 'config.g is waiting: the steps sent now run before it, such as setting the thermistors its heaters will read.'),
+      h('button', { class: 'button primary', type: 'button', disabled: configRunning || state.status.phase !== 'ready', onclick: async () => {
+        configRunning = true;
+        configError = null;
+        renderHeld();
+        try {
+          await api.post('/config');
+        } catch (e) {
+          configError = e.message;
+        } finally {
+          configRunning = false;
+          renderHeld();
+        }
+      } }, configRunning ? 'Running config.g' : 'Run config.g'),
+      configError ? h('div', { class: 'error', role: 'alert', style: 'flex-basis: 100%' }, configError) : null);
+  };
+
+  const offs = [...['steps', 'capture', 'session', 'status'].map(topic => on(topic, render)), box.off];
   render();
   return () => offs.forEach(off => off());
 }
@@ -147,6 +179,7 @@ function mountSteps(column) {
 const INPUT_ACTIONS = ['drive', 'release', 'analog', 'thermistor', 'pulses', 'tacho'];
 
 function kindOf(action) {
+  if (action.config) return ['config', 'Config'];
   if (action.code !== undefined || action.start !== undefined || action.await !== undefined) return ['code', 'Code'];
   if (INPUT_ACTIONS.some(a => action[a])) return ['input', 'Input'];
   if (action.wait !== undefined) return ['', 'Wait'];
@@ -164,7 +197,7 @@ function stepRow(step, names, isOpen, pending, toggle, runAgain, refusal) {
       h('span', { class: 'step-number' }, step.number),
       h('div', { class: 'step-what' },
         h('div', {}, h('span', { class: `kind ${kindClass}` }, kindLabel), h('span', { class: 'text' }, step.step)),
-        h('span', { class: 'when' }, finished.map(t => seconds(t)).join(' · '))),
+        h('span', { class: 'when' }, [...finished.map(t => seconds(t)), ...(step.kind === 'beforeConfig' ? ['before config.g'] : [])].join(' · '))),
       names.map(s => replyCell(step, s, replyDiffers)),
       h('div', { class: 'step-counts' }, counts(names, s => stepEvents(s, step.number)),
         step.differences.length > 0 ? h('span', { class: 'badge diff' }, `${step.differences.length} ≠`) : null)),
@@ -175,11 +208,12 @@ function stepRow(step, names, isOpen, pending, toggle, runAgain, refusal) {
       }),
       names.length === 2 && step.differences.length === 0 && step.state === 'done' ? h('span', { class: 'muted', style: 'font-size: 13px' }, 'The stacks did the same') : null,
       names.length === 1 ? recorded(stepEvents(names[0], step.number)) : null,
+      // config.g runs once, when it is let go, and is no step a scenario lists
       h('div', { style: 'display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px' },
         h('a', { class: 'button small', href: `#/step/${step.number}` }, 'Compare frame by frame', icon('next')),
-        awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => runAgain({ await: step.action.start }) }, 'Await it') : null,
+        step.action.config ? null : [awaitable ? h('button', { class: 'button small', type: 'button', onclick: () => runAgain({ await: step.action.start }) }, 'Await it') : null,
         h('button', { class: 'button small', type: 'button', onclick: () => runAgain(step.action) }, 'Run again'),
-        h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML')),
+        h('button', { class: 'button small', type: 'button', onclick: e => copy(step.yaml, e.currentTarget) }, icon('copy'), 'Copy as YAML')]),
       refusal ? h('div', { class: 'error', role: 'alert' }, refusal) : null) : null);
 }
 

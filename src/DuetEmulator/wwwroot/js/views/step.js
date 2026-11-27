@@ -163,7 +163,7 @@ function compare(data, number, options, open, render, reload) {
     h('div', { class: 'compare-head' },
       h('a', { class: 'button link', href: data.back }, icon('back'), data.back === '#/' ? 'Steps' : data.title),
       h('span', { class: 'mono faint' }, number),
-      h('h1', {}, number === 0 ? 'start: boot and config.g' : action),
+      h('h1', {}, number === 0 ? 'start: boot' : action),
       alignment ? h('span', { class: `badge ${differences.length === 0 ? 'ok' : 'diff'}` }, differences.length === 0 ? 'the same' : `${differences.length} ≠`) : null,
       h('div', { class: 'nav' },
         number > 0 ? h('a', { class: 'button', href: data.href(number - 1) }, icon('back'), `Step ${number - 1}`) : null,

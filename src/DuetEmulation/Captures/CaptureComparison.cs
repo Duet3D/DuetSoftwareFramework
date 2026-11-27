@@ -126,8 +126,8 @@ public sealed record CaptureAlignment(IReadOnlyList<AlignedStep> Steps, IReadOnl
 /// </summary>
 /// <remarks>
 /// <para>
-/// A step starts at each code sent or awaited, wait, input driven or note, and holds everything that
-/// followed until the next; what came before the first is the step called start. Steps are paired in order.
+/// A step starts at each code sent or awaited, wait, input driven, note and at config.g, and holds
+/// everything that followed until the next; what came before the first is the step called start. Steps are paired in order.
 /// </para>
 /// <para>
 /// Replies are compared step by step. The object model is compared by state: at the end of each step,
@@ -209,6 +209,7 @@ public static class CaptureComparison
         CodeSent code => code.Code,
         CodeAwaited awaited => $"await {awaited.Code}",
         WaitStarted wait => $"wait {wait.Duration}",
+        ConfigStarted => ConfigStarted.Action,
         InputDriven input => $"input {input.Board}.{input.Port} {input.Value}",
         Note note => $"# {note.Text}",
         _ => null

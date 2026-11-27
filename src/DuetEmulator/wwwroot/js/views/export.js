@@ -15,7 +15,8 @@ export function fileName(name) {
 
 export function mountExport(host) {
   const session = state.status.session;
-  const steps = state.steps.filter(s => s.state !== 'running');
+  // config.g is always part of a scenario, so it is not one of the steps to pick
+  const steps = state.steps.filter(s => s.state !== 'running' && !s.action.config);
   const form = {
     name: session.name,
     description: session.description ?? '',
@@ -154,8 +155,9 @@ export function mountExport(host) {
                   } }),
                   h('span', { class: 'mono faint', style: 'width: 22px; font-size: 11px' }, step.number),
                   h('span', { class: 'text' }, inConfig ? `config.g: ${step.action.code}` : step.step),
+                  step.kind === 'beforeConfig' ? h('span', { class: 'badge warn' }, 'before config.g') : null,
                   step.state === 'failed' ? h('span', { class: 'badge err' }, 'failed') : null,
-                  step.action.code !== undefined && on ? h('button', { class: 'button small to-config', type: 'button', 'aria-pressed': inConfig, onclick: () => {
+                  step.action.code !== undefined && step.kind === 'step' && on ? h('button', { class: 'button small to-config', type: 'button', 'aria-pressed': inConfig, onclick: () => {
                     if (inConfig) {
                       form.toConfig.delete(step.number);
                       form.keep.add(step.number);

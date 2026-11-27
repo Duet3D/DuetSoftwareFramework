@@ -109,6 +109,16 @@ public sealed class Recorder
         Capture.Add([new CodeAwaited(Now, code)]);
     }
 
+    /// <summary>Let config.g carry on from its hold, as a step of its own, and record what it does</summary>
+    /// <exception cref="TimeoutException">config.g did not finish within <paramref name="timeout"/> of emulated time</exception>
+    public async Task RunConfigAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    {
+        await CatchUpAsync(cancellationToken);
+        Capture.Add([new ConfigStarted(Now)]);
+        await _bench.RunConfigAsync(timeout, cancellationToken);
+        await CatchUpAsync(cancellationToken);
+    }
+
     /// <summary>Let emulated time pass, recording the wait and what happens during it</summary>
     public async Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default)
     {

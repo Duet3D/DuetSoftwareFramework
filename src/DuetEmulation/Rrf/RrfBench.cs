@@ -37,18 +37,18 @@ public sealed class RrfBench : Bench
 
     /// <summary>
     /// Create the boards, with <paramref name="config"/> as config.g after the line that opens the
-    /// console, and boot them
+    /// console and the hold, and boot them to the hold
     /// </summary>
     /// <param name="expansionBoards">The expansion boards, by CAN address</param>
     /// <param name="config">The rest of config.g</param>
     /// <param name="workDirectory">Where the run's files go</param>
     /// <param name="files">Further files for the SD card, by path on the card</param>
     /// <param name="cancellationToken">Cancels starting</param>
-    public static async Task<RrfBench> StartAsync(IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
+    internal static async Task<RrfBench> CreateAsync(IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
                                                   IReadOnlyDictionary<string, string>? files = null, CancellationToken cancellationToken = default)
     {
-        Dictionary<string, byte[]> sdCard = new() { ["sys/config.g"] = SdCardImage.Text(ConsolePreamble + config) };
-        foreach ((string path, string contents) in files ?? new Dictionary<string, string>())
+        Dictionary<string, byte[]> sdCard = new() { ["sys/config.g"] = SdCardImage.Text(ConfigFile(ConsolePreamble, config)) };
+        foreach ((string path, string contents) in SdCardFiles(files))
         {
             sdCard[path] = SdCardImage.Text(contents);
         }
@@ -76,7 +76,7 @@ public sealed class RrfBench : Bench
     /// <inheritdoc/>
     protected override async Task StartStackAsync(TimeSpan timeout, CancellationToken cancellationToken)
     {
-        // The console opens once config.g has run, until when nothing answers
+        // The console opens at config.g's first line, until when nothing answers
         TimeSpan start = System.Time;
         while (true)
         {

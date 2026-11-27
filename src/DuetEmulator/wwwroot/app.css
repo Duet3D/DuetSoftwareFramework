@@ -118,6 +118,7 @@ a { color: var(--rrf); }
 }
 .kind.code { background: var(--primary); color: var(--on-primary); }
 .kind.input { background: var(--ok-tint); color: var(--ok); }
+.kind.config { background: var(--warn-tint); color: var(--warn); }
 .badge { font-size: 12px; font-weight: 600; border-radius: 4px; padding: 1px 7px; white-space: nowrap; }
 .badge.diff { background: var(--diff-tint); color: var(--diff); }
 .badge.ok { background: var(--ok-tint); color: var(--ok); }
@@ -200,6 +201,9 @@ a { color: var(--rrf); }
 .reply.differs { background: var(--diff-tint); border-radius: 4px; padding: 1px 6px; }
 .step-counts { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; color: var(--muted); text-align: right; }
 .step-detail { margin: 0 14px 12px 60px; display: flex; flex-direction: column; gap: 6px; }
+.held { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.held[hidden] { display: none; }
+.held > span { flex: 1 1 240px; }
 .difference { display: flex; gap: 10px; font-size: 12.5px; align-items: baseline; }
 .difference > .aspect { width: 52px; flex: none; font-size: 10.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--diff); }
 .difference > .mono { overflow-wrap: anywhere; white-space: pre-wrap; }

@@ -32,17 +32,34 @@ public enum StepState
 /// <param name="Error">Why it failed, or null</param>
 public sealed record StackStepResult(double Started, double? Finished, CodeReply? Reply, string? Error);
 
+/// <summary>Where a step of a session comes, relative to config.g</summary>
+public enum StepKind
+{
+    /// <summary>A step run while config.g was held at its start</summary>
+    BeforeConfig,
+
+    /// <summary>config.g itself</summary>
+    Config,
+
+    /// <summary>A step run once config.g had</summary>
+    Step
+}
+
 /// <summary>A step a session ran, and what it did on each stack</summary>
 /// <param name="Number">Its number, from 1; it is step <c>Number + 1</c> of a capture, whose step 1 is the start</param>
-/// <param name="Step">The step</param>
+/// <param name="Kind">Where it comes, relative to config.g</param>
+/// <param name="Step">The step; null for config.g</param>
 /// <param name="State">Where it is</param>
 /// <param name="Stacks">What it did, by stack name</param>
 /// <param name="Differences">How the stacks differed in it, when there are two</param>
-public sealed record SessionStep(int Number, ScenarioStep Step, StepState State, IReadOnlyDictionary<string, StackStepResult> Stacks,
+public sealed record SessionStep(int Number, StepKind Kind, ScenarioStep? Step, StepState State, IReadOnlyDictionary<string, StackStepResult> Stacks,
                                  IReadOnlyList<CaptureDifference> Differences)
 {
     /// <summary>The step of the captures it is</summary>
     public int CaptureStep => Number + 1;
+
+    /// <summary>What the step does, as captures name it</summary>
+    public string Describe() => Step?.Describe() ?? ConfigStarted.Action;
 }
 
 /// <summary>What an output of a board drives</summary>
@@ -78,7 +95,7 @@ public sealed class SessionStack(string name, string directory, Recorder recorde
 /// <summary>Which steps of a session to save as a scenario, and what to call it</summary>
 /// <param name="Name">The scenario's name</param>
 /// <param name="Description">What it does, written as the comment the file starts with</param>
-/// <param name="Steps">The numbers of the steps to keep, all of them if null</param>
+/// <param name="Steps">The numbers of the steps to keep, all of them if null; config.g is kept whatever they say</param>
 /// <param name="ToConfig">The numbers of code steps to move to the end of config.g instead</param>
 public sealed record SessionExport(string? Name = null, string? Description = null, IReadOnlyCollection<int>? Steps = null,
                                    IReadOnlyCollection<int>? ToConfig = null);
@@ -97,9 +114,26 @@ public sealed class Session : IAsyncDisposable
     private readonly CancellationTokenSource _ending = new();
     private readonly Lock _stepsLock = new();
     private readonly List<SessionStep> _steps = [];
+    private readonly Scenario _scenario;
+    private volatile bool _configHeld = true;
 
-    /// <summary>What the session started from: its name, stacks, boards, config.g and files</summary>
-    public Scenario Scenario { get; }
+    /// <summary>
+    /// What the session is: its name, stacks, boards, config.g and files, which a restart boots, and its
+    /// steps before config.g as it ran them
+    /// </summary>
+    public Scenario Scenario
+    {
+        get
+        {
+            Scenario scenario = _scenario.Copy();
+            scenario.BeforeConfig = [.. Steps.Where(s => s.Kind == StepKind.BeforeConfig).Select(s => s.Step!)];
+            scenario.Steps = [];
+            return scenario;
+        }
+    }
+
+    /// <summary>Whether config.g is still held at its start, so that the steps run now come before it</summary>
+    public bool ConfigHeld => _configHeld;
 
     /// <summary>Where its files go</summary>
     public string Directory { get; }
@@ -130,7 +164,7 @@ public sealed class Session : IAsyncDisposable
 
     private Session(Scenario scenario, string directory, IReadOnlyList<SessionStack> stacks)
     {
-        Scenario = scenario;
+        _scenario = scenario;
         Directory = directory;
         Stacks = stacks;
         foreach (SessionStack stack in stacks)
@@ -141,7 +175,9 @@ public sealed class Session : IAsyncDisposable
 
     /// <summary>
     /// Boot the scenario's boards on each of its stacks, its files going in a directory per stack under
-    /// <paramref name="directory"/>; its steps are left for <see cref="RunAsync"/>, once the caller is following the session
+    /// <paramref name="directory"/>, to where config.g is held at its start; its steps, before config.g and
+    /// after it, and config.g itself are left for <see cref="RunAsync"/> and <see cref="RunConfigAsync"/>,
+    /// once the caller is following the session
     /// </summary>
     /// <param name="scenario">The boards, config.g, files and stacks</param>
     /// <param name="directory">Where the session's files go</param>
@@ -150,16 +186,10 @@ public sealed class Session : IAsyncDisposable
     public static async Task<Session> StartAsync(Scenario scenario, string directory, IProgress<string>? progress = null,
                                                  CancellationToken cancellationToken = default)
     {
-        Scenario start = new()
-        {
-            Name = scenario.Name,
-            Description = scenario.Description,
-            Stacks = [.. scenario.Stacks.Select(s => s.ToLowerInvariant())],
-            Boards = new(scenario.Boards),
-            Config = scenario.Config,
-            Files = new(scenario.Files),
-            CaptureBoot = scenario.CaptureBoot
-        };
+        Scenario start = scenario.Copy();
+        start.Stacks = [.. start.Stacks.Select(s => s.ToLowerInvariant())];
+        start.BeforeConfig = [];
+        start.Steps = [];
         List<SessionStack> stacks = [];
         try
         {
@@ -168,7 +198,8 @@ public sealed class Session : IAsyncDisposable
                 string name = stack.ToString().ToLowerInvariant();
                 progress?.Report($"Booting {name}");
                 string stackDirectory = Path.Combine(directory, name);
-                Bench bench = await Bench.StartAsync(stack, start.BoardTypes(), start.Config, stackDirectory, start.Files, cancellationToken);
+                Bench bench = await Bench.StartAsync(stack, start.BoardTypes(), start.Config, stackDirectory, start.Files, holdConfig: true,
+                                                     cancellationToken: cancellationToken);
                 try
                 {
                     Recorder recorder = await Recorder.StartAsync(bench, Recorder.Header(start.Name, stack, start.BoardTypes(), start.Config),
@@ -195,7 +226,8 @@ public sealed class Session : IAsyncDisposable
     }
 
     /// <summary>
-    /// Run steps one after another on every stack, after any steps already running, stopping at one that fails
+    /// Run steps one after another on every stack, after any steps already running, stopping at one that
+    /// fails; while config.g is held, they come before it
     /// </summary>
     /// <returns>What each step did</returns>
     public async Task<IReadOnlyList<SessionStep>> RunAsync(IEnumerable<ScenarioStep> steps, CancellationToken cancellationToken = default)
@@ -209,7 +241,8 @@ public sealed class Session : IAsyncDisposable
             List<SessionStep> results = [];
             foreach (ScenarioStep step in list)
             {
-                SessionStep result = await RunOneAsync(step, linked.Token);
+                SessionStep result = await RunOneAsync(_configHeld ? StepKind.BeforeConfig : StepKind.Step, step,
+                                                       (stack, token) => stack.Steps.RunAsync(step, token), linked.Token);
                 results.Add(result);
                 if (result.State == StepState.Failed)
                 {
@@ -224,13 +257,43 @@ public sealed class Session : IAsyncDisposable
         }
     }
 
-    private async Task<SessionStep> RunOneAsync(ScenarioStep step, CancellationToken cancellationToken)
+    /// <summary>
+    /// Let config.g carry on from its hold on every stack, after any steps already running, as a step of its
+    /// own; the steps run after it come after config.g
+    /// </summary>
+    /// <returns>What config.g did</returns>
+    /// <exception cref="InvalidOperationException">config.g has already run</exception>
+    public async Task<SessionStep> RunConfigAsync(CancellationToken cancellationToken = default)
+    {
+        using CancellationTokenSource linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _ending.Token);
+        await _benches.WaitAsync(linked.Token);
+        try
+        {
+            if (!_configHeld)
+            {
+                throw new InvalidOperationException("config.g has already run");
+            }
+            _configHeld = false;
+            return await RunOneAsync(StepKind.Config, null, async (stack, token) =>
+            {
+                await stack.Recorder.RunConfigAsync(cancellationToken: token);
+                return null;
+            }, linked.Token);
+        }
+        finally
+        {
+            _benches.Release();
+        }
+    }
+
+    private async Task<SessionStep> RunOneAsync(StepKind kind, ScenarioStep? step, Func<SessionStack, CancellationToken, Task<CodeReply?>> run,
+                                                CancellationToken cancellationToken)
     {
         Dictionary<string, StackStepResult> results = Stacks.ToDictionary(s => s.Name, s => new StackStepResult(s.Recorder.Now, null, null, null));
         SessionStep record;
         lock (_stepsLock)
         {
-            record = new SessionStep(_steps.Count + 1, step, StepState.Running, results, []);
+            record = new SessionStep(_steps.Count + 1, kind, step, StepState.Running, results, []);
             _steps.Add(record);
         }
         StepChanged?.Invoke(record);
@@ -240,7 +303,7 @@ public sealed class Session : IAsyncDisposable
             double started = stack.Recorder.Now;
             try
             {
-                CodeReply? reply = await stack.Steps.RunAsync(step, cancellationToken);
+                CodeReply? reply = await run(stack, cancellationToken);
                 results[stack.Name] = new StackStepResult(started, stack.Recorder.Now, reply, null);
             }
             catch (Exception e) when (e is TimeoutException or InvalidOperationException or ArgumentException or KeyNotFoundException or FormatException)
@@ -344,10 +407,12 @@ public sealed class Session : IAsyncDisposable
         : throw new InvalidOperationException("The session runs on one stack, so there is nothing to compare");
 
     /// <summary>
-    /// The session as a scenario that replays it: its stacks, boards and files, config.g with any codes
-    /// moved to it, and the steps chosen
+    /// The session as a scenario that replays it: its stacks, boards and files, config.g with
+    /// any codes moved to it, and the steps chosen, before config.g and after it
     /// </summary>
-    /// <exception cref="ArgumentException">A step to keep or move does not exist, or one to move is not a code</exception>
+    /// <exception cref="ArgumentException">
+    /// A step to keep or move does not exist, or one to move is not a code run after config.g
+    /// </exception>
     public Scenario Export(SessionExport export)
     {
         IReadOnlyList<SessionStep> steps = Steps;
@@ -357,28 +422,25 @@ public sealed class Session : IAsyncDisposable
         {
             throw new ArgumentException($"The session has no step {number}");
         }
-        foreach (int number in toConfig.Where(n => steps[n - 1].Step.Code is null))
+        foreach (SessionStep step in toConfig.Select(n => steps[n - 1]).Where(s => s.Kind != StepKind.Step || s.Step!.Code is null))
         {
-            throw new ArgumentException($"Step {number} ({steps[number - 1].Step.Describe()}) is not a code, so it cannot go in config.g");
+            throw new ArgumentException($"Step {step.Number} ({step.Describe()}) is not a code run after config.g, so it cannot go in config.g");
         }
 
-        List<string> config = [.. Scenario.Config.Split('\n').Select(l => l.TrimEnd('\r'))];
+        Scenario scenario = Scenario;
+        List<string> config = [.. scenario.Config.Split('\n').Select(l => l.TrimEnd('\r'))];
         while (config.Count > 0 && config[^1].Length == 0)
         {
             config.RemoveAt(config.Count - 1);
         }
-        config.AddRange(steps.Where(s => toConfig.Contains(s.Number)).Select(s => s.Step.Code!));
-        return new Scenario
-        {
-            Name = string.IsNullOrWhiteSpace(export.Name) ? Scenario.Name : export.Name.Trim(),
-            Description = string.IsNullOrWhiteSpace(export.Description) ? Scenario.Description : export.Description.Trim(),
-            Stacks = [.. Scenario.Stacks],
-            Boards = new(Scenario.Boards),
-            Config = config.Count == 0 ? string.Empty : string.Join('\n', config) + "\n",
-            Files = new(Scenario.Files),
-            CaptureBoot = Scenario.CaptureBoot,
-            Steps = [.. steps.Where(s => keep.Contains(s.Number) && !toConfig.Contains(s.Number)).Select(s => s.Step)]
-        };
+        config.AddRange(steps.Where(s => toConfig.Contains(s.Number)).Select(s => s.Step!.Code!));
+        IEnumerable<SessionStep> kept = steps.Where(s => keep.Contains(s.Number) && !toConfig.Contains(s.Number));
+        scenario.Name = string.IsNullOrWhiteSpace(export.Name) ? scenario.Name : export.Name.Trim();
+        scenario.Description = string.IsNullOrWhiteSpace(export.Description) ? scenario.Description : export.Description.Trim();
+        scenario.Config = config.Count == 0 ? string.Empty : string.Join('\n', config) + "\n";
+        scenario.BeforeConfig = [.. kept.Where(s => s.Kind == StepKind.BeforeConfig).Select(s => s.Step!)];
+        scenario.Steps = [.. kept.Where(s => s.Kind == StepKind.Step).Select(s => s.Step!)];
+        return scenario;
     }
 
     /// <summary>Save each stack's capture in its directory, and their differences beside them</summary>

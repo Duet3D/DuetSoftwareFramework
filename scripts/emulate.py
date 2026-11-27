@@ -17,6 +17,8 @@ A session boots the boards once and runs steps one at a time, on both stacks sid
     scripts/emulate.py start session.yaml                       boot a scenario's boards and config.g
     scripts/emulate.py start --board 1=EXP3HC --config 'M584 X1.0'
                                                                 or name the boards and config.g lines here
+    scripts/emulate.py start session.yaml --hold                stop before config.g, so that steps run before it
+    scripts/emulate.py config                                   run config.g on a session stopped before it
     scripts/emulate.py send 'M584 X1.0' 'G1 X10 F600'           send codes; each answers on every stack
     scripts/emulate.py drive 1 io0.in high                      drive an input
     scripts/emulate.py thermistor 1 temp0 60                    make a thermistor read 60C
@@ -113,6 +115,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     start.add_argument('--stack', choices=('rrf', 'dsf'), help='only on this stack (default both)')
     start.add_argument('--config', action='append', default=[], metavar='LINE', help='a line of config.g; may be repeated')
     start.add_argument('--name', help='what the session is called, which names its directory (default session)')
+    start.add_argument('--hold', action='store_true',
+                       help='stop before config.g, so that the steps sent next run before it, until the config command')
+    commands.add_parser('config', help='run config.g on a session stopped before it, then the scenario\'s steps after it')
     commands.add_parser('stop', help='end the session')
     restart = commands.add_parser('restart', help='boot the session\'s boards afresh, with its config.g and files')
     restart.add_argument('--replay', action='store_true', help='run the session\'s steps again once booted')
@@ -170,7 +175,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     port: int = args.port
     try:
         if command == 'start':
-            show(emulator.request(port, 'POST', '/api/session', start_text(p, args)), args.json)
+            show(emulator.request(port, 'POST', '/api/session' + ('?hold=true' if args.hold else ''), start_text(p, args)), args.json)
+        elif command == 'config':
+            show(emulator.request(port, 'POST', '/api/config', ''), args.json)
         elif command == 'stop':
             show(emulator.request(port, 'DELETE', '/api/session'), True)
         elif command == 'restart':

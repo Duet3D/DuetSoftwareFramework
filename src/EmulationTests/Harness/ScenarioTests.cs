@@ -164,6 +164,7 @@ public class ScenarioTests
             Config = "M950 F0 C\"1.out3+out3.tach\" ; a fan\n\nM106 P0 S0\n",
             Files = { ["sys/homex.g"] = "G91\nG1 H1 X-100 F3000\n", ["macros/one line.g"] = "M115" },
             CaptureBoot = true,
+            BeforeConfig = [.. Scenario.ParseSteps("thermistor: { board: 1, port: temp1, celsius: 25 }")],
             Steps = [.. Scenario.ParseSteps("""
                 - code: "M409 K\"move.axes[0]\" F\"v\""
                 - start: "G1 X10 # not a comment"
@@ -188,10 +189,16 @@ public class ScenarioTests
             Assert.That(read.Config, Is.EqualTo(scenario.Config));
             Assert.That(read.Files, Is.EqualTo(scenario.Files));
             Assert.That(read.CaptureBoot, Is.True);
+            Assert.That(read.BeforeConfig.Select(s => s.ToYaml()), Is.EqualTo(scenario.BeforeConfig.Select(s => s.ToYaml())));
             Assert.That(read.Steps.Select(s => s.ToYaml()), Is.EqualTo(scenario.Steps.Select(s => s.ToYaml())));
             Assert.That(read.Steps[^1].Tacho!.PulsesPerRev, Is.Null, "a default left out stays left out");
         });
     }
+
+    [Test]
+    public void AStepBeforeConfigIsCheckedAndNamedByItsPlace() =>
+        Assert.That(() => Scenario.Parse("beforeConfig:\n  - thermistor: { board: 1, port: temp0 }\n"),
+                    Throws.TypeOf<FormatException>().With.Message.Contains("beforeConfig step 1: thermistor needs celsius"));
 
     [Test]
     public void TheDefaultsAreLeftOut() =>

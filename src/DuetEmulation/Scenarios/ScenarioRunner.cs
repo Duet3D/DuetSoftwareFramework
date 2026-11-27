@@ -11,15 +11,21 @@ namespace DuetEmulation.Scenarios;
 public static class ScenarioRunner
 {
     /// <summary>
-    /// Boot the scenario's boards on a stack, run its steps, and return the capture, which is also
+    /// Boot the scenario's boards on a stack, run its steps before config.g, config.g and its steps, and return the capture, which is also
     /// saved in <paramref name="workDirectory"/> beside the run's logs and traces
     /// </summary>
     public static async Task<MachineCapture> RunAsync(Scenario scenario, Stack stack, string workDirectory, CancellationToken cancellationToken = default)
     {
-        await using Bench bench = await Bench.StartAsync(stack, scenario.BoardTypes(), scenario.Config, workDirectory, scenario.Files, cancellationToken);
+        await using Bench bench = await Bench.StartAsync(stack, scenario.BoardTypes(), scenario.Config, workDirectory, scenario.Files,
+                                                         holdConfig: true, cancellationToken: cancellationToken);
         Recorder recorder = await Recorder.StartAsync(bench, Recorder.Header(scenario.Name, stack, scenario.BoardTypes(), scenario.Config),
                                                       scenario.CaptureBoot, cancellationToken: cancellationToken);
         StepRunner steps = new(recorder);
+        foreach (ScenarioStep step in scenario.BeforeConfig)
+        {
+            await steps.RunAsync(step, cancellationToken);
+        }
+        await recorder.RunConfigAsync(cancellationToken: cancellationToken);
         foreach (ScenarioStep step in scenario.Steps)
         {
             await steps.RunAsync(step, cancellationToken);

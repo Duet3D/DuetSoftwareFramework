@@ -99,6 +99,11 @@ class SessionCommandsTest(TestCase):
         read.assert_called_once_with('session.yaml')
         self.assertEqual(sent, [('POST', '/api/session', 'boards: {1: EXP3HC}')])
 
+    def test_a_session_held_before_config_says_so(self) -> None:
+        with patch.object(emulator, 'scenario_text', return_value='boards: {1: EXP3HC}'):
+            _, _, sent = self.requests('start', 'session.yaml', '--hold', answer={})
+        self.assertEqual(sent, [('POST', '/api/session?hold=true', 'boards: {1: EXP3HC}')])
+
     def test_a_start_that_cannot_be_understood_sends_nothing(self) -> None:
         cases = [
             ['start', 'session.yaml', '--board', '1=EXP3HC'],
@@ -125,6 +130,7 @@ class SessionCommandsTest(TestCase):
             (['capture'], ('GET', '/api/capture')),
             (['capture', '--since', '5', '--text'], ('GET', '/api/capture?since=5&format=text')),
             (['save'], ('POST', '/api/save')),
+            (['config'], ('POST', '/api/config')),
         ]
         for argv, request in cases:
             with self.subTest(argv=argv):
@@ -208,6 +214,7 @@ class DescribeEventTest(TestCase):
             ({'kind': 'note', 't': 1, 'text': 'probing'}, '# probing'),
             ({'kind': 'await', 't': 1, 'code': 'G28'}, 'await G28'),
             ({'kind': 'wait', 't': 1, 'duration': '500ms'}, 'wait 500ms'),
+            ({'kind': 'config', 't': 1}, 'run config.g'),
         ]
         for event, text in cases:
             with self.subTest(kind=event['kind']):

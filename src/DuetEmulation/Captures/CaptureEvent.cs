@@ -13,6 +13,7 @@ namespace DuetEmulation.Captures;
 [JsonDerivedType(typeof(CodeReplied), "reply")]
 [JsonDerivedType(typeof(CodeAwaited), "await")]
 [JsonDerivedType(typeof(WaitStarted), "wait")]
+[JsonDerivedType(typeof(ConfigStarted), "config")]
 [JsonDerivedType(typeof(CanFrameSent), "can")]
 [JsonDerivedType(typeof(ObjectModelChanged), "om")]
 [JsonDerivedType(typeof(ObjectModelSnapshot), "om-snapshot")]
@@ -50,6 +51,16 @@ public sealed record WaitStarted(double T, string Duration) : CaptureEvent(T)
 {
     /// <inheritdoc/>
     public override string Describe() => $"wait {Duration}";
+}
+
+/// <summary>config.g carried on from its hold: what follows until the next step is what config.g did</summary>
+public sealed record ConfigStarted(double T) : CaptureEvent(T)
+{
+    /// <summary>What the step is called</summary>
+    public const string Action = "config.g";
+
+    /// <inheritdoc/>
+    public override string Describe() => $"run {Action}";
 }
 
 /// <summary>A code finished, with its reply</summary>

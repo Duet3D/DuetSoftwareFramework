@@ -96,6 +96,30 @@ public abstract class Bench : IAsyncDisposable
     /// <summary>The boards' pins: what drives their inputs and what their outputs have done</summary>
     public BoardIo Io { get; }
 
+    /// <summary>
+    /// The line config.g has after the stack's own first line: a macro that holds config.g there until
+    /// <see cref="RunConfigAsync"/>, so that the unconfigured machine can be read and its inputs set first
+    /// </summary>
+    public const string HoldLine = "M98 P\"0:/emulation/hold.g\"";
+
+    // The file whose deletion lets config.g carry on, and the one the hold deletes once config.g is waiting
+    private const string HeldFile = "0:/emulation/held";
+    private const string WaitingFile = "0:/emulation/waiting";
+
+    /// <summary>The files the hold needs on the SD card, by path on the card</summary>
+    private static readonly IReadOnlyDictionary<string, string> HoldFiles = new Dictionary<string, string>
+    {
+        ["emulation/hold.g"] = $"M30 \"{WaitingFile}\"\nwhile fileexists(\"{HeldFile}\")\n  G4 P10\n",
+        ["emulation/held"] = "held\n",
+        ["emulation/waiting"] = "waiting\n"
+    };
+
+    /// <summary>config.g as the SD card has it: the stack's first lines, the hold, then the scenario's config.g</summary>
+    protected static string ConfigFile(string stackPreamble, string config) => $"{stackPreamble}{HoldLine}\n{config}";
+
+    /// <summary>Whether config.g is held at its start, waiting for <see cref="RunConfigAsync"/></summary>
+    public bool ConfigHeld { get; private set; }
+
     /// <summary>Create a bench over a system whose machines exist but have not run yet</summary>
     protected Bench(EmulatedSystem system)
     {
@@ -105,22 +129,78 @@ public abstract class Bench : IAsyncDisposable
 
     /// <summary>
     /// Create the boards with <paramref name="config"/> as config.g (after whatever line the stack needs
-    /// first), start the stack, and boot them
+    /// first, and the hold), start the stack, boot them, and run config.g unless <paramref name="holdConfig"/>
     /// </summary>
     /// <param name="stack">The software that drives the boards</param>
     /// <param name="expansionBoards">The expansion boards, by CAN address</param>
     /// <param name="config">config.g, less the stack's own first line</param>
     /// <param name="workDirectory">Where the run's files go</param>
     /// <param name="files">Further files for the SD card, by path on the card</param>
+    /// <param name="holdConfig">
+    /// Whether to leave config.g held at its start, for the caller to read the unconfigured machine, set its
+    /// inputs and then call <see cref="RunConfigAsync"/>
+    /// </param>
     /// <param name="cancellationToken">Cancels starting</param>
     public static async Task<Bench> StartAsync(Stack stack, IReadOnlyDictionary<int, BoardType> expansionBoards, string config, string workDirectory,
-                                               IReadOnlyDictionary<string, string>? files = null, CancellationToken cancellationToken = default) =>
-        stack switch
+                                               IReadOnlyDictionary<string, string>? files = null, bool holdConfig = false,
+                                               CancellationToken cancellationToken = default)
+    {
+        Bench bench = stack switch
         {
-            Stack.Rrf => await Rrf.RrfBench.StartAsync(expansionBoards, config, workDirectory, files, cancellationToken),
-            Stack.Dsf => await Dsf.DsfBench.StartAsync(expansionBoards, config, workDirectory, files, cancellationToken),
+            Stack.Rrf => await Rrf.RrfBench.CreateAsync(expansionBoards, config, workDirectory, files, cancellationToken),
+            Stack.Dsf => await Dsf.DsfBench.CreateAsync(expansionBoards, config, workDirectory, files, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(stack))
         };
+        if (!holdConfig)
+        {
+            try
+            {
+                await bench.RunConfigAsync(cancellationToken: cancellationToken);
+            }
+            catch
+            {
+                await bench.DisposeAsync();
+                throw;
+            }
+        }
+        return bench;
+    }
+
+    /// <summary>The SD card's files for a bench: the scenario's, then the hold's</summary>
+    protected static Dictionary<string, string> SdCardFiles(IReadOnlyDictionary<string, string>? files)
+    {
+        Dictionary<string, string> result = new(files ?? new Dictionary<string, string>());
+        foreach ((string path, string contents) in HoldFiles)
+        {
+            result[path] = contents;
+        }
+        return result;
+    }
+
+    /// <summary>Let config.g carry on from its hold, and wait until the stack has run it and the startup files after it</summary>
+    /// <exception cref="InvalidOperationException">config.g is not held</exception>
+    /// <exception cref="TimeoutException">config.g did not finish within <paramref name="timeout"/> of emulated time (60s by default)</exception>
+    public async Task RunConfigAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    {
+        if (!ConfigHeld)
+        {
+            throw new InvalidOperationException("config.g is not held");
+        }
+        CodeReply released = await SendCodeAsync($"M30 \"{HeldFile}\"", cancellationToken: cancellationToken);
+        if (released.Severity == MessageType.Error)
+        {
+            throw new InvalidOperationException($"Could not let config.g carry on: {released.Text}");
+        }
+        ConfigHeld = false;
+        await WaitUntilAsync(async () => !await IsStartingAsync(cancellationToken), timeout ?? DefaultConfigTimeout, "config.g to finish", cancellationToken);
+    }
+
+    /// <summary>How long config.g may take, in emulated time, unless the caller says otherwise</summary>
+    public static readonly TimeSpan DefaultConfigTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>Whether the stack is still starting: running config.g and the startup files after it</summary>
+    protected virtual async Task<bool> IsStartingAsync(CancellationToken cancellationToken) =>
+        (await GetObjectModelAsync("state.status", cancellationToken))?.GetValue<string>() == "starting";
 
     /// <summary>Send one code without waiting for it to finish</summary>
     public abstract Task<PendingCode> StartCodeAsync(string code, CancellationToken cancellationToken = default);
@@ -190,15 +270,18 @@ public abstract class Bench : IAsyncDisposable
     }
 
     /// <summary>
-    /// Run until the system is ready to use: the stack has started, every expansion board is running in
-    /// the object model, and their step clocks are synchronised to the main board's, so they will
-    /// execute moves
+    /// Run until the system is ready to configure: the stack answers codes, config.g is held at its start,
+    /// every expansion board is running in the object model, and their step clocks are synchronised to the
+    /// main board's, so they will execute moves
     /// </summary>
-    public async Task BootAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    protected async Task BootAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         TimeSpan limit = timeout ?? TimeSpan.FromSeconds(30);
         TimeSpan start = System.Time;
         await StartStackAsync(limit, cancellationToken);
+        await WaitUntilAsync(async () => (await SendCodeAsync($"echo fileexists(\"{WaitingFile}\")", cancellationToken: cancellationToken)).Text == "false",
+                             limit - (System.Time - start), "config.g to reach its hold", cancellationToken);
+        ConfigHeld = true;
         EmulatedBoard[] expansion = [.. System.Boards.Where(b => b.Type.IsExpansion)];
         if (expansion.Length == 0)
         {
@@ -225,7 +308,7 @@ public abstract class Bench : IAsyncDisposable
         }, limit - (System.Time - start), "the expansion boards to synchronise their clocks", cancellationToken);
     }
 
-    /// <summary>Run until the stack answers codes</summary>
+    /// <summary>Run until the stack answers codes, which it does from config.g's first line</summary>
     protected abstract Task StartStackAsync(TimeSpan timeout, CancellationToken cancellationToken);
 
     /// <summary>
