@@ -323,6 +323,11 @@ extern "C"
 	// or for something from outside, which is when a bench driving the clock may move it again.
 	int64_t DuetRT_GetPendingActivity(void);
 
+	// What the pending activity is made of, as text for a bench that has waited too long for it:
+	// inbound events and wake-ups not yet taken, and each thread that takes part, running or waiting.
+	// Writes at most `capacity` bytes including the terminating NUL; returns the length it needed.
+	int32_t DuetRT_DescribeActivity(char* buffer, int32_t capacity);
+
 	// Thread-pool threads parked in a native wait, which a bench watching the thread pool counts as
 	// waiting rather than working
 	int64_t DuetRT_GetParkedElsewhere(void);

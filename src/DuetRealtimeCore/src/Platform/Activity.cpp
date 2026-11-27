@@ -1,9 +1,12 @@
 #include "Activity.h"
 
+#include <pthread.h>
+
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <mutex>
+#include <string>
 #include <vector>
 
 namespace Duet::Sbc::Activity
@@ -22,6 +25,27 @@ namespace Duet::Sbc::Activity
 
 		// Whether the calling thread takes part
 		thread_local bool threadRunning = false;
+
+		// The parts of the pending count, for Describe
+		std::atomic<int64_t> wakeupCount{0};
+		std::atomic<int64_t> eventCount{0};
+
+		// A thread that takes part, and whether it is waiting
+		struct Participant
+		{
+			std::string name;
+			bool parked = false;
+		};
+
+		// The threads that take part, guarded by waitersMutex
+		std::vector<Participant*> participants;
+		thread_local Participant* self = nullptr;
+
+		std::string ThreadName()
+		{
+			std::array<char, 32> name{};
+			return ::pthread_getname_np(::pthread_self(), name.data(), name.size()) == 0 ? std::string(name.data()) : std::string("?");
+		}
 
 		bool AnyReadable(std::span<const pollfd> fds) noexcept
 		{
@@ -48,6 +72,17 @@ namespace Duet::Sbc::Activity
 		{
 			threadRunning = true;
 			pendingCount.fetch_add(1, std::memory_order_seq_cst);
+			try
+			{
+				auto* participant = new Participant{ThreadName()};
+				const std::lock_guard lock(waitersMutex);
+				participants.push_back(participant);
+				self = participant;
+			}
+			catch (...)
+			{
+				// Without its name the thread still takes part; Describe just cannot name it
+			}
 		}
 	}
 
@@ -57,7 +92,29 @@ namespace Duet::Sbc::Activity
 		{
 			pendingCount.fetch_sub(1, std::memory_order_seq_cst);
 			threadRunning = false;
+			if (self != nullptr)
+			{
+				const std::lock_guard lock(waitersMutex);
+				std::erase(participants, self);
+				delete self;
+				self = nullptr;
+			}
 		}
+	}
+
+	std::string Describe()
+	{
+		std::string description = "events " + std::to_string(eventCount.load()) + ", wake-ups " + std::to_string(wakeupCount.load()) + ", threads";
+		const std::lock_guard lock(waitersMutex);
+		if (participants.empty())
+		{
+			description += " none";
+		}
+		for (const Participant* participant : participants)
+		{
+			description += " " + participant->name + (participant->parked ? " (waiting)" : " (running)");
+		}
+		return description;
 	}
 
 	void Signalled(int fd) noexcept
@@ -68,6 +125,7 @@ namespace Duet::Sbc::Activity
 			if (waiter->m_parked && waiter->Watches(fd))
 			{
 				waiter->m_woken++;
+				wakeupCount.fetch_add(1, std::memory_order_seq_cst);
 				pendingCount.fetch_add(1, std::memory_order_seq_cst);
 			}
 		}
@@ -75,11 +133,13 @@ namespace Duet::Sbc::Activity
 
 	void EventPosted() noexcept
 	{
+		eventCount.fetch_add(1, std::memory_order_seq_cst);
 		pendingCount.fetch_add(1, std::memory_order_seq_cst);
 	}
 
 	void EventConsumed() noexcept
 	{
+		eventCount.fetch_sub(1, std::memory_order_seq_cst);
 		pendingCount.fetch_sub(1, std::memory_order_seq_cst);
 	}
 
@@ -89,6 +149,10 @@ namespace Duet::Sbc::Activity
 	{
 		const std::lock_guard lock(waitersMutex);
 		m_parked = !AnyReadable(fds);
+		if (m_parked && m_running && self != nullptr)
+		{
+			self->parked = true;
+		}
 		if (m_parked)
 		{
 			(m_running ? pendingCount : parkedElsewhereCount).fetch_add(m_running ? -1 : 1, std::memory_order_seq_cst);
@@ -100,10 +164,15 @@ namespace Duet::Sbc::Activity
 	{
 		const std::lock_guard lock(waitersMutex);
 		std::erase(waiters, this);
+		if (m_parked && m_running && self != nullptr)
+		{
+			self->parked = false;
+		}
 		if (m_parked)
 		{
 			(m_running ? pendingCount : parkedElsewhereCount).fetch_add(m_running ? 1 : -1, std::memory_order_seq_cst);
 		}
+		wakeupCount.fetch_sub(m_woken, std::memory_order_seq_cst);
 		pendingCount.fetch_sub(m_woken, std::memory_order_seq_cst);
 	}
 

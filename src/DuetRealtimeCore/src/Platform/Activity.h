@@ -21,6 +21,7 @@
 #include <poll.h>
 
 #include <cstdint>
+#include <string>
 #include <span>
 
 namespace Duet::Sbc::Activity
@@ -32,6 +33,10 @@ namespace Duet::Sbc::Activity
 
 	// Threads that do not take part and are waiting here
 	int64_t ParkedElsewhere() noexcept;
+
+	// What is pending, for a bench that has waited too long for it: the inbound events and wake-ups
+	// not yet taken, and each thread that takes part, by name, running or waiting
+	std::string Describe();
 
 	// The calling thread starts or stops taking part
 	void ThreadStarted() noexcept;

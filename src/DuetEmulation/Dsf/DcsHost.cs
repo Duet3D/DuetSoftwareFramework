@@ -93,7 +93,9 @@ public sealed class DcsHost : IAsyncDisposable
 
         IConfiguration configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         // The logging builder does not dispose a provider it is given, so the host does
-        FileLoggerProvider log = new(Path.Combine(workDirectory, "dcs.log"));
+        DateTimeOffset started = clock.GetUtcNow();
+        FileLoggerProvider log = new(Path.Combine(workDirectory, "dcs.log"),
+                                     clock is EmulatedTimeProvider emulated ? () => emulated.Now : () => clock.GetUtcNow() - started);
         IHost host = new HostBuilder()
             .ConfigureLogging(logging => logging.ClearProviders()
                 .AddProvider(log)

@@ -106,7 +106,10 @@ namespace Duet::Sbc
 	void LinkService::Start()
 	{
 		m_stop.store(false, std::memory_order_relaxed);
-		m_thread = std::thread([this] { Execute(); });
+		m_thread = std::thread([this] {
+			NameCurrentThread("DuetRT link");
+			Execute();
+		});
 	}
 
 	void LinkService::Stop()

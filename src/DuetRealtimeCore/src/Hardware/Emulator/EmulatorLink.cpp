@@ -2,6 +2,7 @@
 
 #include <Platform/Activity.h>
 #include <Platform/LocalClock.h>
+#include <Platform/ProcessHelpers.h>
 
 #include <poll.h>
 #include <sys/eventfd.h>
@@ -114,7 +115,10 @@ namespace Duet::Sbc::Emulator
 			}
 			throw;
 		}
-		m_reader = std::thread([this] { ReaderLoop(); });
+		m_reader = std::thread([this] {
+			NameCurrentThread("DuetRT emulator");
+			ReaderLoop();
+		});
 	}
 
 	EmulatorLink::~EmulatorLink()

@@ -556,6 +556,25 @@ extern "C"
 		return Duet::Sbc::Activity::Pending();
 	}
 
+	int32_t DuetRT_DescribeActivity(char* buffer, int32_t capacity)
+	{
+		try
+		{
+			const std::string description = Duet::Sbc::Activity::Describe();
+			if (buffer != nullptr && capacity > 0)
+			{
+				const size_t length = std::min(description.size(), static_cast<size_t>(capacity) - 1);
+				std::memcpy(buffer, description.data(), length);
+				buffer[length] = '\0';
+			}
+			return static_cast<int32_t>(description.size() + 1);
+		}
+		catch (...)
+		{
+			return 0;
+		}
+	}
+
 	int64_t DuetRT_GetParkedElsewhere(void)
 	{
 		return Duet::Sbc::Activity::ParkedElsewhere();

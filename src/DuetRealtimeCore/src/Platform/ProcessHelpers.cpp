@@ -1,5 +1,6 @@
 #include "ProcessHelpers.h"
 
+#include <pthread.h>
 #include <sched.h>
 
 #include <algorithm>
@@ -57,6 +58,11 @@ namespace Duet::Sbc
 		std::memset(&param, 0, sizeof(param));
 		param.sched_priority = priority;
 		return sched_setscheduler(0, SCHED_FIFO, &param) == 0;
+	}
+
+	void NameCurrentThread(const char* name) noexcept
+	{
+		(void)pthread_setname_np(pthread_self(), name);
 	}
 
 } // namespace Duet::Sbc

@@ -188,8 +188,21 @@ internal sealed class SbcLockstep
     }
 
     private static string Describe() =>
-        $"native activity {DuetRT_GetPendingActivity()}, pool items queued {ThreadPool.PendingWorkItemCount}, " +
+        $"native activity {DuetRT_GetPendingActivity()} ({NativeActivity()}), pool items queued {ThreadPool.PendingWorkItemCount}, " +
         $"busy pool threads {BusyPoolThreads()} besides {s_hostPoolThreads} of the host's";
+
+    // What the native activity is made of: events and wake-ups not yet taken, and the threads taking part
+    private static string NativeActivity()
+    {
+        byte[] buffer = new byte[1024];
+        int needed = DuetRT_DescribeActivity(buffer, buffer.Length);
+        if (needed > buffer.Length)
+        {
+            buffer = new byte[needed];
+            needed = DuetRT_DescribeActivity(buffer, buffer.Length);
+        }
+        return needed <= 0 ? "unknown" : System.Text.Encoding.UTF8.GetString(buffer, 0, Math.Min(needed, buffer.Length) - 1);
+    }
 
     // Pool threads the process keeps busy before the SBC side exists (a test host blocks one reading
     // its control channel), which are not DuetControlServer's. The fewest seen over a few samples, so
@@ -261,6 +274,9 @@ internal sealed class SbcLockstep
 
     [DllImport(LibraryName)]
     private static extern long DuetRT_GetParkedElsewhere();
+
+    [DllImport(LibraryName)]
+    private static extern int DuetRT_DescribeActivity(byte[] buffer, int capacity);
 
     [DllImport(LibraryName)]
     private static extern int DuetRT_EmulatorGetCounts(out uint framesSent, out uint framesReceived);

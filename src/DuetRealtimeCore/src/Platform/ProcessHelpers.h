@@ -15,4 +15,7 @@ namespace Duet::Sbc
 	// Requires CAP_SYS_NICE or a suitable RLIMIT_RTPRIO. Returns true on success.
 	bool SetCurrentThreadRealtimePriority(int priority) noexcept;
 
+	// Name the calling thread, as ps, a debugger and Activity::Describe show it (at most 15 characters).
+	void NameCurrentThread(const char* name) noexcept;
+
 } // namespace Duet::Sbc

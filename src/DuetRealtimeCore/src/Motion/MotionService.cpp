@@ -99,6 +99,7 @@ namespace Duet::Sbc
 		}
 		m_stop.store(false, std::memory_order_release);
 		m_thread = std::thread([this, rtPriority] {
+			NameCurrentThread("DuetRT motion");
 			if (rtPriority > 0)
 			{
 				// Below the interface thread's, deliberately: a late transfer loses the link, while

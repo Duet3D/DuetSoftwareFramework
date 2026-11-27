@@ -8,6 +8,7 @@ using DuetAPI;
 using DuetAPI.Commands;
 using DuetAPI.ObjectModel;
 using DuetControlServer.Files;
+using DuetControlServer.Link.Native;
 using DuetControlServer.Link;
 using DuetControlServer.Motion.Native;
 using DuetControlServer.Link.Protocol.FirmwareRequests;
@@ -81,16 +82,57 @@ internal sealed class MotionService(
     }
 
     /// <summary>
-    /// Configure the motion engine and start it, from a thread of its own placed where the motion
-    /// thread is to run: the engine's native thread inherits the placement of the thread that starts it
+    /// Configure the motion engine and start it
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Configuration has to come first. The engine's defaults are all zero, and a zeroed description
+    /// is not a conservative one: with no steps per mm and no extruders every axis is misclassified
+    /// and no move can be scheduled. Init also builds the rings from the configured depth and grace
+    /// period, so a description pushed down later would not be reflected in them
+    /// </para>
+    /// <para>
+    /// Nothing here produces moves - the G-code path does that, through <see cref="MovePlanner"/>.
+    /// What is left is the engine's lifecycle: configure it before starting it, keep it running, and
+    /// stop it on shutdown.
+    /// </para>
+    /// </remarks>
     /// <param name="stoppingToken">Cancellation token</param>
     /// <returns>Whether the engine is running</returns>
-    private Task<bool> StartEngineAsync(CancellationToken stoppingToken)
+    private async Task<bool> StartEngineAsync(CancellationToken stoppingToken)
+    {
+        // On the thread pool, where a bench running the SBC in lockstep sees the work
+        if (!await planner.ReconfigureAsync(stoppingToken, adoptGeometryFromObjectModel: true))
+        {
+            logger.LogError("Could not configure the native motion engine; no moves will be executed");
+            planner.ReportEngineFailed();
+            return false;
+        }
+
+        if (!await StartNativeMotionAsync())
+        {
+            logger.LogError("Native motion engine did not start; no moves will be executed");
+            planner.ReportEngineFailed();
+            return false;
+        }
+
+        logger.LogInformation("Motion engine started for {NumAxes} axes and {NumExtruders} extruders",
+                              planner.Parameters.NumAxes, planner.Parameters.NumExtruders);
+        return true;
+    }
+
+    /// <summary>
+    /// Start the native engine from a thread of its own placed where the motion thread is to run: the
+    /// engine's native thread inherits the placement of the thread that starts it
+    /// </summary>
+    /// <returns>Whether it started</returns>
+    private Task<bool> StartNativeMotionAsync()
     {
         TaskCompletionSource<bool> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
         Thread starter = new(() =>
         {
+            // Not a pool thread, so it says when it works
+            using NativeActivity.RunningScope running = NativeActivity.Running();
             try
             {
                 if (settings.Value.IsolateMotionThread && DuetSharedLibrary.ProcessHelpers.IsRaspberryPi())
@@ -120,22 +162,11 @@ internal sealed class MotionService(
                         }
                     }
                 }
-                tcs.SetResult(StartEngine(stoppingToken));
-            }
-            catch (Exception e) when ((e as AggregateException)?.InnerException is OperationCanceledException || e is OperationCanceledException)
-            {
-                if (stoppingToken.IsCancellationRequested)
-                {
-                    tcs.SetResult(false);
-                }
-                else
-                {
-                    tcs.SetCanceled(stoppingToken);
-                }
+                tcs.SetResult(linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0));
             }
             catch (Exception e)
             {
-                tcs.SetException((e as AggregateException)?.InnerException ?? e);
+                tcs.SetException(e);
             }
         })
         {
@@ -145,45 +176,6 @@ internal sealed class MotionService(
         };
         starter.Start();
         return tcs.Task;
-    }
-
-    /// <summary>
-    /// Configure the motion engine and start it
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Nothing here produces moves - the G-code path does that, through <see cref="MovePlanner"/>.
-    /// What is left is the engine's lifecycle: configure it before starting it, keep it running, and
-    /// stop it on shutdown.
-    /// </para>
-    /// <para>
-    /// Configuration has to come first. The engine's defaults are all zero, and a zeroed description
-    /// is not a conservative one: with no steps per mm and no extruders every axis is misclassified
-    /// and no move can be scheduled. Init also builds the rings from the configured depth and grace
-    /// period, so a description pushed down later would not be reflected in them
-    /// </para>
-    /// </remarks>
-    /// <param name="stoppingToken">Cancellation token</param>
-    /// <returns>Whether the engine is running</returns>
-    private bool StartEngine(CancellationToken stoppingToken)
-    {
-        if (!planner.ReconfigureAsync(stoppingToken, adoptGeometryFromObjectModel: true).AsTask().GetAwaiter().GetResult())
-        {
-            logger.LogError("Could not configure the native motion engine; no moves will be executed");
-            planner.ReportEngineFailed();
-            return false;
-        }
-
-        if (!linkInterface.Native.StartMotion(settings.Value.UseRealtimeScheduling ? settings.Value.MotionRtPriority : 0))
-        {
-            logger.LogError("Native motion engine did not start; no moves will be executed");
-            planner.ReportEngineFailed();
-            return false;
-        }
-
-        logger.LogInformation("Motion engine started for {NumAxes} axes and {NumExtruders} extruders",
-                              planner.Parameters.NumAxes, planner.Parameters.NumExtruders);
-        return true;
     }
 
     /// <summary>
