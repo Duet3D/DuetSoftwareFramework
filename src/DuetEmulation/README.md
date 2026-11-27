@@ -138,6 +138,8 @@ A session needs no scenario file: `start` on its own boots both stacks with no e
 
 The API is under `/api`. It takes JSON or YAML and answers JSON; a refusal is `{"error": ...}` with a status of 400, 404 or 409.
 
+Only this machine's pages and scripts may use it, so that a page on another site open in the browser cannot drive it or write to the repository. A request must name `localhost` or a loopback address as its host, on any port so that a forwarded port works, and an `Origin` must be the server's own. A body must be sent as `application/json` or `application/yaml`, which a page on another site cannot send without a CORS preflight. Anything else is refused with 403.
+
 | Request | |
 | --- | --- |
 | `GET /api/session` | What the server is doing (`none`, `booting`, `ready`, `running`, `failed`) and its session |

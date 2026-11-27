@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -30,6 +31,11 @@ namespace DuetEmulator;
 /// The page is at <c>/</c>. The API is under <c>/api</c>; requests take JSON or YAML (JSON is YAML) and
 /// answer JSON, and a refusal answers <c>{"error": ...}</c>. There is one session at a time, which
 /// every client shares: <c>GET /api/events</c> follows it as server-sent events, whoever drives it.
+/// </para>
+/// <para>
+/// Only this machine's own pages and scripts may use it: a request must name a loopback host, any
+/// Origin must be the server's own, and a body must be JSON or YAML by its Content-Type, which a page
+/// on another site cannot send without a CORS preflight the server never answers.
 /// </para>
 /// <list type="table">
 /// <item><term>GET /api/session</term><description>What the server is doing, and its session</description></item>
@@ -78,6 +84,7 @@ public sealed class SessionServer : IAsyncDisposable
         builder.Logging.SetMinimumLevel(LogLevel.Warning);
         builder.WebHost.UseKestrel(options => options.Listen(IPAddress.Loopback, port));
         _app = builder.Build();
+        _app.Use(RefuseOtherSites);
         _app.Use(RefusalsAsJson);
         PhysicalFileProvider page = new(PageDirectory);
         _app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = page });
@@ -311,6 +318,41 @@ public sealed class SessionServer : IAsyncDisposable
     }
 
     private static IResult Json(JsonNode? node) => Results.Text((node ?? new JsonObject()).ToText(), "application/json");
+
+    // What a page on another site could send: a host name other than this machine's (DNS rebinding), an
+    // Origin other than the server's own, or a body of a type a browser sends cross-site without a preflight
+    private static async Task RefuseOtherSites(HttpContext context, RequestDelegate next)
+    {
+        HttpRequest request = context.Request;
+        string? origin = request.Headers.Origin;
+        string? refusal =
+            !IsLoopback(request.Host) ? $"{request.Host} is not this machine"
+            : origin is not null && origin != $"{request.Scheme}://{request.Host}" ? $"Requests from {origin} are not accepted"
+            : HasBody(request) && !IsJsonOrYaml(request.ContentType) ? "A request body must be application/json or application/yaml"
+            : null;
+        if (refusal is not null)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(new JsonObject { ["error"] = refusal }.ToText());
+            return;
+        }
+        await next(context);
+    }
+
+    // Any port, since a forwarded port need not be the one listened on
+    private static bool IsLoopback(HostString host) =>
+        host.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+        (IPAddress.TryParse(host.Host.Trim('[', ']'), out IPAddress? address) && IPAddress.IsLoopback(address));
+
+    private static bool HasBody(HttpRequest request) =>
+        request.ContentLength > 0 || (request.ContentLength is null && request.Headers.TransferEncoding.Count > 0);
+
+    private static bool IsJsonOrYaml(string? contentType) =>
+        MediaTypeHeaderValue.TryParse(contentType, out MediaTypeHeaderValue? type) &&
+        type.MediaType is { } mediaType &&
+        (mediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
+         mediaType.Equals("application/yaml", StringComparison.OrdinalIgnoreCase));
 
     // A refusal as {"error": ...} with a status that says whose fault it is
     private static async Task RefusalsAsJson(HttpContext context, RequestDelegate next)
