@@ -2,7 +2,7 @@
 """The emulation bench's command line tool and its session server: scripts/emulate.py.
 
 The tool (src/DuetEmulator) runs scenarios, compares captures and serves sessions; the session
-commands here are a client of that server, which listens on localhost.
+commands here are a client of that server's API (under /api), which listens on localhost.
 """
 
 from __future__ import annotations
@@ -78,6 +78,10 @@ def describe_event(event: dict[str, Any]) -> str:
         text = 'OM snapshot'
     elif kind == 'note':
         text = f'# {event["text"]}'
+    elif kind == 'await':
+        text = f'await {event["code"]}'
+    elif kind == 'wait':
+        text = f'wait {event["duration"]}'
     else:
         text = json.dumps(event)
     return f'{float(event.get("t", 0)):12.6f} {text}'
@@ -87,15 +91,15 @@ def describe_steps(answer: dict[str, Any]) -> str:
     """The answer to running steps as text: each step's reply and events on each stack, then their differences."""
     lines: list[str] = []
     for step in cast(list[dict[str, Any]], answer.get('steps', [])):
-        lines.append(f'== {step["step"]}')
-        for stack, result in step.items():
-            if stack in ('step', 'differences') or not isinstance(result, dict):
-                continue
-            result = cast(dict[str, Any], result)
-            lines.append(f'-- {stack} (t={float(result.get("time", 0)):.6f})')
+        lines.append(f'== {step["number"]}: {step["step"]}' + ('' if step.get('state') != 'failed' else ' (failed)'))
+        for stack, result in cast(dict[str, dict[str, Any]], step.get('stacks', {})).items():
+            finished = result.get('finished')
+            lines.append(f'-- {stack} (t={float(finished if finished is not None else result.get("started", 0)):.6f})')
             lines += [describe_event(e) for e in cast(list[dict[str, Any]], result.get('events') or [])]
+            if result.get('error'):
+                lines.append(f'   failed: {result["error"]}')
         differences = cast(list[str], step.get('differences') or [])
-        if 'differences' in step:
+        if len(step.get('stacks', {})) == 2:
             lines.append('-- differences: ' + ('none' if not differences else str(len(differences))))
             lines += [f'   {d}' for d in differences]
     return '\n'.join(lines)

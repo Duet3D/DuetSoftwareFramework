@@ -158,6 +158,10 @@ jobs:
       - name: Test the scripts
         run: scripts/test.py scripts
 
+      # The emulation bench's page, under Node
+      - name: Test the emulation bench's page
+        run: scripts/test.py page
+
   test:
     name: Run unit tests
     needs: image

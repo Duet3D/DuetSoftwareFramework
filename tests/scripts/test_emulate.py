@@ -76,7 +76,7 @@ class SessionCommandsTest(TestCase):
                 self.assertEqual(status, 0)
                 self.assertEqual(len(sent), 1)
                 method, path, text = sent[0]
-                self.assertEqual((method, path), ('POST', '/steps'))
+                self.assertEqual((method, path), ('POST', '/api/steps'))
                 self.assertEqual(json.loads(text or ''), body)
 
     def test_a_session_starts_from_the_boards_and_config_given(self) -> None:
@@ -90,14 +90,14 @@ class SessionCommandsTest(TestCase):
             with self.subTest(argv=argv):
                 status, _, sent = self.requests(*argv, answer={})
                 self.assertEqual(status, 0)
-                self.assertEqual([(m, p) for m, p, _ in sent], [('POST', '/session')])
+                self.assertEqual([(m, p) for m, p, _ in sent], [('POST', '/api/session')])
                 self.assertEqual(json.loads(sent[0][2] or ''), scenario)
 
     def test_a_session_starts_from_a_scenario_file(self) -> None:
         with patch.object(emulator, 'scenario_text', return_value='boards: {1: EXP3HC}') as read:
             _, _, sent = self.requests('start', 'session.yaml', answer={})
         read.assert_called_once_with('session.yaml')
-        self.assertEqual(sent, [('POST', '/session', 'boards: {1: EXP3HC}')])
+        self.assertEqual(sent, [('POST', '/api/session', 'boards: {1: EXP3HC}')])
 
     def test_a_start_that_cannot_be_understood_sends_nothing(self) -> None:
         cases = [
@@ -112,16 +112,17 @@ class SessionCommandsTest(TestCase):
 
     def test_a_step_given_as_yaml_is_passed_on_as_it_is(self) -> None:
         _, _, sent = self.requests('step', '{code: G28, timeout: 30s}')
-        self.assertEqual(sent, [('POST', '/steps', '{code: G28, timeout: 30s}')])
+        self.assertEqual(sent, [('POST', '/api/steps', '{code: G28, timeout: 30s}')])
 
     def test_queries(self) -> None:
         cases: list[tuple[list[str], tuple[str, str]]] = [
-            (['status'], ('GET', '/')),
-            (['stop'], ('DELETE', '/session')),
-            (['om', 'move.axes'], ('GET', '/om?key=move.axes')),
-            (['capture'], ('GET', '/capture')),
-            (['capture', '--since', '5', '--text'], ('GET', '/capture?since=5&format=text')),
-            (['save'], ('POST', '/save')),
+            (['status'], ('GET', '/api/session')),
+            (['stop'], ('DELETE', '/api/session')),
+            (['om', 'move.axes'], ('GET', '/api/om?key=move.axes')),
+            (['om', 'boards[1]'], ('GET', '/api/om?key=boards%5B1%5D')),
+            (['capture'], ('GET', '/api/capture')),
+            (['capture', '--since', '5', '--text'], ('GET', '/api/capture?since=5&format=text')),
+            (['save'], ('POST', '/api/save')),
         ]
         for argv, request in cases:
             with self.subTest(argv=argv):
@@ -136,14 +137,21 @@ class SessionCommandsTest(TestCase):
 
     def test_steps_print_as_text(self) -> None:
         answer: dict[str, Any] = {'steps': [{
-            'step': 'G91',
-            'rrf': {'time': 2.88, 'events': [{'kind': 'code', 't': 2.78, 'code': 'G91'}, {'kind': 'reply', 't': 2.82, 'severity': 'success', 'text': ''}]},
-            'dsf': {'time': 2.0, 'events': [{'kind': 'om', 't': 2.0, 'path': 'inputs[10].axesRelative', 'old': False, 'new': True}]},
+            'number': 1, 'step': 'G91', 'state': 'done',
+            'stacks': {
+                'rrf': {'started': 2.78, 'finished': 2.88, 'events': [{'kind': 'code', 't': 2.78, 'code': 'G91'},
+                                                                      {'kind': 'reply', 't': 2.82, 'severity': 'success', 'text': ''}]},
+                'dsf': {'started': 1.9, 'finished': 2.0, 'events': [{'kind': 'om', 't': 2.0, 'path': 'inputs[10].axesRelative', 'old': False, 'new': True}]},
+            },
             'differences': ['om: inputs[10].axesRelative: false vs true'],
+        }, {
+            'number': 2, 'step': 'G1 X10', 'state': 'failed',
+            'stacks': {'rrf': {'started': 3, 'finished': 13, 'error': 'Timed out', 'events': []}},
+            'differences': [],
         }]}
         _, out, _ = self.requests('send', 'G91', answer=answer)
         self.assertEqual(out.splitlines(), [
-            '== G91',
+            '== 1: G91',
             '-- rrf (t=2.880000)',
             '    2.780000 > G91',
             '    2.820000 < (empty)',
@@ -151,7 +159,38 @@ class SessionCommandsTest(TestCase):
             '    2.000000 OM inputs[10].axesRelative: false -> true',
             '-- differences: 1',
             '   om: inputs[10].axesRelative: false vs true',
+            '== 2: G1 X10 (failed)',
+            '-- rrf (t=13.000000)',
+            '   failed: Timed out',
         ])
+
+    def test_export_keeps_every_step_but_those_skipped(self) -> None:
+        steps = {'steps': [{'number': n} for n in (1, 2, 3, 4)]}
+        sent: list[tuple[str, str, str | None]] = []
+
+        def fake(port: int, method: str, path: str, body: str | None = None, timeout: float = 3600) -> dict[str, Any]:
+            sent.append((method, path, body))
+            return steps if path == '/api/steps' else {'yaml': 'name: homing\n', 'path': 'src/DuetEmulation/Scenarios/homing.yaml'}
+
+        with patch.object(emulator, 'request', side_effect=fake):
+            status, out = run('export', 'src/DuetEmulation/Scenarios/homing.yaml', '--skip', '2,4', '--to-config', '1', '--name', 'homing')
+        self.assertEqual(status, 0)
+        self.assertEqual([(m, p) for m, p, _ in sent], [('GET', '/api/steps'), ('POST', '/api/scenario')])
+        self.assertEqual(json.loads(sent[1][2] or ''), {
+            'steps': [1, 3], 'toConfig': [1], 'overwrite': False, 'name': 'homing', 'path': 'src/DuetEmulation/Scenarios/homing.yaml'})
+        self.assertIn('Saved src/DuetEmulation/Scenarios/homing.yaml', out)
+
+    def test_export_without_a_path_prints_the_scenario(self) -> None:
+        def fake(port: int, method: str, path: str, body: str | None = None, timeout: float = 3600) -> dict[str, Any]:
+            return {'steps': []} if path == '/api/steps' else {'yaml': 'name: homing\n'}
+
+        with patch.object(emulator, 'request', side_effect=fake):
+            status, out = run('export')
+        self.assertEqual((status, out), (0, 'name: homing\n'))
+
+    def test_export_refuses_a_list_that_is_not_of_numbers(self) -> None:
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            run('export', '--skip', 'two')
 
 
 class DescribeEventTest(TestCase):
@@ -165,6 +204,8 @@ class DescribeEventTest(TestCase):
             ({'kind': 'input', 't': 1, 'board': 1, 'port': 'io0.in', 'value': 'high'}, 'INPUT 1.io0.in high'),
             ({'kind': 'input-change', 't': 1, 'board': 1, 'ports': ['io0.in'], 'value': 'low'}, 'INPUT 1.io0.in low (scripted)'),
             ({'kind': 'note', 't': 1, 'text': 'probing'}, '# probing'),
+            ({'kind': 'await', 't': 1, 'code': 'G28'}, 'await G28'),
+            ({'kind': 'wait', 't': 1, 'duration': '500ms'}, 'wait 500ms'),
         ]
         for event, text in cases:
             with self.subTest(kind=event['kind']):

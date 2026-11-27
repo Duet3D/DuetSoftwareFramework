@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Serialization;
 using YamlDotNet.Serialization;
 
 namespace DuetEmulation.Scenarios;
@@ -85,7 +86,7 @@ public sealed class ScenarioStep
     }
 
     /// <summary>How long a code may take</summary>
-    [YamlIgnore]
+    [YamlIgnore, JsonIgnore]
     public TimeSpan? TimeoutSpan => Timeout is null ? null : Scenario.ParseDuration(Timeout);
 }
 
@@ -126,7 +127,7 @@ public sealed class PinInput
     public bool? Inverted { get; set; }
 
     /// <summary>The level as a bool</summary>
-    [YamlIgnore]
+    [YamlIgnore, JsonIgnore]
     public bool LevelValue => Level?.ToLowerInvariant() switch
     {
         "high" or "true" or "1" or "on" => true,

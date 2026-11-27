@@ -13,7 +13,7 @@ captured: every code and reply, CAN frame, object model change and pin change, i
 
 A session boots the boards once and runs steps one at a time, on both stacks side by side:
 
-    scripts/emulate.py serve &                                  start the session server (port 8770)
+    scripts/emulate.py serve &                                  start the session server; its page is http://127.0.0.1:8770/
     scripts/emulate.py start session.yaml                       boot a scenario's boards and config.g
     scripts/emulate.py start --board 1=EXP3HC --config 'M584 X1.0'
                                                                 or name the boards and config.g lines here
@@ -26,6 +26,7 @@ A session boots the boards once and runs steps one at a time, on both stacks sid
     scripts/emulate.py capture --text                           everything recorded so far
     scripts/emulate.py differences                              how the stacks differ so far
     scripts/emulate.py save                                     save the captures
+    scripts/emulate.py export homing.yaml --skip 4              save the session as a scenario, without step 4
     scripts/emulate.py stop                                     end the session
 
 The tool builds and runs src/DuetEmulator; the firmware images must have been built
@@ -37,6 +38,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.parse
 from collections.abc import Sequence
 from typing import Any
 
@@ -141,6 +143,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     capture.add_argument('--text', action='store_true', help='as text')
     commands.add_parser('differences', help='how the stacks differ so far')
     commands.add_parser('save', help='save the captures and their differences')
+    export = commands.add_parser('export', help='the session as a scenario: printed, or saved in the repository')
+    export.add_argument('path', nargs='?', help='where to save it, from the repository\'s root (default: print it)')
+    export.add_argument('--name', help='the scenario\'s name (default: the session\'s)')
+    export.add_argument('--description', help='what it does, written as the comment it starts with')
+    export.add_argument('--skip', type=step_numbers, default=[], metavar='N,...', help='steps to leave out')
+    export.add_argument('--to-config', type=step_numbers, default=[], metavar='N,...', help='code steps to move to config.g')
+    export.add_argument('--overwrite', action='store_true', help='replace the file if it exists')
 
     args = parse(p, argv)
     command: str = args.command
@@ -158,16 +167,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     port: int = args.port
     try:
         if command == 'start':
-            show(emulator.request(port, 'POST', '/session', start_text(p, args)), args.json)
+            show(emulator.request(port, 'POST', '/api/session', start_text(p, args)), args.json)
         elif command == 'stop':
-            show(emulator.request(port, 'DELETE', '/session'), True)
+            show(emulator.request(port, 'DELETE', '/api/session'), True)
         elif command == 'status':
-            show(emulator.request(port, 'GET', '/'), True)
+            show(emulator.request(port, 'GET', '/api/session'), True)
         elif command == 'send':
             steps = [{'code': c, **({'timeout': args.timeout} if args.timeout else {})} for c in args.codes]
-            show(emulator.request(port, 'POST', '/steps', json.dumps(steps)), args.json)
+            show(emulator.request(port, 'POST', '/api/steps', json.dumps(steps)), args.json)
         elif command == 'step':
-            show(emulator.request(port, 'POST', '/steps', args.yaml), args.json)
+            show(emulator.request(port, 'POST', '/api/steps', args.yaml), args.json)
         elif command in ('drive', 'release', 'analog', 'thermistor'):
             pin: dict[str, object] = {'board': args.board, 'port': args.pin}
             if command == 'drive':
@@ -176,30 +185,53 @@ def main(argv: Sequence[str] | None = None) -> int:
                 pin['value'] = float(args.value)
             elif command == 'thermistor':
                 pin['celsius'] = float(args.value)
-            show(emulator.request(port, 'POST', '/steps', emulator.step_json(command, pin)), args.json)
+            show(emulator.request(port, 'POST', '/api/steps', emulator.step_json(command, pin)), args.json)
         elif command == 'wait':
-            show(emulator.request(port, 'POST', '/steps', emulator.step_json('wait', args.duration)), args.json)
+            show(emulator.request(port, 'POST', '/api/steps', emulator.step_json('wait', args.duration)), args.json)
         elif command == 'note':
-            show(emulator.request(port, 'POST', '/steps', emulator.step_json('note', args.text)), args.json)
+            show(emulator.request(port, 'POST', '/api/steps', emulator.step_json('note', args.text)), args.json)
         elif command == 'om':
-            show(emulator.request(port, 'GET', f'/om?key={args.key}'), True)
+            show(emulator.request(port, 'GET', f'/api/om?key={urllib.parse.quote(args.key)}'), True)
         elif command == 'capture':
             query = '&'.join(q for q in (f'since={args.since}' if args.since is not None else '', 'format=text' if args.text else '') if q)
-            answer = emulator.request(port, 'GET', '/capture' + (f'?{query}' if query else ''))
+            answer = emulator.request(port, 'GET', '/api/capture' + (f'?{query}' if query else ''))
             if args.text and not args.json:
                 for stack, text in answer.items():
                     print(f'-- {stack}\n{text}')
             else:
                 show(answer, True)
         elif command == 'differences':
-            answer = emulator.request(port, 'GET', '/differences')
+            answer = emulator.request(port, 'GET', '/api/differences')
             print(answer['report'] if not args.json else json.dumps(answer, indent=2))
         elif command == 'save':
-            show(emulator.request(port, 'POST', '/save'), True)
+            show(emulator.request(port, 'POST', '/api/save'), True)
+        elif command == 'export':
+            steps = emulator.request(port, 'GET', '/api/steps')['steps']
+            request: dict[str, object] = {
+                'steps': [s['number'] for s in steps if s['number'] not in args.skip],
+                'toConfig': args.to_config,
+                'overwrite': args.overwrite,
+            }
+            request.update({k: v for k, v in (('name', args.name), ('description', args.description), ('path', args.path)) if v})
+            answer = emulator.request(port, 'POST', '/api/scenario', json.dumps(request))
+            if args.json:
+                show(answer, True)
+            elif 'path' in answer:
+                print(f'Saved {answer["path"]}')
+            else:
+                print(answer['yaml'], end='')
     except emulator.SessionError as e:
         print(e, file=sys.stderr)
         return 1
     return 0
+
+
+def step_numbers(text: str) -> list[int]:
+    """Step numbers given as a list such as 2,5,7."""
+    try:
+        return [int(n) for n in text.split(',') if n.strip()]
+    except ValueError:
+        raise argparse.ArgumentTypeError(f'"{text}" is not a list of step numbers, such as 2,5') from None
 
 
 def start_text(p: argparse.ArgumentParser, args: argparse.Namespace) -> str:

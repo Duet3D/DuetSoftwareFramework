@@ -62,6 +62,27 @@ public sealed class MachineCapture(CaptureHeader header)
         }
     }
 
+    /// <summary>How many events it has</summary>
+    public int Count
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _events.Count;
+            }
+        }
+    }
+
+    /// <summary>The events from the <paramref name="index"/>th on, as they are now</summary>
+    public IReadOnlyList<CaptureEvent> Since(int index)
+    {
+        lock (_lock)
+        {
+            return index >= _events.Count ? [] : _events.GetRange(Math.Max(0, index), _events.Count - Math.Max(0, index));
+        }
+    }
+
     /// <summary>
     /// Raised after events are added, with the index of the first event that is new or has moved: the
     /// events from there on are to be read again

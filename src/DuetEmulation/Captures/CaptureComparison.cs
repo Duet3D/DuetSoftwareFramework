@@ -18,9 +18,9 @@ public sealed record ComparisonOptions
     public IReadOnlyList<string> IgnoredCanTypes { get; init; } = ["TimeSync", "StatusReport", "BoardStatusReport", "BoardStatusReportV1", "DriversStatusReport", "FansReport"];
 
     /// <summary>
-    /// Fields of decoded CAN messages left out: by default the request id, which each stack numbers its
-    /// own way, and the step clock times a move starts at and an input changed at, which depend on when
-    /// each stack scheduled the move
+    /// Fields of decoded CAN messages left out, at any depth: by default the request id, which each stack
+    /// numbers its own way, and the step clock times a move starts at and an input changed at, which
+    /// depend on when each stack scheduled the move
     /// </summary>
     public IReadOnlyList<string> IgnoredCanFields { get; init; } = ["RequestId", "WhenToExecute", "When"];
 
@@ -172,6 +172,27 @@ public static class CaptureComparison
 
     /// <summary>How many steps a capture has, counting the start</summary>
     public static int StepCount(MachineCapture capture) => Steps(capture.Events).Count;
+
+    /// <summary>The events of one step of a capture: the event that starts it, then everything until the next step</summary>
+    /// <param name="events">The capture's events</param>
+    /// <param name="step">The step's number; step 1 is what came before the first action</param>
+    public static IReadOnlyList<CaptureEvent> EventsOfStep(IReadOnlyList<CaptureEvent> events, int step)
+    {
+        List<CaptureEvent> result = [];
+        int current = 1;
+        foreach (CaptureEvent e in events)
+        {
+            if (StepAction(e) is not null && ++current > step)
+            {
+                break;
+            }
+            if (current == step)
+            {
+                result.Add(e);
+            }
+        }
+        return result;
+    }
 
     /// <summary>What a capture event does to start a step, or null if it does not start one</summary>
     public static string? StepAction(CaptureEvent e) => e switch
@@ -370,11 +391,31 @@ public static class CaptureComparison
             return JsonValue.Create(frame.Data);
         }
         JsonObject message = frame.Message.DeepClone().AsObject();
-        foreach (string field in options.IgnoredCanFields)
-        {
-            message.Remove(field);
-        }
+        RemoveFields(message, options.IgnoredCanFields);
         return message;
+    }
+
+    // Leave out the ignored fields wherever they are, such as each result's time in an input report
+    private static void RemoveFields(JsonNode? node, IReadOnlyList<string> fields)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (string field in fields)
+            {
+                obj.Remove(field);
+            }
+            foreach ((_, JsonNode? child) in obj)
+            {
+                RemoveFields(child, fields);
+            }
+        }
+        else if (node is JsonArray array)
+        {
+            foreach (JsonNode? child in array)
+            {
+                RemoveFields(child, fields);
+            }
+        }
     }
 
     private static IEnumerable<(string Head, JsonNode? Body, CaptureEvent Event)> Pins(Step step) =>

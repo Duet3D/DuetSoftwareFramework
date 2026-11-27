@@ -270,4 +270,15 @@ public class CaptureTests
         Assert.That(changes, Is.EqualTo(new[] { 2, 1 }), "an event added in order is new from its own index; one added earlier moves those after it");
         Assert.That(capture.Events.Select(e => e.T), Is.EqualTo(new[] { 1.0, 2, 3, 4 }));
     }
+
+    [Test]
+    public void AnIgnoredFieldIsLeftOutWhereverItIs()
+    {
+        JsonObject Report(int when) => JsonNode.Parse($$"""{"NumHandles":1,"Results":[{"Handle":{"All":4096},"When":{{when}},"Reading":1}]}""")!.AsObject();
+        MachineCapture first = Capture("rrf", new CodeSent(1, "G1 H1 X-100"), new CanFrameSent(1.5, 1, 0, "InputStateChangedV2", false, "00", Report(33561)));
+        MachineCapture second = Capture("dsf", new CodeSent(1, "G1 H1 X-100"), new CanFrameSent(1.4, 1, 0, "InputStateChangedV2", false, "00", Report(39707)));
+
+        Assert.That(CaptureComparison.Compare(first, second), Is.Empty);
+        Assert.That(CaptureComparison.Compare(first, second, new ComparisonOptions { IgnoredCanFields = [] }), Has.Count.EqualTo(2));
+    }
 }

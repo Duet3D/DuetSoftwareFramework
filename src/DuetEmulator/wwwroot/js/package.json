@@ -1,0 +1,4 @@
+{
+  "//": "The page's scripts are ES modules, which Node runs them as when tests/page imports them",
+  "type": "module"
+}

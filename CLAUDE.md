@@ -66,6 +66,7 @@ Always run tests with `scripts/test.py`, never `dotnet test`, including a single
 | Native | `scripts/test.py native` | DuetRealtimeCore's ctest suite, in a host build used only for tests |
 | Emulation | `scripts/test.py emulation --build` | The firmware images in Renode, on both stacks (`src/DuetEmulation/README.md`); several minutes |
 | Scripts | `scripts/test.py scripts` | The Python scripts' tests (`tests/scripts`), with builds, git and boards faked; run with `pyright` after changing `scripts/` |
+| Page | `scripts/test.py page` | The emulation bench's page (`src/DuetEmulator/wwwroot`) under Node (`tests/page`) |
 
 Single unit test: `scripts/test.py unit --filter "FullyQualifiedName~ClassName.MethodName"`.
 

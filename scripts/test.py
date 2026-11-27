@@ -11,6 +11,7 @@
     scripts/test.py emulation --build                             the firmware on emulated boards, in Renode
     scripts/test.py native                                        DuetRealtimeCore's host-side tests
     scripts/test.py scripts                                       the tests of these scripts
+    scripts/test.py page                                          the tests of the emulation bench's page, under Node
 
 unit runs src/UnitTests under coverage and prints line and branch coverage per assembly. system runs
 src/SystemTests, which host the real DuetControlServer and libduet_realtime_core.so against a scripted
@@ -18,7 +19,8 @@ controller, naming each test as it starts and listing the slow and the failed on
 full suite takes many minutes. emulation runs src/EmulationTests, which run the firmware images in
 Renode, on RepRapFirmware and on DuetControlServer with DuetCANMaster. native builds DuetRealtimeCore for this machine and runs its ctest
 suite. scripts runs tests/scripts, which test the scripts' command lines with the builds, git and the
-boards faked, so they need no toolchain, build or hardware. `scripts/test.py <command> --help` describes each command's options.
+boards faked, so they need no toolchain, build or hardware. page runs tests/page, which test the
+emulation bench's page (src/DuetEmulator/wwwroot) under Node, without a browser. `scripts/test.py <command> --help` describes each command's options.
 """
 
 from __future__ import annotations
@@ -45,6 +47,10 @@ def scripts() -> int:
     return call([sys.executable, '-m', 'unittest', 'discover', '-s', str(ROOT / 'tests/scripts'), '-t', str(ROOT)])
 
 
+def page() -> int:
+    return call(['node', '--test', str(ROOT / 'tests/page')])
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     # Everything after "--" goes to dotnet test as it is
@@ -66,6 +72,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     emulation_tests.add_arguments(emulation)
     commands.add_parser('native', help="DuetRealtimeCore's host-side tests")
     commands.add_parser('scripts', help="the tests of these scripts, which need no build or hardware")
+    commands.add_parser('page', help="the tests of the emulation bench's page, under Node")
     namespace = parse(p, args[:split])
 
     if namespace.command == 'unit':
@@ -76,6 +83,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return emulation_tests.run(typed(emulation_tests.Options, namespace, dotnet_args=passthrough))
     if namespace.command == 'scripts':
         return scripts()
+    if namespace.command == 'page':
+        return page()
     return native()
 
 
