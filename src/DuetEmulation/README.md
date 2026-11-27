@@ -234,7 +234,7 @@ Booting takes tens of seconds of host time, so a fixture boots once and its test
 
 `Emulator/RenodeInstance` runs a headless Renode and drives it through its robot server, the XML-RPC interface Renode's own test runner uses, which reports each monitor command's success or failure. Each board is a Renode machine made from its platform description (`Renode/Platforms`) and the peripheral models it needs (`Renode/Peripherals`), which Renode compiles when the bench starts; the image is loaded where the real board has it, after its bootloader if it has one. The machines' CAN controllers are connected to one CAN hub, whose traffic `CanBusLogger` writes to `can.jsonl`.
 
-The machines take turns, a millisecond of emulated time each. Expansion boards synchronise their step clocks to the main board's with CAN timestamps, so the CAN model (`DuetMCAN`) stamps each frame with the time it finished on the bus by the sender's clock: the boards' clock sync has no jitter from the emulator, and a frame's latency of up to a turn does not disturb it.
+The machines take turns, a millisecond of emulated time each. Expansion boards synchronise their step clocks to the main board's with CAN timestamps, so the CAN model (`DuetMCAN`) stamps each frame with the time it finished on the bus by the sender's clock: the boards' clock sync has no jitter from the emulator, and a frame's latency of up to a turn does not disturb it. A receiver takes a frame no earlier than that time, so its timestamp is never ahead of the receiver's own counter.
 
 **Standalone.** Emulated time passes only while a call waits for something. Codes go in on the console UART, each followed by an `echo` of a marker that shows where its reply ends; the object model comes back through `M409`.
 

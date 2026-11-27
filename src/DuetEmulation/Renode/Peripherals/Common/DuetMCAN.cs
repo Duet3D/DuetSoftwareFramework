@@ -10,7 +10,7 @@
 //     the bit timing in NBTP and the CAN clock frequency; TSS=2 reads an external counter, a
 //     peripheral's "StepClock" property (the SAME70 uses TC0, its step clock, for this)
 //   - the time a frame takes on the bus, from its length and the nominal and data bit timing (NBTP,
-//     DBTP), ignoring stuff bits
+//     DBTP), ignoring stuff bits, with each controller's frames one after another
 //   - TXTS in Tx event FIFO elements: the counter when the frame has been sent, which is what
 //     RepRapFirmware measures its time sync messages' transmit delay with
 //   - the event type of Tx events, which Renode had wrong
@@ -18,6 +18,8 @@
 //     bus by the *sender's* clock. The hub delivers a frame at the receiver's next synchronisation
 //     point, up to a quantum later; stamping it with the time it was on the bus means the sender's and
 //     receivers' timestamps describe the same moment, as they do on a real bus.
+//   - receiving a frame no earlier than its last bit: a synchronisation point can come before then, and
+//     a frame taken there would have an RXTS ahead of TSCV
 //
 using System.Collections.Generic;
 using System.Linq;
@@ -57,6 +59,21 @@ namespace Antmicro.Renode.Peripherals.CAN
         }
 
         public void OnFrameReceived(CANMessageFrame rxMessage)
+        {
+            // Duet: a frame is received once its last bit has arrived. A receiver can be handed it at a sync
+            // point before then, and taking it at once would let its RXTS be ahead of TSCV, which the
+            // firmware reads as a frame almost a timestamp wrap old. Whole microseconds, rounded up, so that
+            // it is never early.
+            var wait = SentAt(rxMessage) - Now();
+            if(wait > 0)
+            {
+                machine.ScheduleAction(TimeInterval.FromMicroseconds((ulong)Math.Ceiling(wait * 1e6)), _ => Receive(rxMessage));
+                return;
+            }
+            Receive(rxMessage);
+        }
+
+        private void Receive(CANMessageFrame rxMessage)
         {
             HandleRxInner(rxMessage);
             UpdateInterrupts();
@@ -1387,11 +1404,12 @@ namespace Antmicro.Renode.Peripherals.CAN
         // When a frame was sent, by the sender's clock, for the receivers to stamp it with
         private static readonly ConditionalWeakTable<CANMessageFrame, StrongBox<double>> sendingTimes = new ConditionalWeakTable<CANMessageFrame, StrongBox<double>>();
 
-        // A frame starts on the bus when it is requested (the bus is assumed idle) and is sent when its
-        // last bit is; that is the moment both ends' timestamps describe
+        // A frame starts on the bus when it is requested, or once this controller's previous frame has
+        // finished (other senders are assumed not to hold the bus), and is sent when its last bit is; that
+        // is the moment both ends' timestamps describe, and frames sent together arrive in their order
         private void RecordSendingTime(CANMessageFrame frame)
         {
-            lastTransmissionEnd = Now() + FrameDuration(frame);
+            lastTransmissionEnd = Math.Max(Now(), lastTransmissionEnd) + FrameDuration(frame);
             sendingTimes.AddOrUpdate(frame, new StrongBox<double>(lastTransmissionEnd));
         }
 
