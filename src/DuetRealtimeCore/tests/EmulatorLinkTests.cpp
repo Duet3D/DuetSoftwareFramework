@@ -285,6 +285,7 @@ namespace
 
 	void AnEdgeCountsWhileAThreadWaitsOnItsLine()
 	{
+		Duet::Sbc::Activity::Enable();
 		const std::string path = SocketPath("activity");
 		FakeEmulator emulator(path);
 		auto link = Connect(emulator, path);

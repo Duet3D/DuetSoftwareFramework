@@ -16,6 +16,13 @@ namespace Duet::Sbc::Activity
 		// The most fds one wait watches
 		constexpr size_t maxWatchedFds = 8;
 
+		std::atomic<bool> enabled{false};
+
+		bool IsEnabled() noexcept
+		{
+			return enabled.load(std::memory_order_relaxed);
+		}
+
 		std::atomic<int64_t> pendingCount{0};
 		std::atomic<int64_t> parkedElsewhereCount{0};
 
@@ -56,6 +63,11 @@ namespace Duet::Sbc::Activity
 		}
 	} // namespace
 
+	void Enable() noexcept
+	{
+		enabled.store(true, std::memory_order_relaxed);
+	}
+
 	int64_t Pending() noexcept
 	{
 		return pendingCount.load(std::memory_order_seq_cst);
@@ -68,7 +80,7 @@ namespace Duet::Sbc::Activity
 
 	void ThreadStarted() noexcept
 	{
-		if (!threadRunning)
+		if (IsEnabled() && !threadRunning)
 		{
 			threadRunning = true;
 			pendingCount.fetch_add(1, std::memory_order_seq_cst);
@@ -119,6 +131,10 @@ namespace Duet::Sbc::Activity
 
 	void Signalled(int fd) noexcept
 	{
+		if (!IsEnabled())
+		{
+			return;
+		}
 		const std::lock_guard lock(waitersMutex);
 		for (WaitingOn* waiter : waiters)
 		{
@@ -133,20 +149,33 @@ namespace Duet::Sbc::Activity
 
 	void EventPosted() noexcept
 	{
+		if (!IsEnabled())
+		{
+			return;
+		}
 		eventCount.fetch_add(1, std::memory_order_seq_cst);
 		pendingCount.fetch_add(1, std::memory_order_seq_cst);
 	}
 
 	void EventConsumed() noexcept
 	{
+		if (!IsEnabled())
+		{
+			return;
+		}
 		eventCount.fetch_sub(1, std::memory_order_seq_cst);
 		pendingCount.fetch_sub(1, std::memory_order_seq_cst);
 	}
 
 	WaitingOn::WaitingOn(std::span<const pollfd> fds) noexcept
 		: m_fds(fds)
+		, m_registered(IsEnabled())
 		, m_running(threadRunning)
 	{
+		if (!m_registered)
+		{
+			return;
+		}
 		const std::lock_guard lock(waitersMutex);
 		m_parked = !AnyReadable(fds);
 		if (m_parked && m_running && self != nullptr)
@@ -162,6 +191,10 @@ namespace Duet::Sbc::Activity
 
 	WaitingOn::~WaitingOn()
 	{
+		if (!m_registered)
+		{
+			return;
+		}
 		const std::lock_guard lock(waitersMutex);
 		std::erase(waiters, this);
 		if (m_parked && m_running && self != nullptr)

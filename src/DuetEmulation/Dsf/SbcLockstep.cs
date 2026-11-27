@@ -60,12 +60,14 @@ internal sealed class SbcLockstep
     public string SbcBridge { get; }
 
     /// <summary>
-    /// Pin the SBC's clocks at the start of emulated time. Before anything native exists, so that the
-    /// step clock's first sample is on emulated time
+    /// Pin the SBC's clocks at the start of emulated time and start counting its native activity.
+    /// Before anything native exists, so that the step clock's first sample is on emulated time and
+    /// every native thread is counted from its start
     /// </summary>
     public SbcLockstep(EmulatedSystem system, string sbcBridge)
     {
         DcsHost.RegisterNativeLibrary();
+        DuetRT_EnableActivityTracking();
         s_hostPoolThreads = MeasureHostPoolThreads();
         _system = system;
         SbcBridge = sbcBridge;
@@ -268,6 +270,9 @@ internal sealed class SbcLockstep
 
     [DllImport(LibraryName)]
     private static extern void DuetRT_UnpinLocalClock();
+
+    [DllImport(LibraryName)]
+    private static extern void DuetRT_EnableActivityTracking();
 
     [DllImport(LibraryName)]
     private static extern long DuetRT_GetPendingActivity();

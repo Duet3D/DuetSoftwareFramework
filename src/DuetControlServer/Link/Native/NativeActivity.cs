@@ -6,7 +6,8 @@ namespace DuetControlServer.Link.Native;
 /// DuetControlServer's dedicated threads taking part in the activity count of DuetRealtimeCore
 /// (<c>Platform/Activity.h</c>), which a bench that drives the SBC's clock itself waits on before it
 /// moves the clock. A thread that takes part counts as running except while it waits in the library.
-/// Thread-pool work is watched through the thread pool instead
+/// Thread-pool work is watched through the thread pool instead. The library counts nothing unless such
+/// a bench has enabled it, so on a real machine these calls do nothing
 /// </summary>
 internal static class NativeActivity
 {

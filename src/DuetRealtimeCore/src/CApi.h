@@ -318,6 +318,10 @@ extern "C"
 	// Restore CLOCK_MONOTONIC as the local time base.
 	void DuetRT_UnpinLocalClock(void);
 
+	// Start counting the native threads' activity (Platform/Activity.h), for a bench that drives the
+	// clock itself. Call it once, before DuetRT_Create; until then the calls below report nothing.
+	void DuetRT_EnableActivityTracking(void);
+
 	// How much the native threads have left to do (Platform/Activity.h): threads running plus
 	// wake-ups and inbound events not yet taken. 0 means every native thread is waiting for the clock
 	// or for something from outside, which is when a bench driving the clock may move it again.

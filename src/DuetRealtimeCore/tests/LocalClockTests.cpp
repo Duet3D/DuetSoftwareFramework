@@ -62,6 +62,33 @@ namespace
 		(void)follows.Drain();
 	}
 
+	// Runs before Enable, which cannot be undone
+	void NothingIsCountedUntilABenchEnablesIt()
+	{
+		Waker waker;
+		{
+			const Activity::Running running;
+			CHECK(Activity::Pending() == 0, "a thread that runs is not counted");
+			pollfd pfd{waker.Fd(), POLLIN, 0};
+			const Activity::WaitingOn wait({&pfd, 1});
+			CHECK(Activity::ParkedElsewhere() == 0, "nor is one that waits");
+			waker.Signal();
+			Activity::EventPosted();
+			CHECK(Activity::Pending() == 0, "nor a wake-up or an event");
+			Activity::EventConsumed();
+		}
+		(void)waker.Drain();
+		CHECK(Activity::Describe() == "events 0, wake-ups 0, threads none", "and no thread takes part");
+
+		// A wait that began before counting started ends without upsetting the count
+		pollfd pfd{waker.Fd(), POLLIN, 0};
+		{
+			const Activity::WaitingOn wait({&pfd, 1});
+			Activity::Enable();
+		}
+		CHECK(Activity::Pending() == 0 && Activity::ParkedElsewhere() == 0, "a wait from before counting leaves nothing behind");
+	}
+
 	void AWakeUpCountsOnlyWhileAThreadWaitsOnIt()
 	{
 		const int64_t before = Activity::Pending();
@@ -147,6 +174,7 @@ int main()
 	APinnedClockReadsWhatItIsPinnedTo();
 	APollTimeoutWaitsForThePinnedClockToMove();
 	AWakerThatFollowsTheClockIsWokenWhenItMoves();
+	NothingIsCountedUntilABenchEnablesIt();
 	AWakeUpCountsOnlyWhileAThreadWaitsOnIt();
 	AThreadIsPendingWhileItRunsAndNotWhileItWaits();
 	return TestSupport::Summarise("local clock");

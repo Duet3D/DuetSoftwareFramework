@@ -219,6 +219,12 @@ namespace Duet::Sbc
 	private:
 		void Run();
 		void SpinOnce();
+
+		// Wake the motion thread for work handed to it. Only a pinned clock needs this, because nothing
+		// else wakes the thread then; on a free-running clock the 1 ms tick picks the work up, so
+		// handing it over costs no system call.
+		void WakeForWork() noexcept;
+
 		void DrainSubmissions();
 
 		// Drop the moves DuetControlServer has submitted for a ring that the motion thread has not
@@ -343,7 +349,7 @@ namespace Duet::Sbc
 
 		std::thread m_thread;
 		std::atomic<bool> m_stop{false};
-		// Wakes the motion thread for work handed to it, for a move of a pinned clock, and to stop
+		// Wakes the motion thread to stop, when a pinned clock moves, and for work handed over on one
 		Waker m_wake{Waker::Clock::Follow};
 
 		// Set once Init has built the rings, and read from the managed side, which asks for room in

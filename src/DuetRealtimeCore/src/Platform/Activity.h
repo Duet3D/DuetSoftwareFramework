@@ -16,6 +16,10 @@
 // ParkedElsewhere() while it waits here, so that whoever is watching the thread pool can tell a pool
 // thread parked in a native wait from one doing work. The managed side's inbound events are counted
 // from when they are posted until they are consumed.
+//
+// It is off unless a bench enables it, which it must do before anything native is created. While
+// it is off every call returns at once, so on a real machine the real-time threads pay nothing
+// for it beyond one relaxed load.
 #pragma once
 
 #include <poll.h>
@@ -26,6 +30,9 @@
 
 namespace Duet::Sbc::Activity
 {
+
+	// Start counting, for good. Before any thread takes part or waits, or the counts start wrong.
+	void Enable() noexcept;
 
 	// Threads that take part and are running, wake-ups written to what a thread waits on, and
 	// inbound events not yet consumed; 0 when there is nothing to do until something moves
@@ -80,6 +87,7 @@ namespace Duet::Sbc::Activity
 
 	  private:
 		std::span<const pollfd> m_fds;
+		bool m_registered = false;
 		bool m_parked = false;
 		bool m_running = false;
 		int64_t m_woken = 0;

@@ -551,6 +551,11 @@ extern "C"
 		Duet::Sbc::LocalClock::Unpin();
 	}
 
+	void DuetRT_EnableActivityTracking(void)
+	{
+		Duet::Sbc::Activity::Enable();
+	}
+
 	int64_t DuetRT_GetPendingActivity(void)
 	{
 		return Duet::Sbc::Activity::Pending();

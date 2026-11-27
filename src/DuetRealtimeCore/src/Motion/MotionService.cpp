@@ -88,7 +88,7 @@ namespace Duet::Sbc
 	void MotionService::Configure(const Motion::MachineConfig& config)
 	{
 		m_move.Configure(config);
-		m_wake.Signal();
+		WakeForWork();
 	}
 
 	void MotionService::Start(int rtPriority)
@@ -120,6 +120,14 @@ namespace Duet::Sbc
 		}
 	}
 
+	void MotionService::WakeForWork() noexcept
+	{
+		if (LocalClock::IsPinned())
+		{
+			m_wake.Signal();
+		}
+	}
+
 	void MotionService::Run()
 	{
 		const Activity::Running running;
@@ -128,9 +136,9 @@ namespace Duet::Sbc
 			SpinOnce();
 			// A fixed tick rather than the interval the rings ask for. Spin returns how long it may
 			// be before more preparation is needed, but a move submitted a moment later needs
-			// picking up sooner than that, and there is no cost to asking again. Work handed over
-			// wakes it sooner. A pinned clock stands still between moves, so then only the clock
-			// moving or work being handed over is a reason to spin again.
+			// picking up sooner than that, and there is no cost to asking again. A pinned clock stands
+			// still between moves, so then only the clock moving or work being handed over
+			// (WakeForWork) is a reason to spin again.
 			pollfd wake{m_wake.Fd(), POLLIN, 0};
 			{
 				const Activity::WaitingOn waiting({&wake, 1});
@@ -344,7 +352,7 @@ namespace Duet::Sbc
 		{
 			return false;
 		}
-		m_wake.Signal();
+		WakeForWork();
 		return true;
 	}
 
@@ -381,7 +389,7 @@ namespace Duet::Sbc
 		{
 			return false;
 		}
-		m_wake.Signal();
+		WakeForWork();
 		return true;
 	}
 
@@ -540,7 +548,7 @@ namespace Duet::Sbc
 			m_submissionsDropped.fetch_add(1, std::memory_order_relaxed);
 			return false;
 		}
-		m_wake.Signal();
+		WakeForWork();
 		return true;
 	}
 
@@ -550,7 +558,7 @@ namespace Duet::Sbc
 		{
 			m_ringState[ring].shouldStartMove.store(shouldStartMove, std::memory_order_relaxed);
 			m_ringState[ring].waitingForEmpty.store(waitingForEmpty, std::memory_order_relaxed);
-			m_wake.Signal();
+			WakeForWork();
 		}
 	}
 
