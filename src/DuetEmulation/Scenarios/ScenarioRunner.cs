@@ -56,8 +56,13 @@ public sealed class StepRunner(Recorder recorder)
         }
         if (step.Await is string awaited)
         {
-            Recorder.RecordedCode pending = _started.Find(c => c.Code == awaited)
-                ?? throw new InvalidOperationException($"\"{awaited}\" was not started");
+            Recorder.RecordedCode? pending = _started.Find(c => c.Code == awaited);
+            if (pending is null)
+            {
+                // Recorded all the same, so that the capture keeps one step for each step run
+                await recorder.RecordAwaitAsync(awaited, cancellationToken);
+                throw new InvalidOperationException($"\"{awaited}\" was not started");
+            }
             _started.Remove(pending);
             return await pending.AwaitAsync(step.TimeoutSpan, cancellationToken);
         }

@@ -102,6 +102,13 @@ public sealed class Recorder
         return new RecordedCode(this, await _bench.StartCodeAsync(code, cancellationToken));
     }
 
+    /// <summary>Record that the script waits for a code, as a step of its own</summary>
+    public async Task RecordAwaitAsync(string code, CancellationToken cancellationToken = default)
+    {
+        await CatchUpAsync(cancellationToken);
+        Capture.Add([new CodeAwaited(Now, code)]);
+    }
+
     /// <summary>Let emulated time pass, recording the wait and what happens during it</summary>
     public async Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default)
     {
@@ -240,8 +247,7 @@ public sealed class Recorder
         /// </summary>
         public async Task<CodeReply> AwaitAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
         {
-            await recorder.CatchUpAsync(cancellationToken);
-            recorder.Capture.Add([new CodeAwaited(recorder.Now, pending.Code)]);
+            await recorder.RecordAwaitAsync(pending.Code, cancellationToken);
             return await WaitAsync(timeout, cancellationToken);
         }
 

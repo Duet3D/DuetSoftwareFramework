@@ -102,6 +102,13 @@ public class SessionTests
         Assert.That(steps[0].State, Is.EqualTo(StepState.Failed));
         Assert.That(steps[0].Stacks["rrf"].Error, Does.Contain("was not started"));
         Assert.That(_session.Steps, Has.Count.EqualTo(before + 1));
+
+        // The failed step is a step of the capture all the same, so the steps after it stay in line with theirs
+        IReadOnlyList<SessionStep> after = await _session.RunAsync(Scenario.ParseSteps("code: M115"));
+        IReadOnlyList<CaptureEvent> events = _session.Stacks[0].Capture.Events;
+        Assert.That(CaptureComparison.StepAction(CaptureComparison.EventsOfStep(events, steps[0].CaptureStep)[0]), Is.EqualTo("await G1 X999"));
+        Assert.That(CaptureComparison.StepAction(CaptureComparison.EventsOfStep(events, after[0].CaptureStep)[0]), Is.EqualTo("M115"));
+        Assert.That(CaptureComparison.StepCount(_session.Stacks[0].Capture), Is.EqualTo(_session.Steps.Count + 1));
     }
 
     [Test, Order(4)]
