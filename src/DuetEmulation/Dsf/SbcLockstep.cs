@@ -51,6 +51,8 @@ internal sealed class SbcLockstep
     private bool _linkActive = true;
     private uint _exchangesSynced;
     private bool _connectionSynced;
+    private TimeSpan _syncedAt;
+    private ulong _framesSynced;
     private TimeSpan _sbcTime;
 
     /// <summary>DuetControlServer's clock</summary>
@@ -229,22 +231,28 @@ internal sealed class SbcLockstep
         }
     }
 
-    // Have the emulator apply what the SBC has sent, and wait for what the emulator has sent back to arrive
+    // Have the emulator apply what the SBC has sent, and wait for what the emulator has sent back to arrive.
+    // Needed after every run of the emulation as well, since the controller sends frames while it runs
     private async Task SyncWithEmulatorAsync(CancellationToken cancellationToken)
     {
         if (DuetRT_EmulatorGetCounts(out uint exchangesSent, out _) == 0)
         {
             return;
         }
-        if (_connectionSynced && exchangesSent == _exchangesSynced)
+        if (_connectionSynced && exchangesSent == _exchangesSynced && _syncedAt == _system.Time)
         {
             return;
         }
 
         ulong framesSent = await _system.Renode.ExecuteForNumberAsync($"{SbcBridge} Sync 1 {exchangesSent}", _system.Main.Machine, cancellationToken);
-        _linkActive = true;
+        if (!_connectionSynced || exchangesSent != _exchangesSynced || framesSent != _framesSynced)
+        {
+            _linkActive = true;
+        }
+        _framesSynced = framesSent;
         _connectionSynced = true;
         _exchangesSynced = exchangesSent;
+        _syncedAt = _system.Time;
 
         Stopwatch elapsed = Stopwatch.StartNew();
         while (DuetRT_EmulatorGetCounts(out _, out uint framesReceived) != 0 && framesReceived < framesSent)

@@ -161,8 +161,16 @@ namespace Antmicro.Renode.Peripherals.SPI
                     Send(FrameExchangeResult, item.Sequence, miso);
                     continue;
                 }
-                heldResult = Tuple.Create(item.Sequence, miso);
-                machine.ScheduleAction(TimeInterval.FromMilliseconds(MaxResultHoldMs), __ => SendHeldResult());
+                var held = Tuple.Create(item.Sequence, miso);
+                heldResult = held;
+                // Sends this result only, should TfrRdy not drop: a later exchange's result is held for its own TfrRdy
+                machine.ScheduleAction(TimeInterval.FromMilliseconds(MaxResultHoldMs), __ =>
+                {
+                    if(heldResult == held)
+                    {
+                        SendHeldResult();
+                    }
+                });
             }
 
             lock(connectionLock)
