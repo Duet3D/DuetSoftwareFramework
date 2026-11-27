@@ -54,12 +54,12 @@ rstc: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40000C00
     size: 0x400
     resetValues: "0x00:0x01"
 
-// STATUS (0x10) and INTFLAG (0x0C): XOSCRDY0/1, DFLLRDY, DFLLLCKF/C, DPLL0/1 LCKR. DFLLSYNC (0x1C)
+// STATUS (0x10) and INTFLAG (0x0C): XOSCRDY0/1, DFLLRDY, DFLLLCKF/C, DPLL0/1 LCKR. DFLLSYNC (0x2C)
 // and the DPLLs' SYNCBUSY (0x3C, 0x50) never busy; their DPLLSTATUS (0x40, 0x54) LOCK and CLKRDY.
 oscctrl: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001000
     size: 0x400
     forceSet: "0x0C:0x01010D03,0x10:0x01010D03,0x40:0x3,0x54:0x3"
-    forceClear: "0x1C:0xFFFFFFFF,0x3C:0xFFFFFFFF,0x50:0xFFFFFFFF"
+    forceClear: "0x2C:0xFFFFFFFF,0x3C:0xFFFFFFFF,0x50:0xFFFFFFFF"
 
 // STATUS (0x0C) and INTFLAG (0x08): XOSC32KRDY
 osc32kctrl: Miscellaneous.SAME5x_RegisterFile @ sysbus 0x40001400
