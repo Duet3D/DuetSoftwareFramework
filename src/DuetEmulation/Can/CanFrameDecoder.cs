@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -78,36 +79,74 @@ public static class CanFrameDecoder
     private static JsonObject DecodeFields<T>(CanFrame frame) where T : struct, ICanMessage<T>
     {
         object message = CanMessageSerializer.Deserialize<T>(frame.Data);
-        return ToJsonObject(message, depth: 0);
+        return ToJsonObject(message, new Extent(0, frame.Data.Length), depth: 0);
     }
 
-    // The public fields and readable properties of a message, recursively for nested structs
-    private static JsonObject ToJsonObject(object value, int depth)
+    // Where a value lies in the payload, and how long the payload is, so that what the frame does not carry is left out
+    private readonly record struct Extent(int Offset, int PayloadLength)
+    {
+        public static readonly Extent Unknown = new(0, int.MaxValue);
+
+        public bool Holds(int size) => Offset + size <= PayloadLength;
+
+        public Extent At(int offset) => this with { Offset = Offset + offset };
+    }
+
+    // The public fields and readable properties of a struct, recursively for nested structs; a field
+    // past the end of the payload is left out, and its computed properties only with the struct
+    private static JsonObject ToJsonObject(object value, Extent extent, int depth)
     {
         JsonObject result = [];
         Type type = value.GetType();
         foreach (FieldInfo field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
         {
-            result[field.Name] = ToJson(field.GetValue(value), depth + 1);
+            Extent fieldExtent = FieldExtent(type, field, extent);
+            object? fieldValue = field.GetValue(value);
+            if (fieldValue?.GetType().GetCustomAttribute<InlineArrayAttribute>() is null && !fieldExtent.Holds(SizeOf(field.FieldType)))
+            {
+                continue;
+            }
+            result[field.Name] = ToJson(fieldValue, fieldExtent, depth + 1);
         }
         foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
             if (property.GetIndexParameters().Length == 0 && property.CanRead && !result.ContainsKey(property.Name))
             {
-                result[property.Name] = ToJson(property.GetValue(value), depth + 1);
+                result[property.Name] = ToJson(property.GetValue(value), Extent.Unknown, depth + 1);
             }
         }
         return result;
     }
 
-    // The elements of an inline array buffer, such as a message's per-drive values
-    private static JsonArray InlineArray(object buffer, int length, int depth)
+    private static Extent FieldExtent(Type type, FieldInfo field, Extent extent)
+    {
+        try
+        {
+            return extent.At(Marshal.OffsetOf(type, field.Name).ToInt32());
+        }
+        catch (ArgumentException)
+        {
+            // A layout Marshal cannot describe: assume the frame carries it
+            return Extent.Unknown;
+        }
+    }
+
+    private static readonly ConcurrentDictionary<Type, int> Sizes = new();
+
+    // The size of a type as it lies in a message
+    private static int SizeOf(Type type) => Sizes.GetOrAdd(type, t =>
+        (int)typeof(Unsafe).GetMethod(nameof(Unsafe.SizeOf))!.MakeGenericMethod(t).Invoke(null, null)!);
+
+    // The elements of an inline array buffer that the payload holds, such as a message's per-drive values
+    private static JsonArray InlineArray(object buffer, int length, Extent extent, int depth)
     {
         Type element = buffer.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Instance)[0].FieldType;
+        int size = SizeOf(element);
+        int present = Enumerable.Range(0, length).TakeWhile(i => extent.At(i * size).Holds(size)).Count();
         MethodInfo read = typeof(CanFrameDecoder).GetMethod(nameof(ReadInlineArray), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(buffer.GetType(), element);
-        object?[] elements = (object?[])read.Invoke(null, [buffer, length])!;
-        return new JsonArray([.. elements.Select(e => ToJson(e, depth + 1))]);
+        object?[] elements = (object?[])read.Invoke(null, [buffer, present])!;
+        return new JsonArray([.. elements.Select((e, i) => ToJson(e, extent.At(i * size), depth + 1))]);
     }
 
     private static object?[] ReadInlineArray<TBuffer, TElement>(object boxed, int length) where TBuffer : struct
@@ -122,7 +161,9 @@ public static class CanFrameDecoder
         return result;
     }
 
-    private static JsonNode? ToJson(object? value, int depth = 0) => value switch
+    private static JsonNode? ToJson(object? value, int depth = 0) => ToJson(value, Extent.Unknown, depth);
+
+    private static JsonNode? ToJson(object? value, Extent extent, int depth) => value switch
     {
         null => null,
         bool b => JsonValue.Create(b),
@@ -136,8 +177,8 @@ public static class CanFrameDecoder
         Array array => new JsonArray([.. array.Cast<object?>().Select(v => ToJson(v, depth + 1))]),
         System.Collections.IEnumerable sequence when value is not ImmutableArray<CanParamDescriptor> =>
             new JsonArray([.. sequence.Cast<object?>().Select(v => ToJson(v, depth + 1))]),
-        _ when value.GetType().GetCustomAttribute<InlineArrayAttribute>() is InlineArrayAttribute inline => InlineArray(value, inline.Length, depth),
-        _ when depth < 6 && value.GetType().IsValueType => ToJsonObject(value, depth),
+        _ when value.GetType().GetCustomAttribute<InlineArrayAttribute>() is InlineArrayAttribute inline => InlineArray(value, inline.Length, extent, depth),
+        _ when depth < 6 && value.GetType().IsValueType => ToJsonObject(value, extent, depth),
         _ => JsonValue.Create(value.ToString())
     };
 }
