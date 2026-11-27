@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using YamlDotNet.Serialization;
 
 namespace DuetEmulation.Scenarios;
 
@@ -52,6 +53,9 @@ public sealed class ScenarioStep
         ?? (Analog is not null ? $"analog {Analog}" : null) ?? (Thermistor is not null ? $"thermistor {Thermistor}" : null)
         ?? (Pulses is not null ? $"pulses {Pulses}" : null) ?? (Tacho is not null ? $"tacho {Tacho}" : null) ?? "nothing";
 
+    /// <summary>The step as a scenario writes it, such as <c>drive: {board: 1, port: io0.in, level: high}</c></summary>
+    public string ToYaml() => Scenario.Serializer.Serialize(this).TrimEnd('\n');
+
     /// <summary>Check that the step has one action, and that what it needs is there</summary>
     /// <exception cref="FormatException">It does not</exception>
     public void Validate()
@@ -81,6 +85,7 @@ public sealed class ScenarioStep
     }
 
     /// <summary>How long a code may take</summary>
+    [YamlIgnore]
     public TimeSpan? TimeoutSpan => Timeout is null ? null : Scenario.ParseDuration(Timeout);
 }
 
@@ -111,16 +116,17 @@ public sealed class PinInput
     /// <summary>For tacho: the fan's output, such as out3</summary>
     public string? Fan { get; set; }
 
-    /// <summary>For tacho: the fan's speed at full duty (default 6000)</summary>
-    public double MaxRpm { get; set; } = 6000;
+    /// <summary>For tacho: the fan's speed at full duty, <see cref="BoardIo.DefaultTachoMaxRpm"/> if not given</summary>
+    public double? MaxRpm { get; set; }
 
-    /// <summary>For tacho: pulses a revolution (default 2)</summary>
-    public double PulsesPerRev { get; set; } = 2;
+    /// <summary>For tacho: pulses a revolution, <see cref="BoardIo.DefaultTachoPulsesPerRev"/> if not given</summary>
+    public double? PulsesPerRev { get; set; }
 
     /// <summary>For tacho: whether the fan runs when its output is low</summary>
-    public bool Inverted { get; set; }
+    public bool? Inverted { get; set; }
 
     /// <summary>The level as a bool</summary>
+    [YamlIgnore]
     public bool LevelValue => Level?.ToLowerInvariant() switch
     {
         "high" or "true" or "1" or "on" => true,

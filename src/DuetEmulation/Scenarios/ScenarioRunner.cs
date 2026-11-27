@@ -59,7 +59,7 @@ public sealed class StepRunner(Recorder recorder)
             Recorder.RecordedCode pending = _started.Find(c => c.Code == awaited)
                 ?? throw new InvalidOperationException($"\"{awaited}\" was not started");
             _started.Remove(pending);
-            return await pending.WaitAsync(step.TimeoutSpan, cancellationToken);
+            return await pending.AwaitAsync(step.TimeoutSpan, cancellationToken);
         }
         if (step.Wait is string wait)
         {
@@ -85,7 +85,8 @@ public sealed class StepRunner(Recorder recorder)
         }
         else if (step.Tacho is PinInput tacho)
         {
-            await recorder.TachoFollowsAsync(tacho.Board, tacho.Fan!, tacho.Port, tacho.MaxRpm, tacho.PulsesPerRev, tacho.Inverted, cancellationToken);
+            await recorder.TachoFollowsAsync(tacho.Board, tacho.Fan!, tacho.Port, tacho.MaxRpm ?? BoardIo.DefaultTachoMaxRpm,
+                                             tacho.PulsesPerRev ?? BoardIo.DefaultTachoPulsesPerRev, tacho.Inverted ?? false, cancellationToken);
         }
         else if (step.Release is PinInput release)
         {

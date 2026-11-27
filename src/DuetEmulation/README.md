@@ -70,7 +70,8 @@ A run's files go in `build/emulation/scenarios/<name>/<stack>`: the capture (`ca
 | --- | --- |
 | `om-snapshot` | The whole object model when the capture started |
 | `code`, `reply` | A code sent, and its reply and severity once it finished |
-| `can` | A CAN frame: source, destination, type, response, raw `data`, and the `message` decoded with DSF's generated CAN types (a generic message by parameter letter) |
+| `await`, `wait` | The script waiting for a code it started, or letting emulated time pass |
+| `can` | A CAN frame: source, destination, type, response, raw `data`, and the `message` decoded with DSF's generated CAN types (a generic message by parameter letter), less any fields and array entries past the end of the frame |
 | `om` | An object model value that changed (`path` as an M409 key, `old`, `new`), seen when the code that changed it finished, after each wait and before each input |
 | `pin` | An output pin with a port name changed what it drives: Low, High, Pwm (with duty and frequency), Peripheral or Input |
 | `input` | An input the script drove |
@@ -79,7 +80,7 @@ A run's files go in `build/emulation/scenarios/<name>/<stack>`: the capture (`ca
 
 The object model leaves out what changes with time rather than with the machine (`state.time`, `state.upTime`, `state.msUpTime`), what describes the computer rather than the machine (`sbc`, `network`, `volumes`), and `inputs[].lineNumber`, which RepRapFirmware advances with the bench's own M409 queries. Standalone, the bench reads the object model the way Duet Web Control does: each key in full when its sequence number changes, and the live values every time. DSF's codes are sent on Aux2, the channel the standalone console is, so the two stacks' `inputs[]` describe the same channel.
 
-**Comparing** pairs the two captures' steps in order (a step starts at each code, input or note; what comes before the first is `start`):
+**Comparing** pairs the two captures' steps in order (a step starts at each code sent or awaited, wait, input or note, so each step of a scenario is one step of its capture; what comes before the first is `start`):
 
 - replies must match, step by step;
 - the object model is compared by state: at the end of each step, every path either stack changed in it must have the same value in both, numbers within 0.1%;

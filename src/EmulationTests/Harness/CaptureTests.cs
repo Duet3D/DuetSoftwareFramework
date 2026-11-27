@@ -175,4 +175,99 @@ public class CaptureTests
         Assert.That(CaptureComparison.Compare(first, second), Is.Empty);
         Assert.That(CaptureComparison.Compare(first, second, new ComparisonOptions { IgnoredCanTypes = [] }), Has.Count.EqualTo(1));
     }
+
+    [Test]
+    public void AWaitAndAnAwaitEachStartAStep()
+    {
+        MachineCapture capture = Capture("rrf",
+            new CodeSent(1, "G1 X10"), new WaitStarted(1.1, "500ms"), new CodeAwaited(1.6, "G1 X10"), new CodeReplied(2, "G1 X10", "success", ""));
+
+        CaptureAlignment alignment = CaptureComparison.Align(capture, capture);
+
+        Assert.That(alignment.Steps.Select(s => s.Action), Is.EqualTo(new[] { "start", "G1 X10", "wait 500ms", "await G1 X10" }));
+        Assert.That(alignment.Steps[3].FirstReply?.Code, Is.EqualTo("G1 X10"), "the reply is in the step that awaited it");
+    }
+
+    [Test]
+    public void TheAlignmentPairsTheSameFramesAndShowsTheMissingOnes()
+    {
+        CanFrameSent enable = new(1.001, 0, 1, "SetDriverStates", false, "00", new JsonObject { ["DriversToUpdate"] = 1 });
+        CanFrameSent move = new(1.002, 0, 1, "MovementLinearShaped", false, "11", null);
+        MachineCapture first = Capture("rrf", new CodeSent(1, "G1 X10"), enable, move, new CodeReplied(1.1, "G1 X10", "success", ""));
+        MachineCapture second = Capture("dsf", new CodeSent(1, "G1 X10"), move with { T = 1.005 }, new CodeReplied(1.1, "G1 X10", "success", ""));
+
+        CaptureAlignment alignment = CaptureComparison.Align(first, second);
+
+        Assert.That(alignment.Can.Select(e => (Type: ((CanFrameSent)(e.First ?? e.Second)!).Type, e.Matched)), Is.EqualTo(new[]
+        {
+            ("SetDriverStates", false),
+            ("MovementLinearShaped", true)
+        }));
+        Assert.That(alignment.Can.All(e => e.IsIn(2)), Is.True);
+        Assert.That(alignment.Can[1].Second!.T, Is.EqualTo(1.005));
+    }
+
+    [Test]
+    public void TheAlignmentGivesEachChangedPathItsValuesBeforeAndAfter()
+    {
+        JsonNode model = JsonNode.Parse("""{"move":{"axes":[{"homed":false,"machinePosition":0}]}}""")!;
+        MachineCapture first = Capture("rrf", new ObjectModelSnapshot(0, model.DeepClone()),
+            new CodeSent(1, "G28"), new CodeReplied(2, "G28", "success", ""),
+            new ObjectModelChanged(2, "move.axes[0].homed", JsonValue.Create(false), JsonValue.Create(true)));
+        MachineCapture second = Capture("dsf", new ObjectModelSnapshot(0, model.DeepClone()),
+            new CodeSent(1, "G28"), new CodeReplied(2, "G28", "success", ""),
+            new ObjectModelChanged(2, "move.axes[0].homed", JsonValue.Create(false), JsonValue.Create(true)),
+            new ObjectModelChanged(2, "move.axes[0].machinePosition", JsonValue.Create(0), JsonValue.Create(-10)));
+
+        IReadOnlyList<AlignedPath> paths = CaptureComparison.Align(first, second).Steps[1].ObjectModel;
+
+        Assert.That(paths.Select(p => $"{p.Path}: {p.FirstBefore} -> {p.First} | {p.SecondBefore} -> {p.Second} {(p.Same ? "same" : "differ")}"), Is.EqualTo(new[]
+        {
+            "move.axes[0].homed: false -> true | false -> true same",
+            "move.axes[0].machinePosition: 0 -> 0 | 0 -> -10 differ"
+        }));
+    }
+
+    [Test]
+    public void StepsBeyondThoseBothHaveAreListedWithOneSide()
+    {
+        MachineCapture first = Capture("rrf", new CodeSent(1, "M115"), new CodeReplied(1.1, "M115", "success", "RRF"), new CodeSent(2, "M114"));
+        MachineCapture second = Capture("dsf", new CodeSent(1, "M115"), new CodeReplied(1.1, "M115", "success", "RRF"));
+
+        CaptureAlignment alignment = CaptureComparison.Align(first, second);
+
+        Assert.That(alignment.Steps.Select(s => (s.FirstAction, s.SecondAction, s.Compared)), Is.EqualTo(new (string?, string?, bool)[]
+        {
+            ("start", "start", true), ("M115", "M115", true), ("M114", null, false)
+        }));
+    }
+
+    [Test]
+    public void LongCapturesThatMostlyMatchAreAlignedWithoutATableOfEveryPair()
+    {
+        // Twenty thousand frames each would need a table of 400 million cells; matching ends need none
+        CanFrameSent[] frames = [.. Enumerable.Range(0, 20000).Select(i => new CanFrameSent(1 + i * 1e-4, 0, 1, "SetFanSpeed", false, "00",
+                                                                                          new JsonObject { ["Name"] = $"fan {i}" }))];
+        MachineCapture first = Capture("rrf", [new CodeSent(1, "M106"), .. frames]);
+        MachineCapture second = Capture("dsf", [new CodeSent(1, "M106"), .. frames.Where((_, i) => i != 10000)]);
+
+        IReadOnlyList<CaptureDifference> differences = CaptureComparison.Compare(first, second);
+
+        Assert.That(differences.Select(d => d.Description), Is.EqualTo(new[] { "only in the first: CAN 0->1 SetFanSpeed {\"Name\":\"fan 10000\"}" }));
+    }
+
+    [Test]
+    public void ACaptureSaysWhichEventsToReadAgainWhenItChanges()
+    {
+        MachineCapture capture = Capture("rrf", new CodeSent(1, "M115"), new CodeSent(3, "M114"));
+        List<int> changes = [];
+        capture.Changed += changes.Add;
+
+        capture.Add([new Note(4, "after")]);
+        capture.Add([new Note(2, "between")]);
+        capture.Add([]);
+
+        Assert.That(changes, Is.EqualTo(new[] { 2, 1 }), "an event added in order is new from its own index; one added earlier moves those after it");
+        Assert.That(capture.Events.Select(e => e.T), Is.EqualTo(new[] { 1.0, 2, 3, 4 }));
+    }
 }

@@ -14,6 +14,12 @@ namespace DuetEmulation;
 /// </summary>
 public sealed class BoardIo(EmulatedSystem system)
 {
+    /// <summary>A scripted fan's speed at full duty unless a script says otherwise</summary>
+    public const double DefaultTachoMaxRpm = 6000;
+
+    /// <summary>Tacho pulses a revolution unless a script says otherwise, as RepRapFirmware assumes (DefaultFanTachoPulsesPerRev)</summary>
+    public const double DefaultTachoPulsesPerRev = 2;
+
     /// <summary>Drive a digital input to a level, as a switch or sensor connected to it would</summary>
     /// <param name="address">The board's CAN address</param>
     /// <param name="port">The port name, such as <c>io1.in</c></param>
@@ -144,7 +150,7 @@ public sealed class BoardIo(EmulatedSystem system)
     /// <param name="pulsesPerRev">Tacho pulses a revolution</param>
     /// <param name="inverted">Whether the fan runs when the output is low</param>
     /// <param name="cancellationToken">Cancels the command</param>
-    public Task TachoFollowsAsync(int address, string fanPort, string tachoPort, double maxRpm, double pulsesPerRev = 2, bool inverted = false,
+    public Task TachoFollowsAsync(int address, string fanPort, string tachoPort, double maxRpm, double pulsesPerRev = DefaultTachoPulsesPerRev, bool inverted = false,
                                   CancellationToken cancellationToken = default)
     {
         EmulatedBoard board = system.Board(address);

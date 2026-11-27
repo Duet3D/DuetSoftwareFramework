@@ -11,6 +11,8 @@ namespace DuetEmulation.Captures;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(CodeSent), "code")]
 [JsonDerivedType(typeof(CodeReplied), "reply")]
+[JsonDerivedType(typeof(CodeAwaited), "await")]
+[JsonDerivedType(typeof(WaitStarted), "wait")]
 [JsonDerivedType(typeof(CanFrameSent), "can")]
 [JsonDerivedType(typeof(ObjectModelChanged), "om")]
 [JsonDerivedType(typeof(ObjectModelSnapshot), "om-snapshot")]
@@ -32,6 +34,22 @@ public sealed record CodeSent(double T, string Code) : CaptureEvent(T)
 {
     /// <inheritdoc/>
     public override string Describe() => $"> {Code}";
+}
+
+/// <summary>The script started waiting for a code it sent without waiting</summary>
+public sealed record CodeAwaited(double T, string Code) : CaptureEvent(T)
+{
+    /// <inheritdoc/>
+    public override string Describe() => $"await {Code}";
+}
+
+/// <summary>The script let emulated time pass</summary>
+/// <param name="T">When the wait started</param>
+/// <param name="Duration">How long, as the script gave it</param>
+public sealed record WaitStarted(double T, string Duration) : CaptureEvent(T)
+{
+    /// <inheritdoc/>
+    public override string Describe() => $"wait {Duration}";
 }
 
 /// <summary>A code finished, with its reply</summary>

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 
 namespace DuetEmulation.Captures;
 
@@ -40,12 +41,32 @@ public sealed class MachineCapture(CaptureHeader header)
     };
 
     private readonly List<CaptureEvent> _events = [];
+    private readonly Lock _lock = new();
+    private CaptureEvent[]? _snapshot;
 
     /// <summary>What it was taken of</summary>
     public CaptureHeader Header { get; } = header;
 
-    /// <summary>The events, in time order</summary>
-    public IReadOnlyList<CaptureEvent> Events => _events;
+    /// <summary>
+    /// The events, in time order: a snapshot, which events added later do not change, so that another
+    /// thread can read a capture that is still being recorded
+    /// </summary>
+    public IReadOnlyList<CaptureEvent> Events
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _snapshot ??= [.. _events];
+            }
+        }
+    }
+
+    /// <summary>
+    /// Raised after events are added, with the index of the first event that is new or has moved: the
+    /// events from there on are to be read again
+    /// </summary>
+    public event Action<int>? Changed;
 
     /// <summary>
     /// Add events, keeping time order. Events at the same time keep the order they were added in,
@@ -54,15 +75,28 @@ public sealed class MachineCapture(CaptureHeader header)
     /// </summary>
     public void Add(IEnumerable<CaptureEvent> events)
     {
-        int start = _events.Count;
-        _events.AddRange(events);
-        if (start > 0 && _events.Skip(start).Any(e => e.T < _events[start - 1].T))
+        int changed;
+        lock (_lock)
         {
-            // A stable sort, which keeps the order they were added in among those at the same time
-            List<CaptureEvent> sorted = [.. _events.OrderBy(e => e.T)];
-            _events.Clear();
-            _events.AddRange(sorted);
+            int start = _events.Count;
+            _events.AddRange(events);
+            if (_events.Count == start)
+            {
+                return;
+            }
+            changed = start;
+            if (start > 0 && _events.Skip(start).Min(e => e.T) < _events[start - 1].T)
+            {
+                // A stable sort, which keeps the order they were added in among those at the same time
+                double earliest = _events.Skip(start).Min(e => e.T);
+                changed = _events.FindIndex(e => e.T > earliest);
+                List<CaptureEvent> sorted = [.. _events.OrderBy(e => e.T)];
+                _events.Clear();
+                _events.AddRange(sorted);
+            }
+            _snapshot = null;
         }
+        Changed?.Invoke(changed);
     }
 
     /// <summary>Write the capture and its report into <paramref name="directory"/></summary>
@@ -74,7 +108,7 @@ public sealed class MachineCapture(CaptureHeader header)
         using (StreamWriter writer = new(path, append: false, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
         {
             writer.WriteLine(JsonSerializer.Serialize(Header, JsonOptions));
-            foreach (CaptureEvent e in _events)
+            foreach (CaptureEvent e in Events)
             {
                 writer.WriteLine(JsonSerializer.Serialize(e, JsonOptions));
             }
@@ -113,7 +147,7 @@ public sealed class MachineCapture(CaptureHeader header)
         StringBuilder report = new();
         report.AppendLine($"{Header.Name} on {Header.Stack}");
         report.AppendLine("Boards: " + (Header.Boards.Count == 0 ? "main board only" : string.Join(", ", Header.Boards.Select(b => $"{b.Key}: {b.Value}"))));
-        foreach (CaptureEvent e in _events)
+        foreach (CaptureEvent e in Events)
         {
             report.AppendLine($"{e.Time,12} {e.Describe()}");
         }

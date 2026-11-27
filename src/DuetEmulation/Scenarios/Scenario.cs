@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using DuetEmulation.Boards;
 using YamlDotNet.Core;
+using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.EventEmitters;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace DuetEmulation.Scenarios;
@@ -35,6 +38,10 @@ public sealed partial class Scenario
 {
     /// <summary>What it is</summary>
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>What it does and why, from the comment the file starts with; null if it has none</summary>
+    [YamlIgnore]
+    public string? Description { get; set; }
 
     /// <summary>The stacks it runs on, rrf and dsf by default</summary>
     public List<string> Stacks { get; set; } = ["rrf", "dsf"];
@@ -88,6 +95,7 @@ public sealed partial class Scenario
         {
             scenario.Name = Path.GetFileNameWithoutExtension(source);
         }
+        scenario.Description = LeadingComment(yaml);
         for (int i = 0; i < scenario.Steps.Count; i++)
         {
             try
@@ -140,6 +148,110 @@ public sealed partial class Scenario
         return steps;
     }
 
+    // The comment lines a file starts with, as one paragraph each run of them; null if it starts with none
+    private static string? LeadingComment(string yaml)
+    {
+        List<string> paragraphs = [];
+        List<string> lines = [];
+        foreach (string line in yaml.Split('\n').Select(l => l.Trim()))
+        {
+            if (!line.StartsWith('#'))
+            {
+                break;
+            }
+            string text = line.TrimStart('#').Trim();
+            if (text.Length == 0)
+            {
+                if (lines.Count > 0)
+                {
+                    paragraphs.Add(string.Join(' ', lines));
+                    lines.Clear();
+                }
+                continue;
+            }
+            lines.Add(text);
+        }
+        if (lines.Count > 0)
+        {
+            paragraphs.Add(string.Join(' ', lines));
+        }
+        return paragraphs.Count == 0 ? null : string.Join('\n', paragraphs);
+    }
+
+    /// <summary>
+    /// The scenario as YAML that <see cref="Parse"/> reads back the same: its description as the comment
+    /// the file starts with, then what differs from the defaults, inputs written on one line as the
+    /// examples write them
+    /// </summary>
+    public string ToYaml()
+    {
+        StringBuilder yaml = new();
+        foreach (string paragraph in (Description ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (yaml.Length > 0)
+            {
+                yaml.AppendLine("#");
+            }
+            yaml.Append("# ").AppendLine(paragraph);
+        }
+        Document document = new()
+        {
+            Name = Name,
+            Stacks = Stacks.Order().SequenceEqual(DefaultStacks.Order()) ? null : Stacks,
+            Boards = Boards.Count == 0 ? null : new SortedDictionary<int, string>(Boards),
+            Config = Config.Length == 0 ? null : Config.EndsWith('\n') ? Config : Config + "\n",
+            Files = Files.Count == 0 ? null : new SortedDictionary<string, string>(Files, StringComparer.Ordinal),
+            CaptureBoot = CaptureBoot ? true : null,
+            Steps = Steps.Count == 0 ? null : Steps
+        };
+        yaml.Append(Serializer.Serialize(document));
+        return yaml.ToString();
+    }
+
+    private static readonly IReadOnlyList<string> DefaultStacks = new Scenario().Stacks;
+
+    // What ToYaml writes, in the order the examples write it, a null key left out
+    private sealed class Document
+    {
+        public string Name { get; set; } = string.Empty;
+        public List<string>? Stacks { get; set; }
+        public SortedDictionary<int, string>? Boards { get; set; }
+        public string? Config { get; set; }
+        public SortedDictionary<string, string>? Files { get; set; }
+        public bool? CaptureBoot { get; set; }
+        public List<ScenarioStep>? Steps { get; set; }
+    }
+
+    // Inputs on one line, and text of several lines as a literal block
+    private sealed class ScenarioEventEmitter(IEventEmitter next) : ChainedEventEmitter(next)
+    {
+        public override void Emit(MappingStartEventInfo eventInfo, IEmitter emitter)
+        {
+            if (eventInfo.Source.Type == typeof(PinInput) || eventInfo.Source.Type == typeof(StepCount))
+            {
+                eventInfo.Style = MappingStyle.Flow;
+            }
+            base.Emit(eventInfo, emitter);
+        }
+
+        public override void Emit(ScalarEventInfo eventInfo, IEmitter emitter)
+        {
+            if (eventInfo.Source.Value is string text && text.Contains('\n'))
+            {
+                eventInfo.Style = ScalarStyle.Literal;
+            }
+            base.Emit(eventInfo, emitter);
+        }
+    }
+
+    internal static readonly ISerializer Serializer = new SerializerBuilder()
+        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+        .ConfigureDefaultValuesHandling(DefaultValuesHandling.OmitNull)
+        .WithIndentedSequences()
+        .WithEventEmitter(next => new ScenarioEventEmitter(next))
+        .DisableAliases()
+        .Build();
+
     /// <summary>Read a scenario file</summary>
     public static Scenario Load(string path) => Parse(File.ReadAllText(path), path);
 
@@ -159,6 +271,18 @@ public sealed partial class Scenario
             "us" => TimeSpan.FromMicroseconds(value),
             "min" => TimeSpan.FromMinutes(value),
             _ => TimeSpan.FromSeconds(value)
+        };
+    }
+
+    /// <summary>A duration as scenarios write it, in the largest unit that keeps it a whole or short number</summary>
+    public static string FormatDuration(TimeSpan duration)
+    {
+        double us = duration.Ticks / (double)TimeSpan.TicksPerMicrosecond;
+        return us switch
+        {
+            _ when us % 1_000_000 == 0 || us >= 1_000_000 => FormattableString.Invariant($"{us / 1_000_000:0.######}s"),
+            _ when us % 1000 == 0 || us >= 1000 => FormattableString.Invariant($"{us / 1000:0.###}ms"),
+            _ => FormattableString.Invariant($"{us:0.#}us")
         };
     }
 

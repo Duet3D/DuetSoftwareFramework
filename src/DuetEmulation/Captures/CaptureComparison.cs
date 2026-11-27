@@ -58,13 +58,67 @@ public sealed record CaptureDifference(int Step, string Action, string Aspect, s
 }
 
 /// <summary>
+/// A pair of events a comparison lined up: the same event in both captures, or one only one of them has
+/// </summary>
+/// <param name="First">The event in the first capture, or null if only the second has it</param>
+/// <param name="FirstStep">The step <paramref name="First"/> is in</param>
+/// <param name="Second">The event in the second capture, or null if only the first has it</param>
+/// <param name="SecondStep">The step <paramref name="Second"/> is in</param>
+public sealed record AlignedEvent(CaptureEvent? First, int? FirstStep, CaptureEvent? Second, int? SecondStep)
+{
+    /// <summary>Whether both captures have it</summary>
+    public bool Matched => First is not null && Second is not null;
+
+    /// <summary>Whether it is in a step, in either capture</summary>
+    public bool IsIn(int step) => FirstStep == step || SecondStep == step;
+}
+
+/// <summary>An object model path's value at some point of a capture</summary>
+/// <param name="Present">Whether the model has the path</param>
+/// <param name="Value">Its value</param>
+public sealed record ModelValue(bool Present, JsonNode? Value)
+{
+    /// <summary>A path the model does not have</summary>
+    public static readonly ModelValue Absent = new(false, null);
+
+    /// <inheritdoc/>
+    public override string ToString() => Present ? Value?.ToJsonString() ?? "null" : "absent";
+}
+
+/// <summary>An object model path either capture changed in a step, with its value in each before and after it</summary>
+public sealed record AlignedPath(string Path, ModelValue FirstBefore, ModelValue First, ModelValue SecondBefore, ModelValue Second, bool Same);
+
+/// <summary>A step of each capture, paired by their order</summary>
+/// <param name="Number">The step's number, from 1; step 1 is what came before the first action</param>
+/// <param name="FirstAction">What the first capture's step did, or null if it has no such step</param>
+/// <param name="SecondAction">What the second capture's step did, or null if it has no such step</param>
+/// <param name="Compared">Whether the steps were compared: both captures have them, and every step before did the same</param>
+/// <param name="FirstReply">The first capture's reply in the step</param>
+/// <param name="SecondReply">The second capture's reply in the step</param>
+/// <param name="ObjectModel">The paths either capture changed in the step, for a compared step</param>
+public sealed record AlignedStep(int Number, string? FirstAction, string? SecondAction, bool Compared, CodeReplied? FirstReply, CodeReplied? SecondReply,
+                                 IReadOnlyList<AlignedPath> ObjectModel)
+{
+    /// <summary>What the step did</summary>
+    public string Action => FirstAction ?? SecondAction ?? string.Empty;
+}
+
+/// <summary>Two captures lined up step by step and event by event, and how they differ</summary>
+/// <param name="Steps">Each step</param>
+/// <param name="Can">The CAN frames compared, lined up over the whole captures</param>
+/// <param name="Pins">The pin changes compared, lined up over the whole captures; empty if pins are not compared</param>
+/// <param name="Differences">Every difference, in step order</param>
+public sealed record CaptureAlignment(IReadOnlyList<AlignedStep> Steps, IReadOnlyList<AlignedEvent> Can, IReadOnlyList<AlignedEvent> Pins,
+                                      IReadOnlyList<CaptureDifference> Differences);
+
+/// <summary>
 /// The differences between two captures of the same script, such as one on RepRapFirmware and one on
 /// DuetControlServer
 /// </summary>
 /// <remarks>
 /// <para>
-/// A step starts at each code sent, input driven or note, and holds everything that followed until the
-/// next; what came before the first is the step called start. Steps are paired in order.
+/// A step starts at each code sent or awaited, wait, input driven or note, and holds everything that
+/// followed until the next; what came before the first is the step called start. Steps are paired in order.
 /// </para>
 /// <para>
 /// Replies are compared step by step. The object model is compared by state: at the end of each step,
@@ -77,10 +131,14 @@ public sealed record CaptureDifference(int Step, string Action, string Aspect, s
 public static class CaptureComparison
 {
     /// <summary>Every difference, in step order</summary>
-    public static IReadOnlyList<CaptureDifference> Compare(MachineCapture first, MachineCapture second, ComparisonOptions? options = null)
+    public static IReadOnlyList<CaptureDifference> Compare(MachineCapture first, MachineCapture second, ComparisonOptions? options = null) =>
+        Align(first, second, options).Differences;
+
+    /// <summary>Line the two captures up step by step and event by event, and find how they differ</summary>
+    public static CaptureAlignment Align(MachineCapture first, MachineCapture second, ComparisonOptions? options = null)
     {
         options ??= new ComparisonOptions();
-        List<Step> a = Steps(first), b = Steps(second);
+        List<Step> a = Steps(first.Events), b = Steps(second.Events);
         List<CaptureDifference> differences = [];
         int common = Math.Min(a.Count, b.Count);
         for (int i = common; i < Math.Max(a.Count, b.Count); i++)
@@ -99,17 +157,32 @@ public static class CaptureComparison
         }
 
         CompareReplies(a, b, common, options, differences);
-        CompareObjectModels(a, b, common, options, differences);
-        CompareSequences("can", a, b, common, step => Can(step, options), options, differences);
-        if (options.ComparePins)
+        List<IReadOnlyList<AlignedPath>> models = CompareObjectModels(a, b, common, options, differences);
+        List<AlignedEvent> can = CompareSequences("can", a, b, common, step => Can(step, options), options, differences);
+        List<AlignedEvent> pins = options.ComparePins ? CompareSequences("pin", a, b, common, Pins, options, differences) : [];
+
+        List<AlignedStep> steps = [];
+        for (int i = 0; i < Math.Max(a.Count, b.Count); i++)
         {
-            CompareSequences("pin", a, b, common, Pins, options, differences);
+            Step? stepA = i < a.Count ? a[i] : null, stepB = i < b.Count ? b[i] : null;
+            steps.Add(new AlignedStep(i + 1, stepA?.Action, stepB?.Action, i < common, stepA?.Reply, stepB?.Reply, i < common ? models[i] : []));
         }
-        return [.. differences.OrderBy(d => d.Step)];
+        return new CaptureAlignment(steps, can, pins, [.. differences.OrderBy(d => d.Step)]);
     }
 
     /// <summary>How many steps a capture has, counting the start</summary>
-    public static int StepCount(MachineCapture capture) => Steps(capture).Count;
+    public static int StepCount(MachineCapture capture) => Steps(capture.Events).Count;
+
+    /// <summary>What a capture event does to start a step, or null if it does not start one</summary>
+    public static string? StepAction(CaptureEvent e) => e switch
+    {
+        CodeSent code => code.Code,
+        CodeAwaited awaited => $"await {awaited.Code}",
+        WaitStarted wait => $"wait {wait.Duration}",
+        InputDriven input => $"input {input.Board}.{input.Port} {input.Value}",
+        Note note => $"# {note.Text}",
+        _ => null
+    };
 
     /// <summary>The differences as readable text</summary>
     public static string Report(IReadOnlyList<CaptureDifference> differences, MachineCapture first, MachineCapture second)
@@ -135,22 +208,18 @@ public static class CaptureComparison
         return report.ToString();
     }
 
-    private sealed record Step(int Number, string Action, double Start, List<CaptureEvent> Events);
+    private sealed record Step(int Number, string Action, double Start, List<CaptureEvent> Events)
+    {
+        public CodeReplied? Reply => Events.OfType<CodeReplied>().FirstOrDefault();
+    }
 
-    private static List<Step> Steps(MachineCapture capture)
+    private static List<Step> Steps(IReadOnlyList<CaptureEvent> events)
     {
         List<Step> steps = [];
         Step current = new(1, "start", 0, []);
-        foreach (CaptureEvent e in capture.Events)
+        foreach (CaptureEvent e in events)
         {
-            string? action = e switch
-            {
-                CodeSent code => code.Code,
-                InputDriven input => $"input {input.Board}.{input.Port} {input.Value}",
-                Note note => $"# {note.Text}",
-                _ => null
-            };
-            if (action is not null)
+            if (StepAction(e) is string action)
             {
                 steps.Add(current);
                 current = new Step(steps.Count + 1, action, e.T, []);
@@ -166,7 +235,7 @@ public static class CaptureComparison
     {
         for (int i = 0; i < count; i++)
         {
-            CodeReplied? replyA = a[i].Events.OfType<CodeReplied>().FirstOrDefault(), replyB = b[i].Events.OfType<CodeReplied>().FirstOrDefault();
+            CodeReplied? replyA = a[i].Reply, replyB = b[i].Reply;
             if (replyA?.Severity != replyB?.Severity || replyA?.Text != replyB?.Text)
             {
                 differences.Add(new(i + 1, a[i].Action, "reply", $"{Describe(replyA)}\nvs {Describe(replyB)}"));
@@ -195,28 +264,44 @@ public static class CaptureComparison
     }
 
     // The value each path has at the end of each step, compared for the paths either capture changed in it
-    private static void CompareObjectModels(List<Step> a, List<Step> b, int count, ComparisonOptions options, List<CaptureDifference> differences)
+    private static List<IReadOnlyList<AlignedPath>> CompareObjectModels(List<Step> a, List<Step> b, int count, ComparisonOptions options,
+                                                                        List<CaptureDifference> differences)
     {
         Dictionary<string, JsonNode?> stateA = [], stateB = [];
+        List<IReadOnlyList<AlignedPath>> steps = [];
         for (int i = 0; i < count; i++)
         {
-            HashSet<string> changed = [.. Apply(a[i], stateA), .. Apply(b[i], stateB)];
-            foreach (string path in changed.Where(p => !ObjectModelDiff.Matches(p, options.IgnoredPaths)).Order(StringComparer.Ordinal))
+            Dictionary<string, ModelValue> beforeA = Apply(a[i], stateA), beforeB = Apply(b[i], stateB);
+            List<AlignedPath> paths = [];
+            foreach (string path in beforeA.Keys.Union(beforeB.Keys).Where(p => !ObjectModelDiff.Matches(p, options.IgnoredPaths)).Order(StringComparer.Ordinal))
             {
-                bool inA = stateA.TryGetValue(path, out JsonNode? valueA), inB = stateB.TryGetValue(path, out JsonNode? valueB);
-                if (inA == inB && Same(valueA, valueB, options.NumberTolerance))
+                ModelValue valueA = Value(stateA, path), valueB = Value(stateB, path);
+                ModelValue wasA = beforeA.GetValueOrDefault(path) ?? valueA, wasB = beforeB.GetValueOrDefault(path) ?? valueB;
+                if (!valueA.Present && !valueB.Present && !wasA.Present && !wasB.Present)
                 {
+                    // An object or array replaced in both, whose own path holds no value
                     continue;
                 }
-                differences.Add(new(i + 1, a[i].Action, "om", $"{path}: {(inA ? Format(valueA) : "absent")} vs {(inB ? Format(valueB) : "absent")}"));
+                bool same = valueA.Present == valueB.Present && Same(valueA.Value, valueB.Value, options.NumberTolerance);
+                paths.Add(new AlignedPath(path, wasA, valueA, wasB, valueB, same));
+                if (!same)
+                {
+                    differences.Add(new(i + 1, a[i].Action, "om", $"{path}: {valueA} vs {valueB}"));
+                }
             }
+            steps.Add(paths);
         }
+        return steps;
     }
 
-    // Bring the state up to the end of a step, and return the paths that changed in it
-    private static IEnumerable<string> Apply(Step step, Dictionary<string, JsonNode?> state)
+    private static ModelValue Value(Dictionary<string, JsonNode?> state, string path) =>
+        state.TryGetValue(path, out JsonNode? value) ? new ModelValue(true, value) : ModelValue.Absent;
+
+    // Bring the state up to the end of a step, and return the paths that changed in it with the values they had before it
+    private static Dictionary<string, ModelValue> Apply(Step step, Dictionary<string, JsonNode?> state)
     {
-        List<string> changed = [];
+        Dictionary<string, ModelValue> before = [];
+        void Changing(string path) => before.TryAdd(path, Value(state, path));
         foreach (CaptureEvent e in step.Events)
         {
             if (e is ObjectModelSnapshot snapshot)
@@ -233,31 +318,27 @@ public static class CaptureComparison
                 foreach (string stale in state.Keys.Where(k => k.StartsWith(change.Path + ".", StringComparison.Ordinal) ||
                                                                k.StartsWith(change.Path + "[", StringComparison.Ordinal)).ToList())
                 {
+                    Changing(stale);
                     state.Remove(stale);
-                    changed.Add(stale);
                 }
+                Changing(change.Path);
                 state.Remove(change.Path);
                 if (change.New is JsonObject or JsonArray)
                 {
                     foreach ((string path, JsonNode? value) in ObjectModelDiff.Flatten(change.New))
                     {
                         string full = path.StartsWith('[') ? change.Path + path : $"{change.Path}.{path}";
+                        Changing(full);
                         state[full] = value;
-                        changed.Add(full);
                     }
-                }
-                else if (change.New is not null)
-                {
-                    state[change.Path] = change.New;
                 }
                 else
                 {
-                    state[change.Path] = null;
+                    state[change.Path] = change.New;
                 }
-                changed.Add(change.Path);
             }
         }
-        return changed;
+        return before;
     }
 
     private static bool Same(JsonNode? a, JsonNode? b, double tolerance)
@@ -269,8 +350,6 @@ public static class CaptureComparison
         }
         return JsonNode.DeepEquals(a, b);
     }
-
-    private static string Format(JsonNode? value) => value?.ToJsonString() ?? "null";
 
     // What a sequence comparison compares: what the event is (its kind, addresses and type), what it
     // carries, compared with the number tolerance, the event itself and the step it is in
@@ -312,44 +391,77 @@ public static class CaptureComparison
     };
 
     // Align the two captures' sequences of one kind of event (longest common subsequence) over the steps
-    // both have, and report what each has that the other has not, in the step it is in
-    private static void CompareSequences(string aspect, List<Step> stepsA, List<Step> stepsB, int count,
-                                         Func<Step, IEnumerable<(string Head, JsonNode? Body, CaptureEvent Event)>> select, ComparisonOptions options,
-                                         List<CaptureDifference> differences)
+    // both have, and report what each has that the other has not, in the step it is in. What the steps
+    // after those are hold is listed unaligned, as their steps already differ
+    private static List<AlignedEvent> CompareSequences(string aspect, List<Step> stepsA, List<Step> stepsB, int count,
+                                                       Func<Step, IEnumerable<(string Head, JsonNode? Body, CaptureEvent Event)>> select,
+                                                       ComparisonOptions options, List<CaptureDifference> differences)
     {
-        List<Item> a = [.. stepsA.Take(count).SelectMany(s => select(s).Select(e => new Item(e.Head, e.Body, e.Event, s)))];
-        List<Item> b = [.. stepsB.Take(count).SelectMany(s => select(s).Select(e => new Item(e.Head, e.Body, e.Event, s)))];
+        List<Item> Items(IEnumerable<Step> steps) => [.. steps.SelectMany(s => select(s).Select(e => new Item(e.Head, e.Body, e.Event, s)))];
+        List<Item> a = Items(stepsA.Take(count)), b = Items(stepsB.Take(count));
         bool Equal(int i, int j) => a[i].Head == b[j].Head && SameDeep(a[i].Body, b[j].Body, options.NumberTolerance);
-        int[,] lcs = new int[a.Count + 1, b.Count + 1];
-        for (int i = a.Count - 1; i >= 0; i--)
+
+        // The common prefix and suffix are part of every longest common subsequence, so only what lies between needs the table
+        int prefix = 0;
+        while (prefix < a.Count && prefix < b.Count && Equal(prefix, prefix))
         {
-            for (int j = b.Count - 1; j >= 0; j--)
+            prefix++;
+        }
+        int suffix = 0;
+        while (suffix < a.Count - prefix && suffix < b.Count - prefix && Equal(a.Count - 1 - suffix, b.Count - 1 - suffix))
+        {
+            suffix++;
+        }
+        int endA = a.Count - suffix, endB = b.Count - suffix;
+        int[,] lcs = new int[endA - prefix + 1, endB - prefix + 1];
+        for (int i = endA - 1; i >= prefix; i--)
+        {
+            for (int j = endB - 1; j >= prefix; j--)
             {
-                lcs[i, j] = Equal(i, j) ? lcs[i + 1, j + 1] + 1 : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
+                lcs[i - prefix, j - prefix] = Equal(i, j) ? lcs[i - prefix + 1, j - prefix + 1] + 1 : Math.Max(lcs[i - prefix + 1, j - prefix], lcs[i - prefix, j - prefix + 1]);
             }
         }
-        int x = 0, y = 0;
-        while (x < a.Count || y < b.Count)
+
+        List<AlignedEvent> aligned = [];
+        void Match(int x, int y)
         {
-            if (x < a.Count && y < b.Count && Equal(x, y))
+            if (TimeDifference(a[x].Event, a[x].Step, b[y].Event, b[y].Step, options) is string time)
             {
-                if (TimeDifference(a[x].Event, a[x].Step, b[y].Event, b[y].Step, options) is string time)
-                {
-                    differences.Add(new(a[x].Step.Number, a[x].Step.Action, "time", time));
-                }
-                x++;
-                y++;
+                differences.Add(new(a[x].Step.Number, a[x].Step.Action, "time", time));
             }
-            else if (y >= b.Count || (x < a.Count && lcs[x + 1, y] >= lcs[x, y + 1]))
+            aligned.Add(new AlignedEvent(a[x].Event, a[x].Step.Number, b[y].Event, b[y].Step.Number));
+        }
+        for (int i = 0; i < prefix; i++)
+        {
+            Match(i, i);
+        }
+        int p = prefix, q = prefix;
+        while (p < endA || q < endB)
+        {
+            if (p < endA && q < endB && Equal(p, q))
             {
-                differences.Add(new(a[x].Step.Number, a[x].Step.Action, aspect, $"only in the first: {a[x].Describe()}"));
-                x++;
+                Match(p++, q++);
+            }
+            else if (q >= endB || (p < endA && lcs[p - prefix + 1, q - prefix] >= lcs[p - prefix, q - prefix + 1]))
+            {
+                differences.Add(new(a[p].Step.Number, a[p].Step.Action, aspect, $"only in the first: {a[p].Describe()}"));
+                aligned.Add(new AlignedEvent(a[p].Event, a[p].Step.Number, null, null));
+                p++;
             }
             else
             {
-                differences.Add(new(b[y].Step.Number, b[y].Step.Action, aspect, $"only in the second: {b[y].Describe()}"));
-                y++;
+                differences.Add(new(b[q].Step.Number, b[q].Step.Action, aspect, $"only in the second: {b[q].Describe()}"));
+                aligned.Add(new AlignedEvent(null, null, b[q].Event, b[q].Step.Number));
+                q++;
             }
         }
+        for (int i = 0; i < suffix; i++)
+        {
+            Match(endA + i, endB + i);
+        }
+
+        aligned.AddRange(Items(stepsA.Skip(count)).Select(i => new AlignedEvent(i.Event, i.Step.Number, null, null)));
+        aligned.AddRange(Items(stepsB.Skip(count)).Select(i => new AlignedEvent(null, null, i.Event, i.Step.Number)));
+        return aligned;
     }
 }

@@ -102,9 +102,11 @@ public sealed class Recorder
         return new RecordedCode(this, await _bench.StartCodeAsync(code, cancellationToken));
     }
 
-    /// <summary>Let emulated time pass, recording what happens</summary>
+    /// <summary>Let emulated time pass, recording the wait and what happens during it</summary>
     public async Task WaitAsync(TimeSpan time, CancellationToken cancellationToken = default)
     {
+        await CatchUpAsync(cancellationToken);
+        Capture.Add([new WaitStarted(Now, Scenarios.Scenario.FormatDuration(time))]);
         await _bench.WaitAsync(time, cancellationToken);
         await CatchUpAsync(cancellationToken);
     }
@@ -153,7 +155,7 @@ public sealed class Recorder
     }
 
     /// <summary>Pulse a tacho input as a fan driven by an output would turn</summary>
-    public async Task TachoFollowsAsync(int address, string fanPort, string tachoPort, double maxRpm, double pulsesPerRev = 2, bool inverted = false,
+    public async Task TachoFollowsAsync(int address, string fanPort, string tachoPort, double maxRpm, double pulsesPerRev = BoardIo.DefaultTachoPulsesPerRev, bool inverted = false,
                                         CancellationToken cancellationToken = default)
     {
         await RecordInputAsync(address, tachoPort, string.Create(CultureInfo.InvariantCulture,
@@ -231,6 +233,17 @@ public sealed class Recorder
     {
         /// <summary>The code</summary>
         public string Code => pending.Code;
+
+        /// <summary>
+        /// Record that the script waits for the code, as a step of its own, then wait for it as
+        /// <see cref="WaitAsync"/> does
+        /// </summary>
+        public async Task<CodeReply> AwaitAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+        {
+            await recorder.CatchUpAsync(cancellationToken);
+            recorder.Capture.Add([new CodeAwaited(recorder.Now, pending.Code)]);
+            return await WaitAsync(timeout, cancellationToken);
+        }
 
         /// <summary>Let emulated time pass until the code has finished, record what it did, and return its reply</summary>
         public async Task<CodeReply> WaitAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
