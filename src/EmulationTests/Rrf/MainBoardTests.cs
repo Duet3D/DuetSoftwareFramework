@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using DuetAPI.ObjectModel;
@@ -41,6 +43,19 @@ public class MainBoardTests
         CodeReply reply = await _bench.SendCodeAsync("M4321");
 
         Assert.That(reply.Severity, Is.EqualTo(MessageType.Warning), reply.ToString());
+    }
+
+    // The TMC5160s are driven over XDMAC, and RepRapFirmware counts a transfer whose completion interrupt does not come as a timeout
+    [Test]
+    public async Task TheMainBoardDriversAnswerWithoutTimeouts()
+    {
+        await _bench.WaitAsync(TimeSpan.FromMilliseconds(500));
+        CodeReply reply = await _bench.SendCodeAsync("M122");
+
+        Match driver = Regex.Match(reply.Text, @"Driver 0: .*?reads (\d+), writes (\d+) timeouts (\d+)");
+        Assert.That(driver.Success, Is.True, reply.Text);
+        Assert.That(int.Parse(driver.Groups[1].Value), Is.GreaterThan(0), "registers are read back from the driver");
+        Assert.That(int.Parse(driver.Groups[3].Value), Is.Zero, "no transfer times out");
     }
 
     [Test]

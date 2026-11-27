@@ -16,6 +16,10 @@
 // counts down the elements left, as on the part. The peripheral is told when such a channel is
 // enabled, so that it can raise the requests it already has (a transmitter with an empty TDR).
 //
+// Enabling a channel starts its microblock at the length last written to CUBC: RepRapFirmware writes
+// the TMC drivers' length once and only moves the addresses for each later transfer, while
+// DuetCANMaster reads CUBC as the bytes still to go.
+//
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -114,11 +118,14 @@ namespace Antmicro.Renode.Peripherals.DMA
                 var channel = channels[index];
                 switch((offset - ChannelBase) % ChannelSize)
                 {
-                    case ChannelInterruptEnable: channel.InterruptMask |= value; break;
-                    case ChannelInterruptDisable: channel.InterruptMask &= ~value; break;
+                    case ChannelInterruptEnable: channel.InterruptMask |= value; UpdateInterrupt(); break;
+                    case ChannelInterruptDisable: channel.InterruptMask &= ~value; UpdateInterrupt(); break;
                     case ChannelSourceAddress: channel.SourceAddress = value; break;
                     case ChannelDestAddress: channel.DestinationAddress = value; break;
-                    case ChannelMicroblockControl: channel.MicroblockLength = value; break;
+                    case ChannelMicroblockControl:
+                        channel.ProgrammedLength = value & MicroblockLengthMask;
+                        channel.MicroblockLength = channel.ProgrammedLength;
+                        break;
                     case ChannelConfiguration: channel.Configuration = value; break;
                     default: break;
                 }
@@ -127,8 +134,8 @@ namespace Antmicro.Renode.Peripherals.DMA
 
             switch(offset)
             {
-                case GlobalInterruptEnable: globalInterruptMask |= value; break;
-                case GlobalInterruptDisable: globalInterruptMask &= ~value; break;
+                case GlobalInterruptEnable: globalInterruptMask |= value; UpdateInterrupt(); break;
+                case GlobalInterruptDisable: globalInterruptMask &= ~value; UpdateInterrupt(); break;
                 case GlobalChannelEnable:
                     for(var i = 0; i < NumChannels; i++)
                     {
@@ -136,6 +143,7 @@ namespace Antmicro.Renode.Peripherals.DMA
                         {
                             continue;
                         }
+                        channels[i].MicroblockLength = channels[i].ProgrammedLength;
                         if(IsPaced(channels[i], out var source))
                         {
                             enabledMask |= 1u << i;
@@ -305,6 +313,7 @@ namespace Antmicro.Renode.Peripherals.DMA
                 SourceAddress = 0;
                 DestinationAddress = 0;
                 MicroblockLength = 0;
+                ProgrammedLength = 0;
                 Configuration = 0;
             }
 
@@ -312,7 +321,10 @@ namespace Antmicro.Renode.Peripherals.DMA
             public uint InterruptStatus;
             public uint SourceAddress;
             public uint DestinationAddress;
+            // The elements left in the microblock, which CUBC reads
             public uint MicroblockLength;
+            // The length last written to CUBC, which each enable starts from
+            public uint ProgrammedLength;
             public uint Configuration;
         }
 
@@ -343,6 +355,7 @@ namespace Antmicro.Renode.Peripherals.DMA
         private const int DestAddressingModeShift = 18;
         private const uint AddressingFixed = 0;
         private const uint InterruptEndOfBlock = 1u << 0;
+        private const uint MicroblockLengthMask = 0xFFFFFF;
         private const uint ConfigurationTypePeripheral = 1u << 0;
         private const int PeripheralIdShift = 24;
     }

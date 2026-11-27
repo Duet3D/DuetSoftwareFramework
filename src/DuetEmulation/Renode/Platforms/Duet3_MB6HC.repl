@@ -103,6 +103,7 @@ hsmci: SD.SAME70_Hsmci @ sysbus 0x40000000
 // DMA. RepRapFirmware moves SD data with XDMAC rather than through HSMCI itself, so the card is
 // unusable without this.
 xdmac: DMA.SAME70_Xdmac @ sysbus 0x40078000
+    0 -> nvic@58
 
 // The SBC's SPI port (SPI1, Config/Pins_Duet3_MB6HC.h), a slave paced by XDMAC (peripheral IDs 3 and 4,
 // CoreN2G's DmaTrigSource), with its chip select on PC25 and the TfrRdy and DataAvailable outputs on
