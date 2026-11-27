@@ -300,7 +300,7 @@ scripts/test.py emulation --stack dsf        # only on DuetControlServer
 
 A run takes several minutes, most of it booting the emulated boards.
 
-`scripts/emulate.py` runs the bench by hand: a scenario file (the boards, `config.g` and the steps, including inputs that change by themselves, such as an endstop that triggers after so many steps) runs on both stacks and is captured, every code, reply, CAN frame, object model change and pin change in emulated time, and the two captures are compared. `scripts/emulate.py serve` keeps a bench booted for an interactive session, a step at a time on both stacks side by side:
+`scripts/emulate.py` runs the bench by hand: a scenario file (the boards, `config.g` and the steps, including inputs that change by themselves, such as an endstop that triggers after so many steps) runs on both stacks and is captured, every code, reply, CAN frame, object model change and pin change in emulated time, and the two captures are compared. `scripts/emulate.py serve` keeps a bench booted for an interactive session, a step at a time on both stacks side by side, driven from its page at `http://127.0.0.1:8770/` or from the command line, and saved as a scenario when it does what it should:
 
 ```bash
 scripts/emulate.py run homing.yaml            # capture a scenario on RepRapFirmware and DSF, and compare them

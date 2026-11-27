@@ -91,13 +91,32 @@ By default the comparison leaves out the periodic CAN messages (TimeSync, the st
 
 ## Sessions
 
-A session boots the boards once and runs steps one at a time, on both stacks side by side, answering each with what it did on each stack and how they differ. It is the way to explore: a boot takes a minute, a step a few seconds.
+A session boots the boards once and runs steps one at a time, on both stacks side by side, answering each with what it did on each stack and how they differ. It is the way to explore: a boot takes a minute, a step a few seconds. The session server serves a page and an API; both drive the same session, and each sees what the other does.
 
 ```bash
-scripts/emulate.py serve &                       # the session server, on localhost:8770
+scripts/emulate.py serve &                       # the session server; its page is http://127.0.0.1:8770/
+```
+
+### The page
+
+Open `http://127.0.0.1:8770/` (VS Code forwards the port out of the devcontainer). With no session it offers a form for one (the stacks, the expansion boards, `config.g` and files on the SD card), the scenario files under `Scenarios` to start from, and the saved runs under `build/emulation` to look at without booting anything.
+
+Once the boards are up, the workspace shows:
+
+- **Boards**: each board's drivers' step counts and the inputs and outputs in use, on each stack. A board's **Inputs and outputs** drawer drives its inputs (a level, a level once a driver has made so many more steps, a thermistor's temperature or an analogue fraction, a pulse train or a tacho that follows its fan) and shows every output. Each control shows the scenario step it sends.
+- **Steps**: every step run so far, from the page or from the CLI, with each stack's reply and how much it recorded, and how many differences it has. A step opens to its differences, to **Compare frame by frame**, to run it again or to copy it as YAML. The box under them sends a code, a code not waited for, an await, a wait, a note or any step as YAML; ↑ recalls earlier codes.
+- **Object model**: each stack's object model side by side, as last recorded. A key the last step changed is marked •, one where the stacks differ ≠, and the paths the comparison leaves out are grey. Any key can be watched, to keep it in view.
+
+**Compare frame by frame** shows one step on both stacks: the replies, the CAN frames and pin changes lined up as the comparison lines them up (a frame one stack did not send is marked, and any frame opens to its decoded fields), the object model paths the step changed with their values before and after, and everything each stack recorded. Its options change what is compared, as `scripts/emulate.py diff` does.
+
+**Save as scenario** writes the session as a scenario that replays it: its boards, `config.g` and files, and the steps ticked. Queries and failed steps start unticked, and a code can be moved to the end of `config.g` instead of being a step. It saves to a path in the repository (asking before it replaces a file) or downloads the file.
+
+### The CLI
+
+```bash
 scripts/emulate.py start --board 1=EXP3HC --board 121=TOOL1RR --config 'M584 X1.0'
                                                  # boot these boards with these lines of config.g
-scripts/emulate.py start session.yaml            # or a scenario's boards and config.g; its steps run at once
+scripts/emulate.py start session.yaml            # or a scenario's boards and config.g; its steps run once booted
 scripts/emulate.py send 'M584 X1.0' 'G1 X10'     # codes, each waited for
 scripts/emulate.py drive 1 io0.in high           # also release, analog, thermistor
 scripts/emulate.py wait 500ms
@@ -106,23 +125,37 @@ scripts/emulate.py om move.axes                  # the object model at a key, on
 scripts/emulate.py capture --text                # everything recorded so far
 scripts/emulate.py differences                   # how the stacks differ so far
 scripts/emulate.py save                          # save the captures and their differences
+scripts/emulate.py export homing.yaml --skip 4   # save the session as a scenario, without step 4
 scripts/emulate.py stop
 ```
 
-A session needs no scenario file: `start` on its own boots both stacks with no expansion boards and an empty `config.g`, and `--board ADDRESS=TYPE` and `--config LINE` (each repeatable), `--stack` and `--name` describe the rest. A scenario file is for what a session needs files or setup steps for. `--json` prints the server's answers as they are. The server's HTTP API takes JSON or YAML and answers JSON:
+A session needs no scenario file: `start` on its own boots both stacks with no expansion boards and an empty `config.g`, and `--board ADDRESS=TYPE` and `--config LINE` (each repeatable), `--stack` and `--name` describe the rest. `--json` prints the server's answers as they are, and `--port` reaches a server on another port.
+
+### The API
+
+The API is under `/api`. It takes JSON or YAML and answers JSON; a refusal is `{"error": ...}` with a status of 400, 404 or 409.
 
 | Request | |
 | --- | --- |
-| `GET /` | The session: its stacks, boards, emulated times and event counts |
-| `POST /session` | Start a session from a scenario, which may be empty; its steps run at once |
-| `DELETE /session` | End it, saving the captures |
-| `POST /steps` | Run a step, or a list of steps, on every stack |
-| `GET /om?key=...` | The object model at a key on every stack |
-| `GET /capture?since=N&format=text` | The events recorded, from the Nth on |
-| `GET /differences` | How the stacks' captures differ so far |
-| `POST /save` | Save the captures and their differences, answering where |
+| `GET /api/session` | What the server is doing (`none`, `booting`, `ready`, `running`, `failed`) and its session |
+| `POST /api/session` | Start a session from a scenario, which may be empty, ending the one there is; its steps run once booted |
+| `DELETE /api/session` | End it, saving the captures |
+| `GET /api/events` | Follow the session as server-sent events: `hello` with everything so far, then `status`, `step`, `capture` (the events from an index on) and `boards` |
+| `GET /api/steps` | The steps run so far |
+| `POST /api/steps` | Run a step, or a list of steps, on every stack, answering with what each did |
+| `GET /api/om?key=...` | The object model at a key on every stack, read between steps |
+| `GET /api/model` | Every stack's whole object model as last recorded, without waiting for a step |
+| `GET /api/capture?since=N&format=text` | The events recorded, from the Nth on |
+| `GET /api/alignment` | The captures lined up step by step and event by event; `periodic=1`, `fields=1`, `pins=0` and `tolerance=S` change what is compared |
+| `GET /api/differences` | How the stacks' captures differ so far |
+| `POST /api/save` | Save the captures and their differences, answering where |
+| `GET /api/boards` | The session's expansion boards with their ports, and what their drivers and outputs have done |
+| `GET /api/board-types` | The expansion boards a session can have |
+| `POST /api/scenario` | The session as a scenario: `steps` to keep and `toConfig` to move to `config.g`, by number; with `path`, saved there (`overwrite` to replace a file) |
+| `GET /api/scenarios` | The scenario files under `Scenarios`; `GET /api/scenarios/file?path=...` reads one |
+| `GET /api/runs` | The saved runs under `build/emulation`; `GET /api/runs/{kind}/{name}` gives one's captures, lined up when it has two |
 
-Sessions' files go in `build/emulation/sessions/<name>`.
+Sessions' files go in `build/emulation/sessions/<name>`. The page's files are in `src/DuetEmulator/wwwroot`, served as they are, so a change shows on reload; `scripts/test.py page` tests the parts that need no browser.
 
 ## Tests
 
